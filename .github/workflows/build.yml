@@ -20,14 +20,12 @@ jobs:
 
       - name: Deploy to DigitalOcean
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} -p ${{ secrets.PORT }} "
-            cd /root/mitchbot  # Change to the directory where your app should live
-          if [ -d "/root/mitchbot/.git" ]; then
-          cd /root/mitchbot && git pull origin main
-          else
-          git clone https://github.com/TheShield2594/mitchbot.git /root/mitchbot && cd /root/mitchbot
-          fi
-
-          npm install
-          pm2 startOrRestart
-          "
+            ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} -p ${{ secrets.PORT }} "
+            if [ -d '/root/mitchbot/.git' ]; then
+              cd /root/mitchbot && git pull origin main;
+            else
+              git clone git@github.com:TheShield2594/mitchbot.git /root/mitchbot && cd /root/mitchbot;
+            fi;
+            npm install;
+            pm2 startOrRestart ecosystem.config.js; # or your specific start script
+            "
