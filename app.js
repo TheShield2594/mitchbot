@@ -85,20 +85,19 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
   const randomNumber = (message.createdTimestamp % 9) + 1;
+	console.log(randomNumber);
 
   if (randomNumber === 5) {
     if (
       message.author.id === "475256575926206474" &&
-      message.channelId === "1032494913885065276" &&
-      message.createdTimestamp.endsWith(getRandomNumber())
+      message.channelId === "1032494913885065276"
     ) {
       message.reply("Shutup you stupid skank.");
     }
 
     if (
       message.author.id === "495321423045328906" &&
-      message.channelId === "1032494913885065276" &&
-      message.createdTimestamp.endsWith(getRandomNumber())
+      message.channelId === "1032494913885065276"
     ) {
       message.reply("Thank you for your message.");
     }
