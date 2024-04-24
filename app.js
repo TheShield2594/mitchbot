@@ -85,7 +85,7 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
   const randomNumber = (message.createdTimestamp % 9) + 1;
-	console.log(randomNumber);
+  console.log(randomNumber);
 
   if (randomNumber === 5) {
     if (
