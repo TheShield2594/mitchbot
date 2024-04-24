@@ -34,6 +34,7 @@ for (const folder of commandFolders) {
 deployCommands();
 
 
+
 client.once(Events.ClientReady, c => {
 	console.log(`Ready! Logged in as ${c.user.tag}`);
 });
@@ -58,6 +59,11 @@ client.on(Events.InteractionCreate, async interaction => {
 			await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
 		}
 	}
+});
+
+client.on('messageCreate', async (message) => {
+	console.log(message);
+    if (message.author.bot) return;
 });
 
 client.login(BOT_TOKEN);
