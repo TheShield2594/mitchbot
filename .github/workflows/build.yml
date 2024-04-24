@@ -21,7 +21,7 @@ jobs:
     - name: Deploy to DigitalOcean
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} -p ${{ secrets.PORT }} "
-          cd /path/to/your/project  # Change to the directory where your app should live
+          cd ~/mitchbot  # Change to the directory where your app should live
           git pull origin main  # Pull the latest code
           npm install  # Install dependencies
           pm2 restart all  # Restart the app using PM2
