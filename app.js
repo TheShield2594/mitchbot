@@ -62,7 +62,10 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 client.on('messageCreate', async (message) => {
-	console.log(message);
+	if (message.author.globalName === 'stiffsock6699') {
+		console.log(message.author.id);
+		console.log(message.content);
+	}
     if (message.author.bot) return;
 });
 
