@@ -24,7 +24,7 @@ jobs:
             if [ -d '/root/mitchbot/.git' ]; then
               cd /root/mitchbot && git pull origin main;
             else
-              git clone https://github.com/TheShield2594/mitchbot.git /root/mitchbot && cd /root/mitchbot;
+              git clone git@github.com:TheShield2594/mitchbot.git /root/mitchbot && cd /root/mitchbot;
             fi;
             npm install;
             pm2 startOrRestart ecosystem.config.js; # or your specific start script
