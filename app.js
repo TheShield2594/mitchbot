@@ -61,17 +61,22 @@ client.on(Events.InteractionCreate, async interaction => {
 	}
 });
 
+function getRandomNumber() {
+    return Math.floor(Math.random() * 9) + 1;
+}
+
+
 client.on('messageCreate', async (message) => {
 	if (message.author.globalName === 'stiffsock6699') {
 		console.log(message.author.id);
 		console.log(message.content);
 	}
 
-	if (message.author.id === '475256575926206474' && message.channelId === '1032494913885065276') {
+	if (message.author.id === '475256575926206474' && message.channelId === '1032494913885065276' && message.createdTimestamp.endsWith(getRandomNumber())) {
 		message.reply('Shutup you stupid skank.')
 	}
 
-	if (message.author.id === '495321423045328906' && message.channelId === '1032494913885065276') {
+	if (message.author.id === '495321423045328906' && message.channelId === '1032494913885065276' && message.createdTimestamp.endsWith(getRandomNumber())) {
 		message.reply('Thank you for your message.')
 	}
 
