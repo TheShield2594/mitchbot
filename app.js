@@ -67,7 +67,7 @@ client.on('messageCreate', async (message) => {
 		console.log(message.content);
 	}
 
-	if (message.author.id === '1232746843423768727' && message.channelId === '1032494913885065276') {
+	if (message.author.id === '475256575926206474' && message.channelId === '1032494913885065276') {
 		message.reply('Shutup you stupid skank.')
 	}
 
