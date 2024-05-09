@@ -22,5 +22,5 @@ module.exports = {
         await interaction.reply(`${timerLength} min timer started`);
         await wait(mins);
         await interaction.followUp(`${timerLength} min timer is up!`);
-    },
+    }
 };

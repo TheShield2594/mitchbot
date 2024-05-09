@@ -4,9 +4,7 @@ const { SlashCommandBuilder } = require("discord.js");
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("dadjoke")
-        .setDescription(
-            "I'm hungry. Hello Hungry I'm dad."
-        ),
+        .setDescription("I'm hungry. Hello Hungry I'm dad."),
       
     async execute(interaction) {
         const dadJokeURL = await request("https://icanhazdadjoke.com", {headers: {Accept: "application/json"}});

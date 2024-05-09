@@ -6,18 +6,17 @@ module.exports = {
         .setName("praise")
         .setDescription("Hey you're pretty cool.")
         .addUserOption((option) =>
-            option.setName("user").setDescription("Let's be nice to people.")
-        ),
+            option.setName("user").setDescription("Let's be nice to people.")),
     async execute(interaction) {
-        const complimentURL = await request(`https://www.generatormix.com/random-compliment-generator`);
-        const { compliment } = await complimentURL.body.json();
+        const complimentURL = await request("https://complimentr.com/api/");
+        const { compliments } = await complimentURL.body.json();
 
         await interaction.deferReply();
         const message = await interaction.editReply(
             `${
                 interaction.options.getUser("user") ?? interaction.user
-            } ${compliment}`
+            } ${compliments[Math.floor(Math.random() * compliments.length)]}`
         );
         message.react("🙏");
-    },
+    }
 };
