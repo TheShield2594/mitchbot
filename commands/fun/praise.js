@@ -6,10 +6,10 @@ module.exports = {
         .setName("praise")
         .setDescription("Hey you're pretty cool.")
         .addUserOption((option) =>
-            option.setName("user").setDescription("Let's be nice to people")
+            option.setName("user").setDescription("Let's be nice to people.")
         ),
     async execute(interaction) {
-        const complimentURL = await request(`http://127.0.0.1:5000/`);
+        const complimentURL = await request(`https://www.generatormix.com/random-compliment-generator`);
         const { compliment } = await complimentURL.body.json();
 
         await interaction.deferReply();
@@ -19,11 +19,5 @@ module.exports = {
             } ${compliment}`
         );
         message.react("🙏");
-        /*
-        	if (commandName === 'react') {
-		const message = await interaction.reply({ content: 'You can react with Unicode emojis!', fetchReply: true });
-		message.react('😄');
-	}
-        */
     },
 };
