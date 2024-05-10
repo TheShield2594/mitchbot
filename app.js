@@ -64,6 +64,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   try {
+    console.log('hit app')
     await command.execute(interaction);
   } catch (error) {
     console.error(error);
