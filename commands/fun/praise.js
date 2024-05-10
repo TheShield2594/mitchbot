@@ -2,7 +2,7 @@
 const { request } = require(`undici`);
 
 
-const { SlashCommandBuilder } = require(`discord.js`);
+const { SlashCommandBuilder, PermissionsBitField, Component } = require(`discord.js`);
 
 // Extract the generate_random_compliment function to a separate file or outside the execute function
 async function generate_random_compliment() {
@@ -46,7 +46,6 @@ module.exports = {
         .addUserOption((option) =>
             option.setName(`user`).setDescription(`Let's be nice to people`)),
     async execute(interaction) {
-        console.log('hit 1');
         if (!interaction.inGuild()) {
             await interaction.reply({
                 content: "This command can only be used in a server.",
@@ -55,30 +54,24 @@ module.exports = {
             return;
         }
 
-        console.log('hit 2');
-        if (!interaction.memberPermissions.has("MANAGE_MESSAGES")) {
+        if (!interaction.memberPermissions.has(PermissionsBitField.Flags.ManageMessages)) {
             await interaction.reply({
                 content: "You don't have permission to use this command.",
                 ephemeral: true
             });
             return;
         }
-        console.log('hit 3');
 
         try {
-            console.log('hit 4');
             await interaction.deferReply();
-            const mentionedUser = interaction.options.getUser("user") ?? interaction.user;
             const compliment = generate_random_compliment();
-            const message = await interaction.editReply(`${mentionedUser} ${compliment}`);
-            message.react("🙏");
+            const mentionedUser = interaction.options.getUser("user") ?? interaction.user;
+            await interaction.editReply(`${mentionedUser} ${compliment}`);
         } catch (error) {
-            console.log('hit 5');
-            console.error(`Error executing command:`, error);
-            await interaction.reply({
-                content: "An error occurred while executing the command.",
-                ephemeral: true
-            });
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: "Failed to process your command, please try again.", ephemeral: true });
+            }
         }
+        
     }
 };
