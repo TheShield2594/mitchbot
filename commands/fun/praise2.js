@@ -1,7 +1,4 @@
-
 const { request } = require(`undici`);
-
-
 const { SlashCommandBuilder } = require(`discord.js`);
 
 // Extract the generate_random_compliment function to a separate file or outside the execute function
