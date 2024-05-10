@@ -64,7 +64,7 @@ module.exports = {
 
         try {
             await interaction.deferReply();
-            const compliment = generate_random_compliment();
+            const compliment = await generate_random_compliment();
             const mentionedUser = interaction.options.getUser("user") ?? interaction.user;
             await interaction.editReply(`${mentionedUser} ${compliment}`);
         } catch (error) {
