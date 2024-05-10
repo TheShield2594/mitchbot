@@ -53,6 +53,7 @@ module.exports = {
         }
 
         console.log('hit 2');
+        console.log(interaction.memberPermissions);
         if (!interaction.memberPermissions.has("MANAGE_MESSAGES")) {
             await interaction.reply({
                 content: "You don't have permission to use this command.",
