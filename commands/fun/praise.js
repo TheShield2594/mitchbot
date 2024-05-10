@@ -43,6 +43,7 @@ module.exports = {
         .addUserOption((option) =>
             option.setName(`user`).setDescription(`Let's be nice to people`)),
     async execute(interaction) {
+        console.log('hit 1');
         if (!interaction.inGuild()) {
             await interaction.reply({
                 content: "This command can only be used in a server.",
@@ -51,6 +52,7 @@ module.exports = {
             return;
         }
 
+        console.log('hit 2');
         if (!interaction.memberPermissions.has("MANAGE_MESSAGES")) {
             await interaction.reply({
                 content: "You don't have permission to use this command.",
@@ -58,14 +60,17 @@ module.exports = {
             });
             return;
         }
+        console.log('hit 3');
 
         try {
+            console.log('hit 4');
             await interaction.deferReply();
             const mentionedUser = interaction.options.getUser("user") ?? interaction.user;
             const compliment = generate_random_compliment();
             const message = await interaction.editReply(`${mentionedUser} ${compliment}`);
             message.react("🙏");
         } catch (error) {
+            console.log('hit 5');
             console.error(`Error executing command:`, error);
             await interaction.reply({
                 content: "An error occurred while executing the command.",
