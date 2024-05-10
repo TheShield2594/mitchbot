@@ -54,7 +54,6 @@ client.once(Events.ClientReady, (c) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  console.log(interaction);
   if (!interaction.isChatInputCommand()) return;
 
   const command = interaction.client.commands.get(interaction.commandName);
@@ -65,7 +64,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   try {
-    console.log('hit app')
     await command.execute(interaction);
   } catch (error) {
     console.error(error);
