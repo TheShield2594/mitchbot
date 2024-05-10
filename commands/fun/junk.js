@@ -38,7 +38,7 @@ async function generate_random_compliment() {
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName(`praise`)
+        .setName(`junk`)
         .setDescription(`Hey you're pretty cool.`)
         .addUserOption((option) =>
             option.setName(`user`).setDescription(`Let's be nice to people`)),
