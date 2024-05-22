@@ -17,7 +17,7 @@ module.exports = {
         const catURL = await request(
             `https://cataas.com/cat/cute/says/${msg}`
         );
-        const { cat } = await mooURL.body.json();
+        const { cat } = await catURL.body.json();
         await interaction.deferReply();
         await interaction.editReply("```" + cat + "```");
     },
