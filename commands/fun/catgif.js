@@ -3,13 +3,18 @@ const { SlashCommandBuilder } = require("discord.js");
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName("cat gift")
+        .setName("cat git")
         .setDescription("Here is a random cat."),
-    
+
     async execute(interaction) {
         try {
-            const randomCatURL = await request("https://cataas.com/cat/gif"); {Headers: {Accept: "application/json"}};
-            const {cat} = await randomCatURL.body.json();
+            const options = {
+                headers: {
+                    Accept: "application/json"
+                }
+            };
+            const randomCatURL = await request("https://cataas.com/cat/gif", options);
+            const { cat } = await randomCatURL.body.json();
             if (cat) {
                 await interaction.reply(`${cat}`);
             } else {

@@ -5,10 +5,14 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName("fact")
         .setDescription("Here is a random fact."),
-    
+
     async execute(interaction) {
         try {
-            const randomFactURL = await request("https://uselessfacts.jsph.pl/random.json?language=en"); {Headers: {Accept: "application/json"}};
+            const randomFactURL = await request("https://uselessfacts.jsph.pl/random.json?language=en", {
+                headers: {
+                    Accept: "application/json"
+                }
+            });
             const { fact } = await randomFactURL.body.json();
             if (fact) {
                 await interaction.reply(`${fact}`);
