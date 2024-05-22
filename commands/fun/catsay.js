@@ -11,14 +11,12 @@ module.exports = {
     async execute(interaction) {
         const catsayText =
             interaction.options.getString("catsay") ?? "Meow Meow Meow Meow!";
-        splitMessage = catsayText.split(" ");
-        joinedMessage = splitMessage.join("+");
+        const splitMessage = catsayText.split(" ");
+        const joinedMessage = splitMessage.join("+");
 
-        const catURL = await request(
-            `https://cataas.com/cat/cute/says/${msg}`
-        );
+        const catURL = await request(`https://cataas.com/cat/cute/says/${joinedMessage}`);
         const { cat } = await catURL.body.json();
         await interaction.deferReply();
-        await interaction.editReply("```" + cat + "```");
+        await interaction.editReply(`\`\`${cat}\`\``);
     },
 };
