@@ -8,9 +8,9 @@ module.exports = {
     async execute(interaction) {
         try {
             const res = await axios.get('https://cataas.com/cat/gif');
-            if (res.data.memes && res.data.memes.length > 0) {
-                const randomIndex = Math.floor(Math.random() * res.data.memes.length);
-                const randomGif = res.data.memes[randomIndex].url;
+            if (res.data.cats && res.cats.memes.length > 0) {
+                const randomIndex = Math.floor(Math.random() * res.data.cats.length);
+                const randomGif = res.data.cats[randomIndex].url;
                 await interaction.reply(randomGif);
             } else {
                 await interaction.reply("No gif found :(");
