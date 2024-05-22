@@ -1,23 +1,23 @@
-const axios = require('axios');
-const { SlashCommandBuilder } = require('discord.js');
+const { request } = require("undici");
+const { SlashCommandBuilder } = require("discord.js");
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('cat-gif')
-        .setDescription('Sends a random cat gif'),
+        .setName("cat gift")
+        .setDescription("Here is a random cat."),
+    
     async execute(interaction) {
         try {
-            const res = await axios.get('https://cataas.com/cat/gif');
-            if (res.data.cats && res.cats.memes.length > 0) {
-                const randomIndex = Math.floor(Math.random() * res.data.cats.length);
-                const randomGif = res.data.cats[randomIndex].url;
-                await interaction.reply(randomGif);
+            const randomCatURL = await request("https://cataas.com/cat/gif"); {Headers: {Accept: "application/json"}};
+            const {cat} = await randomCatURL.body.json();
+            if (cat) {
+                await interaction.reply(`${cat}`);
             } else {
-                await interaction.reply("No gif found :(");
+                await interaction.reply("No cat found :(");
             }
-        } catch (err) {
-            console.error('Error fetching gif:', err);
-            await interaction.reply("Failed to fetch a gif. Please try again later.");
+        } catch (error) {
+            console.error(error);
+            await interaction.reply("An error occurred while fetching the cool cat. Please try again later.");
         }
-    },
+    }
 };
