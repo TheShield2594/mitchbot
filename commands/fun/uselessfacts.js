@@ -1,18 +1,22 @@
-const axios = require('axios');
-const { SlashCommandBuilder } = require('discord.js');
-
+const { request } = require("undici");
+const { SlashCommandBuilder } = require("discord.js");
 
 module.exports = {
-	data: new SlashCommandBuilder()
-		.setName('fact')
-		.setDescription('Sends todays random fact'),
-	async execute(interaction) {
-        const res = await axios.get('uselessfacts.com/api/v2/facts/today/random?language=en');
-        if (res.data.fact[0].url){
-            interaction.reply(res.data.fact[0].url);
+    data: new SlashCommandBuilder()
+        .setName("fact")
+        .setDescription("Here is a random fact."),
+    async execute(interaction) {
+        try {
+            const response = await request("https://uselessfacts.jsph.pl/random.json?language=en");
+            const { fact } = await response.body.json();
+            if (fact) {
+                await interaction.reply(`${fact}`);
+            } else {
+                await interaction.reply("No fact found :(");
+            }
+        } catch (error) {
+            console.error(error);
+            await interaction.reply("An error occurred while fetching the fact. Please try again later.");
         }
-        else{
-            interaction.reply("No fact found :(");
-        }
-	},
+    }
 };
