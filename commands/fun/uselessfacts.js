@@ -8,7 +8,7 @@ module.exports = {
     
     async execute(interaction) {
         try {
-            const randomFactURL = await request("https://uselessfacts.jsph.pl/random.json?language=en");
+            const randomFactURL = await request("https://uselessfacts.jsph.pl/random.json?language=en"); {Headers: {Accept: "application/json"}};
             const { fact } = await randomFactURL.body.json();
             if (fact) {
                 await interaction.reply(`${fact}`);
