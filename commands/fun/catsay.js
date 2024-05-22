@@ -4,19 +4,28 @@ const { SlashCommandBuilder } = require("discord.js");
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("meow")
-        .setDescription("Meow Meow Meow Meow!")
-        .addStringOption((option) =>
-            option.setName("catsay").setDescription("The text for catsay")
+        .setDescription("meow meow meow meow meow meow meow")
+        .addUserOption((option) =>
+            option.setName("user").setDescription("Pspspspspspspspspspsps")
         ),
     async execute(interaction) {
-        const catsayText =
-            interaction.options.getString("catsay") ?? "Meow Meow Meow Meow!";
-        const splitMessage = catsayText.split(" ");
-        const joinedMessage = splitMessage.join("+");
+       
+        try {
+            const response = await fetch('https://cataas.com/cat/gif');
+            const data = await response.json();
+            const { insult } = data;
 
-        const catURL = await request(`https://cataas.com/cat/cute/says/${joinedMessage}&format=gif`);
-        const { cat } = await catURL.body.json();
-        await interaction.deferReply();
-        await interaction.editReply(`\`\`${cat}\`\``);
-    }
+            await interaction.deferReply();
+            const message = await interaction.editReply(
+                `${
+                    interaction.options.getUser("user") ?? interaction.user
+                } ${insult}`
+            );
+            message.react("🔥");
+        } catch (err) {
+            console.log('error: ', err);
+            await interaction.reply("Failed to fetch an image. Please try again later bitch.");
+            return;
+        }
+    },
 };
