@@ -14,9 +14,9 @@ module.exports = {
         const splitMessage = catsayText.split(" ");
         const joinedMessage = splitMessage.join("+");
 
-        const catURL = await request(`https://cataas.com/cat/cute/says/I love you`);
+        const catURL = await request(`https://cataas.com/cat/cute/says/${joinedMessage}`);
         const { cat } = await catURL.body.json();
         await interaction.deferReply();
         await interaction.editReply(`\`\`${cat}\`\``);
-    },
+    }
 };
