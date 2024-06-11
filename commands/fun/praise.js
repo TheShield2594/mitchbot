@@ -1,5 +1,4 @@
-const { request } = require(`undici`);
-const { SlashCommandBuilder, PermissionsBitField } = require(`discord.js`);
+const { SlashCommandBuilder } = require(`discord.js`);
 
 // Extract the generate_random_compliment function to a separate file or outside the execute function
 async function generate_random_compliment() {
