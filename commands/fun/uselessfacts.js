@@ -1,6 +1,11 @@
 const { request } = require("undici");
 const { SlashCommandBuilder } = require("discord.js");
 
+async function get(url, options) {
+    const response = await request(url, options);
+    return response;
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("fact")
@@ -8,11 +13,12 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            const randomFactURL = await request("https://uselessfacts.jsph.pl/random.json?language=en", {
+            const randomFactURL = await get("https://uselessfacts.jsph.pl/random.json?language=en", {
                 headers: {
                     Accept: "application/json"
                 }
             });
+
             const { fact } = await randomFactURL.body.json();
             if (fact) {
                 await interaction.reply(`${fact}`);
