@@ -1,9 +1,11 @@
 const { request } = require("undici");
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder } = require("@discordjs/builders");
+const { CommandInteraction } = require("discord.js");
 
 async function get(url, options) {
-    const response = await request(url, options);
-    return response;
+    const { body } = await request(url, options);
+    const json = await body.json();
+    return json;
 }
 
 module.exports = {
@@ -11,15 +13,19 @@ module.exports = {
         .setName("fact")
         .setDescription("Here is a random fact."),
 
+    /**
+     * 
+     * @param {CommandInteraction} interaction 
+     */
     async execute(interaction) {
         try {
-            const randomFactURL = await get("https://uselessfacts.jsph.pl/random.json?language=en", {
+            const randomFactURL = "https://uselessfacts.jsph.pl/random.json?language=en";
+            const { fact } = await get(randomFactURL, {
                 headers: {
                     Accept: "application/json"
                 }
             });
 
-            const { fact } = await randomFactURL.body.json();
             if (fact) {
                 await interaction.reply(`${fact}`);
             } else {
