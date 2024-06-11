@@ -18,8 +18,10 @@ module.exports = {
                     Accept: "application/json"
                 }
             });
+            console.log(response);
 
             const data = await response.body.json(); //correctly parse the JSON from the response
+            console.log(data);
             const {text: fact } = data; //extract the fact from the parsed data
             if (fact) {
                 await interaction.reply(`${fact}`);
