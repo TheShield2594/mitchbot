@@ -1,7 +1,7 @@
 const { request } = require("undici");
 const { SlashCommandBuilder } = require("discord.js");
 
-async function fetch(url, options) {
+async function fetchData(url, options) {
     const response = await fetch(url, options);
     return response;
 }
@@ -13,13 +13,14 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            const randomFactURL = await fetch("https://uselessfacts.jsph.pl/random.json?language=en", {
+            const response = await fetchData("https://uselessfacts.jsph.pl/random.json?language=en", {
                 headers: {
                     Accept: "application/json"
                 }
             });
 
-            const { fact } = await randomFactURL.body.json();
+            const data = await response.body.json(); //correctly parse the JSON from the response
+            const {text: fact } = data; //extract the fact from the parsed data
             if (fact) {
                 await interaction.reply(`${fact}`);
             } else {
