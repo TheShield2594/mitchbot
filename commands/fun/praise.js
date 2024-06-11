@@ -35,14 +35,6 @@ module.exports = {
             return;
         }
 
-        if (!interaction.memberPermissions.has(PermissionsBitField.Flags.ManageMessages)) {
-            await interaction.reply({
-                content: "You don't have permission to use this command.",
-                ephemeral: true
-            });
-            return;
-        }
-
         try {
             await interaction.deferReply();
             const compliment = await generate_random_compliment();
