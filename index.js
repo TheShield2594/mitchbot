@@ -11,7 +11,8 @@ const client = new Client({
     ]
 });
 
-const TOKEN = 'CLIENT_TOKEN';
+const TOKEN = 'MTIyNzQyOTc5MjkxMjExNzg3MQ.Gwzovm.fm9W7qw_htbItX6clD06LgS6IXIALSapKGyL9k';
+const CHANNEL_ID = '903737939467587635'; // Add the ID of the channel where you want to send birthday messages
 
 // Load birthdays from a JSON file
 function loadBirthdays() {
@@ -74,14 +75,16 @@ client.on('messageCreate', async message => {
     }
 });
 
-function checkBirthdays() {
+async function checkBirthdays() {
     const today = new Date().toISOString().slice(5, 10); // MM-DD
+
+    const channel = await client.channels.fetch(CHANNEL_ID);
 
     for (const userId in birthdays) {
         if (birthdays[userId] === today) {
-            const user = client.users.cache.get(userId);
-            if (user) {
-                user.send(`Happy Birthday, ${user.username}! 🎉`);
+            const user = await client.users.fetch(userId);
+            if (user && channel) {
+                channel.send(`Happy Birthday, ${user.username}! 🎉`);
             }
         }
     }
