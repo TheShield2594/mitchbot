@@ -1,103 +1,90 @@
-const Discord = require("discord.js")
-const { Client, GatewayIntentBits, Partials } = require("discord.js");
-const client = new Client({
-  partials: [
-    Partials.Message, // for message
-    Partials.Channel, // for text channel
-    Partials.GuildMember, // for guild member
-    Partials.Reaction, // for message reaction
-  ],
-  intents: [
-    GatewayIntentBits.Guilds, // for guild related things
-    GatewayIntentBits.GuildInvites, // for guild invite managing
-    GatewayIntentBits.GuildMessages, // for guild messages things
-    GatewayIntentBits.GuildMessageReactions, // for message reactions things
-    GatewayIntentBits.MessageContent, // enable if you need message content things
-  ],
-});
-const fs = require("fs");
-const config = require("./config.json");
-client.config = config;
+const { Client, GatewayIntentBits, Intents } = require('discord.js');
+const fs = require('fs');
+const schedule = require('node-schedule');
 
-// Initialise discord giveaways
-const { GiveawaysManager } = require("discord-giveaways");
-client.giveawaysManager = new GiveawaysManager(client, {
-  storage: "./storage/giveaways.json",
-  default: {
-    botsCanWin: false,
-    embedColor: "#2F3136",
-    reaction: "🎉",
-    lastChance: {
-      enabled: true,
-      content: `🛑 **Last chance to enter** 🛑`,
-      threshold: 5000,
-      embedColor: '#FF0000'
+const client = new Client({ 
+    intents: [
+        GatewayIntentBits.Guilds, 
+        GatewayIntentBits.GuildMessages, 
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers
+    ]
+});
+
+const TOKEN = 'CLIENT_TOKEN';
+
+// Load birthdays from a JSON file
+function loadBirthdays() {
+    try {
+        const data = fs.readFileSync('birthdays.json', 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        console.error(err);
+        return {};
     }
-  }
-});
-//Coded by ZeroSync on yt
+}
 
-/* Load all events (discord based) */
+// Save birthdays to a JSON file
+function saveBirthdays(birthdays) {
+    try {
+        fs.writeFileSync('birthdays.json', JSON.stringify(birthdays, null, 4));
+    } catch (err) {
+        console.error(err);
+    }
+}
 
+let birthdays = loadBirthdays();
 
-fs.readdir("./events/discord", (_err, files) => {
-  files.forEach(file => {
-    if (!file.endsWith(".js")) return;
-    const event = require(`./events/discord/${file}`);
-    let eventName = file.split(".")[0];
-    console.log(`[Event]   ✅  Loaded: ${eventName}`);
-    client.on(eventName, event.bind(null, client));
-    delete require.cache[require.resolve(`./events/discord/${file}`)];
-  });
-});
+client.once('ready', () => {
+    console.log(`Logged in as ${client.user.tag}`);
 
-/* Load all events (giveaways based) */
-
-
-fs.readdir("./events/giveaways", (_err, files) => {
-  files.forEach((file) => {
-    if (!file.endsWith(".js")) return;
-    const event = require(`./events/giveaways/${file}`);
-    let eventName = file.split(".")[0];
-    console.log(`[Event]   🎉 Loaded: ${eventName}`);
-    client.giveawaysManager.on(eventName, (...file) => event.execute(...file, client)), delete require.cache[require.resolve(`./events/giveaways/${file}`)];
-  })
-})
-
-// Let commands be a new collection ( message commands )
-client.commands = new Discord.Collection();
-/* Load all commands */
-fs.readdir("./commands/", (_err, files) => {
-  files.forEach(file => {
-    if (!file.endsWith(".js")) return;
-    let props = require(`./commands/${file}`);
-    let commandName = file.split(".")[0];
-    client.commands.set(commandName, {
-      name: commandName,
-      ...props
-    });
-    console.log(`[Command] ✅  Loaded: ${commandName}`);
-  });
+    // Schedule daily birthday check at midnight
+    schedule.scheduleJob('0 0 * * *', checkBirthdays);
 });
 
-// let interactions be a new collection ( slash commands  )
-client.interactions = new Discord.Collection();
-// creating an empty array for registering slash commands
-client.register_arr = []
-/* Load all slash commands */
-fs.readdir("./slash/", (_err, files) => {
-  files.forEach(file => {
-    if (!file.endsWith(".js")) return;
-    let props = require(`./slash/${file}`);
-    let commandName = file.split(".")[0];
-    client.interactions.set(commandName, {
-      name: commandName,
-      ...props
-    });
-    client.register_arr.push(props)
-  });
+client.on('messageCreate', async message => {
+    if (!message.content.startsWith('!')) return;
+
+    const args = message.content.slice(1).split(' ');
+    const command = args.shift().toLowerCase();
+
+    if (command === 'add_birthday') {
+        const user = message.mentions.users.first();
+        const date = args[1];
+
+        if (!user || !date || !/^\d{2}-\d{2}$/.test(date)) {
+            return message.channel.send('Usage: !add_birthday @user MM-DD');
+        }
+
+        birthdays[user.id] = date;
+        saveBirthdays(birthdays);
+        message.channel.send(`Added birthday for ${user.username} on ${date}`);
+    }
+
+    if (command === 'remove_birthday') {
+        const user = message.mentions.users.first();
+
+        if (!user || !birthdays[user.id]) {
+            return message.channel.send('Usage: !remove_birthday @user');
+        }
+
+        delete birthdays[user.id];
+        saveBirthdays(birthdays);
+        message.channel.send(`Removed birthday for ${user.username}`);
+    }
 });
 
+function checkBirthdays() {
+    const today = new Date().toISOString().slice(5, 10); // MM-DD
 
-// Login through the client
-client.login(config.token);
+    for (const userId in birthdays) {
+        if (birthdays[userId] === today) {
+            const user = client.users.cache.get(userId);
+            if (user) {
+                user.send(`Happy Birthday, ${user.username}! 🎉`);
+            }
+        }
+    }
+}
+
+client.login(TOKEN);
