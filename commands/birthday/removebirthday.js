@@ -3,9 +3,9 @@ const { Routes } = require('discord-api-types/v9');
 const { Client, GatewayIntentBits } = require('discord.js');
 const { SlashCommandBuilder } = require('discord.js');
 
-const TOKEN = 'CLIENT_TOKEN';
-const CLIENT_ID = 'CLIENT_ID'; // Your bot's client ID
-const GUILD_ID = '641450750639341569'; // The server ID where you want to deploy the commands
+const TOKEN = process.env.CLIENT_TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID
+const GUILD_ID = process.env.GUILD_ID;
 
 const commands = [
     new SlashCommandBuilder()
