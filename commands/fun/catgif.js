@@ -1,18 +1,27 @@
-const axios = require('axios');
 const { SlashCommandBuilder } = require('discord.js');
-
+const fetch = require("node-fetch");
 
 module.exports = {
-	data: new SlashCommandBuilder()
-		.setName('cat')
-		.setDescription('Sends a random cat'),
-	async execute(interaction) {
-        const res = await axios.get('https://cataas.com/cat?position=center');
-        if (res.data.memes[0].url){
-            interaction.reply(res.data.cat[0].url);
+    data: new SlashCommandBuilder()
+        .setName('cat')
+        .setDescription('Get a random cat image!'),
+
+    async execute(client, interaction) {
+        try {
+            const res = await fetch(`https://some-random-api.com/img/cat`);
+            const json = await res.json();
+
+            client.embed({
+                title: `🐱・Random Cat`,
+                image: json.link,
+                type: 'editreply'
+            }, interaction);
+        } catch (error) {
+            console.error('Error fetching cat image:', error);
+            interaction.reply({
+                content: 'Sorry, something went wrong fetching the cat image!',
+                ephemeral: true
+            });
         }
-        else{
-            interaction.reply("No cat found :(");
-        }
-	},
-};
+    }
+}
