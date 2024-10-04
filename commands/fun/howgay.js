@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, MessageEmbed } = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -8,9 +8,9 @@ module.exports = {
   async execute(interaction) {
     const result = Math.ceil(Math.random() * 100);
 
-    const embed = new MessageEmbed();
-    embed.setDescription = `You are ${result}% gay!`;
-    embed.setTitle = `🏳️‍🌈・Gay rate`;
+    const embed = new EmbedBuilder()
+      .setTitle(`🏳️‍🌈・Gay rate`)
+      .setDescription(`You are ${result}% gay!`);
 
     await interaction.reply({ embeds: [embed] });
   },
