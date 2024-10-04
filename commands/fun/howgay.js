@@ -1,19 +1,17 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageEmbed } = require("discord.js");
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('gayrate')
-        .setDescription('Calculate your gay rate!'),
+  data: new SlashCommandBuilder()
+    .setName("gayrate")
+    .setDescription("Calculate your gay rate!"),
 
-    async execute(client, interaction) {
-        const result = Math.ceil(Math.random() * 100);
+  async execute(interaction) {
+    const result = Math.ceil(Math.random() * 100);
 
-        const embed = {
-            title: `🏳️‍🌈・Gay rate`,
-            desc: `You are ${result}% gay!`,
-            type: 'editreply'
-        }
+    const embed = new MessageEmbed();
+    embed.setDescription = `You are ${result}% gay!`;
+    embed.setTitle = `🏳️‍🌈・Gay rate`;
 
-        await interaction.reply({ embeds: [embed]});
-    }
-}
+    await interaction.reply({ embeds: [embed] });
+  },
+};
