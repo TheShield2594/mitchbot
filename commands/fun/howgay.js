@@ -6,12 +6,14 @@ module.exports = {
         .setDescription('Calculate your gay rate!'),
 
     async execute(client, interaction) {
-        var result = Math.ceil(Math.random() * 100);
+        const result = Math.ceil(Math.random() * 100);
 
-        client.embed({
+        const embed = {
             title: `🏳️‍🌈・Gay rate`,
             desc: `You are ${result}% gay!`,
             type: 'editreply'
-        }, interaction);
+        }
+
+        await interaction.reply({ embeds: [embed]});
     }
 }
