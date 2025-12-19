@@ -1,35 +1,31 @@
-const { REST } = require('@discordjs/rest');
-const { Routes } = require('discord-api-types/v9');
-const { Client, GatewayIntentBits } = require('discord.js');
 const { SlashCommandBuilder } = require('discord.js');
+const { getBirthdays, removeBirthday } = require('../../utils/birthdays');
 
-const TOKEN = process.env.CLIENT_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID
-const GUILD_ID = process.env.GUILD_ID;
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('remove_birthday')
+    .setDescription('Remove a birthday reminder')
+    .addUserOption((option) =>
+      option
+        .setName('user')
+        .setDescription('The user to remove a birthday for')
+        .setRequired(true)
+    ),
+  async execute(interaction) {
+    const user = interaction.options.getUser('user');
 
-const commands = [
-    new SlashCommandBuilder()
-        .setName('remove_birthday')
-        .setDescription('Remove a birthday reminder')
-        .addUserOption(option => 
-            option.setName('user')
-                .setDescription('The user to remove a birthday for')
-                .setRequired(true))
-].map(command => command.toJSON());
-
-const rest = new REST({ version: '9' }).setToken(TOKEN);
-
-(async () => {
-    try {
-        console.log('Started refreshing application (/) commands.');
-
-        await rest.put(
-            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-            { body: commands }
-        );
-
-        console.log('Successfully reloaded application (/) commands.');
-    } catch (error) {
-        console.error(error);
+    if (!user || !getBirthdays()[user.id]) {
+      await interaction.reply({
+        content: 'Usage: /remove_birthday @user',
+        ephemeral: true,
+      });
+      return;
     }
-})();
+
+    removeBirthday(user.id);
+    await interaction.reply({
+      content: `Removed birthday for ${user.username}`,
+      ephemeral: true,
+    });
+  },
+};

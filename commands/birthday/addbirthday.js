@@ -1,40 +1,38 @@
-const { REST } = require('@discordjs/rest');
-const { Routes } = require('discord-api-types/v9');
-const { Client, GatewayIntentBits } = require('discord.js');
 const { SlashCommandBuilder } = require('discord.js');
-const fs = require('fs');
+const { addBirthday } = require('../../utils/birthdays');
 
-const TOKEN = 'CLIENT_TOKEN';
-const CLIENT_ID = 'CLIENT_ID'; // Your bot's client ID
-const GUILD_ID = '641450750639341569'; // The server ID where you want to deploy the commands
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('add_birthday')
+    .setDescription('Add a Birthday')
+    .addUserOption((option) =>
+      option
+        .setName('user')
+        .setDescription('The user to add a birthday for')
+        .setRequired(true)
+    )
+    .addStringOption((option) =>
+      option
+        .setName('date')
+        .setDescription('The birthday in MM-DD format')
+        .setRequired(true)
+    ),
+  async execute(interaction) {
+    const user = interaction.options.getUser('user');
+    const date = interaction.options.getString('date');
 
-const commands = [
-    new SlashCommandBuilder()
-        .setName('add_birthday')
-        .setDescription('Add a Birthday')
-        .addUserOption(option => 
-            option.setName('user')
-                .setDescription('The user to add a birthday for')
-                .setRequired(true))
-        .addStringOption(option => 
-            option.setName('date')
-                .setDescription('The birthday in MM-DD format')
-                .setRequired(true))
-].map(command => command.toJSON());
-
-const rest = new REST({ version: '9' }).setToken(TOKEN);
-
-(async () => {
-    try {
-        console.log('Started refreshing application (/) commands.');
-
-        await rest.put(
-            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-            { body: commands }
-        );
-
-        console.log('Successfully reloaded application (/) commands.');
-    } catch (error) {
-        console.error(error);
+    if (!/^\d{2}-\d{2}$/.test(date)) {
+      await interaction.reply({
+        content: 'Usage: /add_birthday @user MM-DD',
+        ephemeral: true,
+      });
+      return;
     }
-})();
+
+    addBirthday(user.id, date);
+    await interaction.reply({
+      content: `Added birthday for ${user.username} on ${date}`,
+      ephemeral: true,
+    });
+  },
+};
