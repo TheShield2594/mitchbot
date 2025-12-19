@@ -1,15 +1,21 @@
 const { Events } = require('discord.js');
-const fetch = require('node-fetch');
+const { fetch } = require('undici');
 
 const userCooldown = new Map();
 const replyTracker = new Map();
 
 const COOLDOWN_MS = 30_000;
+const FOLLOW_UP_WINDOW_MS = 10 * 60 * 1000;
 const MAX_PROMPT_LENGTH = 500;
 
 module.exports = {
   name: Events.MessageCreate,
   async execute(message) {
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('messageCreate: Missing GEMINI_API_KEY; cannot call Gemini.');
+      return;
+    }
+
     const client = message.client;
 
     // Ignore bots
@@ -44,7 +50,10 @@ module.exports = {
           prompt = message.content.trim();
           shouldRespond = true;
           replyTracker.set(message.author.id, true);
-          setTimeout(() => replyTracker.delete(message.author.id), 10 * 60 * 1000);
+          setTimeout(
+            () => replyTracker.delete(message.author.id),
+            FOLLOW_UP_WINDOW_MS
+          );
         }
       } catch {
         return;
@@ -64,6 +73,7 @@ module.exports = {
       return;
     }
     userCooldown.set(message.author.id, Date.now());
+    setTimeout(() => userCooldown.delete(message.author.id), COOLDOWN_MS);
 
     // Gemini API call
     try {
@@ -97,6 +107,14 @@ User: ${prompt}
           }),
         }
       );
+
+      if (!response.ok) {
+        console.error(
+          `messageCreate: Gemini request failed with status ${response.status} ${response.statusText}`
+        );
+        await message.reply('That failed.');
+        return;
+      }
 
       const data = await response.json();
       const reply =
