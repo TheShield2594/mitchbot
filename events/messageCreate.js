@@ -10,6 +10,8 @@ const PREFIX = process.env.PREFIX || '!';
 module.exports = {
   name: Events.MessageCreate,
   async execute(message) {
+    if (message.author?.bot) return;
+    if (message.webhookId) return;
     if (!message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).split(' ');
