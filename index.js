@@ -1,93 +1,20 @@
-const { Client, GatewayIntentBits, Intents } = require('discord.js');
-const fs = require('fs');
-const schedule = require('node-schedule');
+require('dotenv').config();
+const { Client, GatewayIntentBits } = require('discord.js');
+const { loadCommands } = require('./handlers/commandHandler');
+const { registerEvents } = require('./handlers/eventHandler');
+const deployCommands = require('./deploy/deployCommands');
 
-const client = new Client({ 
-    intents: [
-        GatewayIntentBits.Guilds, 
-        GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
-    ]
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+  ],
 });
 
-const TOKEN = 'MTIyNzQyOTc5MjkxMjExNzg3MQ.Gwzovm.fm9W7qw_htbItX6clD06LgS6IXIALSapKGyL9k';
-const CHANNEL_ID = '903737939467587635'; // Add the ID of the channel where you want to send birthday messages
+loadCommands(client);
+registerEvents(client);
+deployCommands();
 
-// Load birthdays from a JSON file
-function loadBirthdays() {
-    try {
-        const data = fs.readFileSync('birthdays.json', 'utf8');
-        return JSON.parse(data);
-    } catch (err) {
-        console.error(err);
-        return {};
-    }
-}
-
-// Save birthdays to a JSON file
-function saveBirthdays(birthdays) {
-    try {
-        fs.writeFileSync('birthdays.json', JSON.stringify(birthdays, null, 4));
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-let birthdays = loadBirthdays();
-
-client.once('ready', () => {
-    console.log(`Logged in as ${client.user.tag}`);
-
-    // Schedule daily birthday check at midnight
-    schedule.scheduleJob('0 0 * * *', checkBirthdays);
-});
-
-client.on('messageCreate', async message => {
-    if (!message.content.startsWith('!')) return;
-
-    const args = message.content.slice(1).split(' ');
-    const command = args.shift().toLowerCase();
-
-    if (command === 'add_birthday') {
-        const user = message.mentions.users.first();
-        const date = args[1];
-
-        if (!user || !date || !/^\d{2}-\d{2}$/.test(date)) {
-            return message.channel.send('Usage: !add_birthday @user MM-DD');
-        }
-
-        birthdays[user.id] = date;
-        saveBirthdays(birthdays);
-        message.channel.send(`Added birthday for ${user.username} on ${date}`);
-    }
-
-    if (command === 'remove_birthday') {
-        const user = message.mentions.users.first();
-
-        if (!user || !birthdays[user.id]) {
-            return message.channel.send('Usage: !remove_birthday @user');
-        }
-
-        delete birthdays[user.id];
-        saveBirthdays(birthdays);
-        message.channel.send(`Removed birthday for ${user.username}`);
-    }
-});
-
-async function checkBirthdays() {
-    const today = new Date().toISOString().slice(5, 10); // MM-DD
-
-    const channel = await client.channels.fetch(CHANNEL_ID);
-
-    for (const userId in birthdays) {
-        if (birthdays[userId] === today) {
-            const user = await client.users.fetch(userId);
-            if (user && channel) {
-                channel.send(`Happy Birthday, ${user.username}! 🎉`);
-            }
-        }
-    }
-}
-
-client.login(TOKEN);
+client.login(process.env.CLIENT_TOKEN);
