@@ -1,6 +1,7 @@
 const { Events } = require('discord.js');
 const schedule = require('node-schedule');
 const { getBirthdays } = require('../utils/birthdays');
+const { initReminders, schedulePendingReminders } = require('../utils/reminders');
 
 const CHANNEL_ID = process.env.BIRTHDAY_CHANNEL_ID;
 
@@ -23,8 +24,14 @@ async function checkBirthdays(client) {
 module.exports = {
   name: Events.ClientReady,
   once: true,
-  execute(client) {
+  async execute(client) {
     console.log(`✅ Logged in as ${client.user.tag}`);
     schedule.scheduleJob('0 0 * * *', () => checkBirthdays(client));
+    try {
+      await initReminders();
+      await schedulePendingReminders(client);
+    } catch (error) {
+      console.error('Failed to initialize reminders', error);
+    }
   },
 };
