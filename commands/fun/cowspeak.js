@@ -15,10 +15,15 @@ module.exports = {
         joinedMessage = splitMessage.join("+");
         await interaction.deferReply();
 
-        const mooURL = await request(
-            `https://cowsay.morecode.org/say?message=${joinedMessage}&format=json`
-        );
-        const { cow } = await mooURL.body.json();
-        await interaction.editReply("```" + cow + "```");
+        try {
+            const mooURL = await request(
+                `https://cowsay.morecode.org/say?message=${joinedMessage}&format=json`
+            );
+            const { cow } = await mooURL.body.json();
+            await interaction.editReply("```" + cow + "```");
+        } catch (error) {
+            console.error("Error fetching cowspeak:", error);
+            await interaction.editReply("Failed to fetch cowspeak. Please try again later.");
+        }
     },
 };
