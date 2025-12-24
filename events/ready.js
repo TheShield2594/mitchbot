@@ -27,7 +27,11 @@ module.exports = {
   async execute(client) {
     console.log(`✅ Logged in as ${client.user.tag}`);
     schedule.scheduleJob('0 0 * * *', () => checkBirthdays(client));
-    await initReminders();
-    await schedulePendingReminders(client);
+    try {
+      await initReminders();
+      await schedulePendingReminders(client);
+    } catch (error) {
+      console.error('Failed to initialize reminders', error);
+    }
   },
 };
