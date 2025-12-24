@@ -16,15 +16,15 @@ function ensureRemindersFile() {
   }
 }
 
-function loadReminders() {
+async function loadReminders() {
   ensureRemindersFile();
 
   try {
-    const data = fs.readFileSync(remindersPath, 'utf8');
+    const data = await fsp.readFile(remindersPath, 'utf8');
     const parsed = JSON.parse(data);
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
-    console.error(error);
+    console.warn('Failed to load reminders', { error });
     return [];
   }
 }
@@ -44,11 +44,9 @@ function saveReminders() {
   return writeQueue;
 }
 
-function refreshReminders() {
-  reminders = loadReminders();
+async function initReminders() {
+  reminders = await loadReminders();
 }
-
-refreshReminders();
 
 function createReminder({ userId, channelId, message, scheduledAt }) {
   const reminder = {
@@ -118,7 +116,7 @@ async function sendReminder(reminder, client) {
 }
 
 async function deliverReminder(reminderId, client) {
-  refreshReminders();
+  await initReminders();
   const reminder = getReminderById(reminderId);
   if (!reminder || reminder.status !== 'pending') {
     clearScheduledJob(reminderId);
@@ -168,8 +166,8 @@ function scheduleReminder(reminder, client) {
   scheduledJobs.set(reminder.id, timeout);
 }
 
-function schedulePendingReminders(client) {
-  refreshReminders();
+async function schedulePendingReminders(client) {
+  await initReminders();
   const now = Date.now();
 
   for (const reminder of reminders) {
@@ -210,6 +208,7 @@ function cancelReminder(reminderId) {
 module.exports = {
   cancelReminder,
   createReminder,
+  initReminders,
   schedulePendingReminders,
   scheduleReminder,
 };
