@@ -2,9 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const { randomUUID } = require('node:crypto');
 
+const fsp = fs.promises;
+
 const remindersPath = path.join(__dirname, '..', 'data', 'reminders.json');
 const scheduledJobs = new Map();
 let reminders = [];
+let writeQueue = Promise.resolve();
 
 function ensureRemindersFile() {
   if (!fs.existsSync(remindersPath)) {
@@ -27,11 +30,18 @@ function loadReminders() {
 }
 
 function saveReminders() {
-  try {
-    fs.writeFileSync(remindersPath, JSON.stringify(reminders, null, 4));
-  } catch (error) {
-    console.error(error);
-  }
+  const payload = JSON.stringify(reminders, null, 4);
+  writeQueue = writeQueue
+    .then(async () => {
+      const tmpPath = `${remindersPath}.tmp`;
+      await fsp.writeFile(tmpPath, payload, 'utf8');
+      await fsp.rename(tmpPath, remindersPath);
+    })
+    .catch((error) => {
+      console.warn('Failed to save reminders', { error });
+    });
+
+  return writeQueue;
 }
 
 function refreshReminders() {
