@@ -7,6 +7,7 @@ module.exports = {
         .setDescription('Get a random cat image!'),
 
     async execute(client, interaction) {
+        await interaction.deferReply();
         try {
             const res = await fetch(`https://some-random-api.com/img/cat`);
             const json = await res.json();
@@ -18,9 +19,8 @@ module.exports = {
             }, interaction);
         } catch (error) {
             console.error('Error fetching cat image:', error);
-            interaction.reply({
-                content: 'Sorry, something went wrong fetching the cat image!',
-                ephemeral: true
+            await interaction.editReply({
+                content: 'Sorry, something went wrong fetching the cat image!'
             });
         }
     }

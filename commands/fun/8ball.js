@@ -15,11 +15,12 @@ module.exports = {
         ),
     async execute(interaction) {
         const question = interaction.options.getString("question");
+        await interaction.deferReply();
 
         const questionURL = await request("https://www.eightballapi.com/api");
         const { reading } = await questionURL.body.json();
         await console.log(reading);
-        await interaction.reply(
+        await interaction.editReply(
             `Question: ${question} \n Answer: ${reading}`
         );
     },

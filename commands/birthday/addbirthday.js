@@ -20,19 +20,18 @@ module.exports = {
   async execute(interaction) {
     const user = interaction.options.getUser('user');
     const date = interaction.options.getString('date');
+    await interaction.deferReply({ ephemeral: true });
 
     if (!/^\d{2}-\d{2}$/.test(date)) {
-      await interaction.reply({
+      await interaction.editReply({
         content: 'Usage: /add_birthday @user MM-DD',
-        ephemeral: true,
       });
       return;
     }
 
     addBirthday(user.id, date);
-    await interaction.reply({
+    await interaction.editReply({
       content: `Added birthday for ${user.username} on ${date}`,
-      ephemeral: true,
     });
   },
 };

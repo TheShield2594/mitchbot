@@ -16,7 +16,8 @@ module.exports = {
     const achievement =
       achievements[Math.floor(Math.random() * achievements.length)];
 
-    await interaction.reply(
+    await interaction.deferReply();
+    await interaction.editReply(
       `${interaction.user.username} unlocked an achievement:\n${achievement}`
     );
   },

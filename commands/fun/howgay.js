@@ -12,6 +12,7 @@ module.exports = {
       .setTitle(`🏳️‍🌈・Gay rate`)
       .setDescription(`You are ${result}% gay!`);
 
-    await interaction.reply({ embeds: [embed] });
+    await interaction.deferReply();
+    await interaction.editReply({ embeds: [embed] });
   },
 };

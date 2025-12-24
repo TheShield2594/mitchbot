@@ -14,6 +14,7 @@ module.exports = {
     .setDescription('Generates a reason you haven’t played it yet'),
   async execute(interaction) {
     const excuse = excuses[Math.floor(Math.random() * excuses.length)];
-    await interaction.reply(`Reason: ${excuse}`);
+    await interaction.deferReply();
+    await interaction.editReply(`Reason: ${excuse}`);
   },
 };

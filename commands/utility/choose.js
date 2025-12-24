@@ -15,7 +15,8 @@ module.exports = {
     const splitOptions = choiceInput.split(" OR ");
     const randomAnswer =
       splitOptions[Math.floor(Math.random() * splitOptions.length)];
-    await interaction.reply(
+    await interaction.deferReply();
+    await interaction.editReply(
       `\`\`${interaction.user.username} asks: ${choiceInput}\`\``
     );
     await interaction.channel.send(randomAnswer);

@@ -12,6 +12,7 @@ module.exports = {
         .setDescription("Here is a random fact."),
 
     async execute(interaction) {
+        await interaction.deferReply();
         try {
             const response = await fetchData("https://uselessfacts.jsph.pl/random.json?language=en", {
                 headers: {
@@ -23,13 +24,13 @@ module.exports = {
             const {text: fact } = data; //extract the fact from the parsed data
             
             if (fact) {
-                await interaction.reply(`${fact}`);
+                await interaction.editReply(`${fact}`);
             } else {
-                await interaction.reply("No fact found :(");
+                await interaction.editReply("No fact found :(");
             }
         } catch (error) {
             console.error(error);
-            await interaction.reply("An error occurred while fetching the fact. Please try again later.");
+            await interaction.editReply("An error occurred while fetching the fact. Please try again later.");
         }
     }
 };

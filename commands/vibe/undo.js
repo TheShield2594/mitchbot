@@ -5,7 +5,8 @@ module.exports = {
     .setName('undo')
     .setDescription('Undo your last decision'),
   async execute(interaction) {
-    await interaction.reply(
+    await interaction.deferReply();
+    await interaction.editReply(
       'Undoing last action...\n❌ Failed: irreversible life decision detected.'
     );
   },

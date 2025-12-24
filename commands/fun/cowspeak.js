@@ -13,12 +13,12 @@ module.exports = {
             interaction.options.getString("cowspeak") ?? "HoW I sPeAk CoW?/";
         splitMessage = cowspeakText.split(" ");
         joinedMessage = splitMessage.join("+");
+        await interaction.deferReply();
 
         const mooURL = await request(
             `https://cowsay.morecode.org/say?message=${joinedMessage}&format=json`
         );
         const { cow } = await mooURL.body.json();
-        await interaction.deferReply();
         await interaction.editReply("```" + cow + "```");
     },
 };

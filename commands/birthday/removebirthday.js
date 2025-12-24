@@ -13,19 +13,18 @@ module.exports = {
     ),
   async execute(interaction) {
     const user = interaction.options.getUser('user');
+    await interaction.deferReply({ ephemeral: true });
 
     if (!user || !getBirthdays()[user.id]) {
-      await interaction.reply({
+      await interaction.editReply({
         content: 'Usage: /remove_birthday @user',
-        ephemeral: true,
       });
       return;
     }
 
     removeBirthday(user.id);
-    await interaction.reply({
+    await interaction.editReply({
       content: `Removed birthday for ${user.username}`,
-      ephemeral: true,
     });
   },
 };

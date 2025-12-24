@@ -13,6 +13,7 @@ module.exports = {
     .setDescription('Explains a simple task like enterprise software'),
   async execute(interaction) {
     const reply = outputs[Math.floor(Math.random() * outputs.length)];
-    await interaction.reply(reply);
+    await interaction.deferReply();
+    await interaction.editReply(reply);
   },
 };

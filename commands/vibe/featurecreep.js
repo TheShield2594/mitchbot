@@ -14,6 +14,7 @@ module.exports = {
     .setName('featurecreep')
     .setDescription('Simulates feature creep'),
   async execute(interaction) {
-    await interaction.reply(stages.join('\n'));
+    await interaction.deferReply();
+    await interaction.editReply(stages.join('\n'));
   },
 };

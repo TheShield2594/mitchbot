@@ -11,7 +11,7 @@ module.exports = {
                 .setRequired(true)),
     async execute(interaction) {
         // Temporary response
-        await interaction.reply('Mitch is thinking...');
+        await interaction.deferReply();
 
         // Get the message from user input
         const message = interaction.options.getString('message'); // Corrected from option to options

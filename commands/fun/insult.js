@@ -9,6 +9,7 @@ module.exports = {
             option.setName("user").setDescription("Let's insult somebody...")
         ),
     async execute(interaction) {
+        await interaction.deferReply();
         // Commented out to try different API
         // const insultURL = await request(`https://insult.mattbas.org/api/insult.json`, {
         //     signal: interaction.client.requestTimeout,
@@ -26,7 +27,6 @@ module.exports = {
             const data = await response.json();
             const { insult } = data;
 
-            await interaction.deferReply();
             const message = await interaction.editReply(
                 `${
                     interaction.options.getUser("user") ?? interaction.user
@@ -35,7 +35,7 @@ module.exports = {
             message.react("🔥");
         } catch (err) {
             console.log('error: ', err);
-            await interaction.reply("Failed to fetch an insult. Please try again later bitch.");
+            await interaction.editReply("Failed to fetch an insult. Please try again later bitch.");
             return;
         }
     },
