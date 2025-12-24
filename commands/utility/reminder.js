@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const wait = require("node:timers/promises").setTimeout;
+const { createReminder, scheduleReminder } = require("../../utils/reminders");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -22,34 +22,21 @@ module.exports = {
     async execute(interaction) {
         const minutes = interaction.options.getInteger("minutes");
         const message = interaction.options.getString("message");
-        const delayMs = minutes * 60000;
-        const channelId = interaction.channelId;
-        const user = interaction.user;
+        const scheduledAt = new Date(Date.now() + minutes * 60000).toISOString();
+        const unit = minutes === 1 ? "minute" : "minutes";
 
-        await interaction.reply({
-            content: `Okay! I'll remind you in ${minutes} minute(s).`,
-            ephemeral: true,
+        const reminder = createReminder({
+            userId: interaction.user.id,
+            channelId: interaction.channelId,
+            message,
+            scheduledAt,
         });
 
-        await wait(delayMs);
+        scheduleReminder(reminder, interaction.client);
 
-        const reminderText = `⏰ Reminder: ${message}`;
-
-        try {
-            await user.send(reminderText);
-        } catch (error) {
-            try {
-                const channel = await interaction.client.channels.fetch(channelId);
-                if (channel) {
-                    await channel.send({ content: `${user} ${reminderText}` });
-                }
-            } catch (channelError) {
-                console.warn("Failed to send reminder", {
-                    error: channelError,
-                    userId: user.id,
-                    channelId,
-                });
-            }
-        }
+        await interaction.reply({
+            content: `Okay! I'll remind you in ${minutes} ${unit}. (ID: ${reminder.id})`,
+            ephemeral: true,
+        });
     }
 };
