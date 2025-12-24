@@ -13,12 +13,17 @@ module.exports = {
             interaction.options.getString("cowspeak") ?? "HoW I sPeAk CoW?/";
         splitMessage = cowspeakText.split(" ");
         joinedMessage = splitMessage.join("+");
-
-        const mooURL = await request(
-            `https://cowsay.morecode.org/say?message=${joinedMessage}&format=json`
-        );
-        const { cow } = await mooURL.body.json();
         await interaction.deferReply();
-        await interaction.editReply("```" + cow + "```");
+
+        try {
+            const mooURL = await request(
+                `https://cowsay.morecode.org/say?message=${joinedMessage}&format=json`
+            );
+            const { cow } = await mooURL.body.json();
+            await interaction.editReply("```" + cow + "```");
+        } catch (error) {
+            console.error("Error fetching cowspeak:", error);
+            await interaction.editReply("Failed to fetch cowspeak. Please try again later.");
+        }
     },
 };

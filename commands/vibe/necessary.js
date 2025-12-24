@@ -13,6 +13,7 @@ module.exports = {
     .setDescription('Judges whether something needed to be said'),
   async execute(interaction) {
     const reply = replies[Math.floor(Math.random() * replies.length)];
-    await interaction.reply(reply);
+    await interaction.deferReply();
+    await interaction.editReply(reply);
   },
 };

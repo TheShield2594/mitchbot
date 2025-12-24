@@ -23,7 +23,8 @@ module.exports = {
             }
         }
 
-        await interaction.reply(
+        await interaction.deferReply();
+        await interaction.editReply(
             `${result}`
         );
     },

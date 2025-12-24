@@ -7,6 +7,7 @@ module.exports = {
         .setName("help")
         .setDescription("Get a list of all the commands form the discord bot."),
     async execute(interaction) {
+        await interaction.deferReply();
         console.log(
             fs.readdirSync(path.join(__dirname, "..", "..", "commands"))
         );
@@ -53,6 +54,6 @@ module.exports = {
             });
         });
 
-        await interaction.reply({ embeds: [exampleEmbed] });
+        await interaction.editReply({ embeds: [exampleEmbed] });
     },
 };

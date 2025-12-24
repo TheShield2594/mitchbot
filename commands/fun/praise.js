@@ -27,9 +27,9 @@ module.exports = {
             option.setName(`user`).setDescription(`Let's be nice to people`)),
     async execute(interaction) {
         if (!interaction.inGuild()) {
-            await interaction.reply({
-                content: "This command can only be used in a server.",
-                ephemeral: true
+            await interaction.deferReply({ ephemeral: true });
+            await interaction.editReply({
+                content: "This command can only be used in a server."
             });
             return;
         }
@@ -40,9 +40,7 @@ module.exports = {
             const mentionedUser = interaction.options.getUser("user") ?? interaction.user;
             await interaction.editReply(`${mentionedUser} ${compliment}`);
         } catch (error) {
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: "Failed to process your command, please try again.", ephemeral: true });
-            }
+            await interaction.editReply("Failed to process your command, please try again.");
         }
         
     }

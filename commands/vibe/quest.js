@@ -14,6 +14,7 @@ module.exports = {
     .setDescription('Generates a terrible daily quest'),
   async execute(interaction) {
     const quest = quests[Math.floor(Math.random() * quests.length)];
-    await interaction.reply(`🗺️ Daily Quest:\n${quest}`);
+    await interaction.deferReply();
+    await interaction.editReply(`🗺️ Daily Quest:\n${quest}`);
   },
 };

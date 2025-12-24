@@ -7,12 +7,13 @@ module.exports = {
 		.setName('meme')
 		.setDescription('Sends a random meme'),
 	async execute(interaction) {
+        await interaction.deferReply();
         const res = await axios.get('https://meme-api.com/gimme/1');
         if (res.data.memes[0].url){
-            interaction.reply(res.data.memes[0].url);
+            await interaction.editReply(res.data.memes[0].url);
         }
         else{
-            interaction.reply("No meme found :(");
+            await interaction.editReply("No meme found :(");
         }
 	},
 };

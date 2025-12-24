@@ -13,6 +13,7 @@ module.exports = {
     .setDescription('Rates your NPC energy for today'),
   async execute(interaction) {
     const reply = responses[Math.floor(Math.random() * responses.length)];
-    await interaction.reply(reply);
+    await interaction.deferReply();
+    await interaction.editReply(reply);
   },
 };
