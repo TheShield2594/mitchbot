@@ -9,13 +9,25 @@ async function checkBirthdays(client) {
   if (!CHANNEL_ID) return;
 
   const today = new Date().toISOString().slice(5, 10);
-  const channel = await client.channels.fetch(CHANNEL_ID);
 
-  for (const userId of Object.keys(getBirthdays())) {
-    if (getBirthdays()[userId] === today) {
-      const user = await client.users.fetch(userId);
-      if (user && channel) {
-        await channel.send(`Happy Birthday, ${user.username}! 🎉`);
+  let channel;
+  try {
+    channel = await client.channels.fetch(CHANNEL_ID);
+  } catch (error) {
+    console.error('Failed to fetch birthday channel:', error);
+    return;
+  }
+
+  const birthdays = getBirthdays();
+  for (const [userId, birthday] of Object.entries(birthdays)) {
+    if (birthday === today) {
+      try {
+        const user = await client.users.fetch(userId);
+        if (user && channel) {
+          await channel.send(`Happy Birthday, ${user.username}.`);
+        }
+      } catch (error) {
+        console.error(`Failed to send birthday message for user ${userId}:`, error);
       }
     }
   }

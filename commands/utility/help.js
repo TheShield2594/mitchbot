@@ -8,14 +8,11 @@ module.exports = {
         .setDescription("Get a list of all the commands form the discord bot."),
     async execute(interaction) {
         await interaction.deferReply();
-        console.log(
-            fs.readdirSync(path.join(__dirname, "..", "..", "commands"))
-        );
         const commandFolder = fs.readdirSync(
             path.join(__dirname, "..", "..", "commands")
         );
 
-        let commandList = [];
+        const commandList = [];
         for (const folder of commandFolder) {
             const commandFiles = fs
                 .readdirSync(
@@ -32,14 +29,12 @@ module.exports = {
                     file
                 ));
                 if ("data" in command && "execute" in command) {
-                    console.log("in If statement ", folder, file);
-                    await commandList.push({
+                    commandList.push({
                         name: command.data.name,
                         description: command.data.description,
                     });
                 }
             }
-            console.log(commandList);
         }
 
         const exampleEmbed = new EmbedBuilder()

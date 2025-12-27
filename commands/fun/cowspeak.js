@@ -11,13 +11,15 @@ module.exports = {
     async execute(interaction) {
         const cowspeakText =
             interaction.options.getString("cowspeak") ?? "HoW I sPeAk CoW?/";
-        splitMessage = cowspeakText.split(" ");
-        joinedMessage = splitMessage.join("+");
+        const encodedMessage = encodeURIComponent(cowspeakText);
         await interaction.deferReply();
 
         try {
             const mooURL = await request(
-                `https://cowsay.morecode.org/say?message=${joinedMessage}&format=json`
+                `https://cowsay.morecode.org/say?message=${encodedMessage}&format=json`,
+                {
+                    signal: AbortSignal.timeout(5000)
+                }
             );
             const { cow } = await mooURL.body.json();
             await interaction.editReply("```" + cow + "```");

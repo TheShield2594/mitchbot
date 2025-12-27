@@ -12,10 +12,20 @@ module.exports = {
       await command.execute(interaction);
     } catch (error) {
       console.error(error);
-      await interaction.reply({
-        content: 'Something broke. Mitch is pretending this didn’t happen.',
+      const errorMessage = {
+        content: 'Something broke. Mitch is pretending this didn't happen.',
         ephemeral: true,
-      });
+      };
+
+      try {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply(errorMessage);
+        } else {
+          await interaction.reply(errorMessage);
+        }
+      } catch (replyError) {
+        console.error('Failed to send error message:', replyError);
+      }
     }
   },
 };
