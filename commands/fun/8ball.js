@@ -1,5 +1,6 @@
 const { request } = require("undici");
 const { SlashCommandBuilder } = require("discord.js");
+const { checkCooldown, setCooldown } = require("../../utils/cooldowns");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -14,6 +15,15 @@ module.exports = {
                 .setRequired(true)
         ),
     async execute(interaction) {
+        const cooldown = checkCooldown(interaction.user.id, "8ball", 5000);
+        if (cooldown.onCooldown) {
+            await interaction.reply({
+                content: `Wait ${cooldown.remainingTime}s.`,
+                ephemeral: true,
+            });
+            return;
+        }
+
         const question = interaction.options.getString("question");
         await interaction.deferReply();
 
@@ -23,19 +33,19 @@ module.exports = {
             });
             if (questionURL.statusCode >= 400) {
                 await interaction.editReply(
-                    "The magic 8ball is busy right now. Please try again later."
+                    "The magic 8ball is busy."
                 );
                 return;
             }
             const { reading } = await questionURL.body.json();
-            console.log(reading);
             await interaction.editReply(
                 `Question: ${question} \n Answer: ${reading}`
             );
+            setCooldown(interaction.user.id, "8ball", 5000);
         } catch (error) {
             console.error("Error fetching 8ball:", error);
             await interaction.editReply(
-                "The magic 8ball is busy right now. Please try again later."
+                "The magic 8ball is busy."
             );
         }
     },

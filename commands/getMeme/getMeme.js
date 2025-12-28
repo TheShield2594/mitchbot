@@ -1,19 +1,36 @@
-const axios = require('axios');
+const { request } = require('undici');
 const { SlashCommandBuilder } = require('discord.js');
-
+const { checkCooldown, setCooldown } = require('../../utils/cooldowns');
 
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('meme')
 		.setDescription('Sends a random meme'),
 	async execute(interaction) {
-        await interaction.deferReply();
-        const res = await axios.get('https://meme-api.com/gimme/1');
-        if (res.data.memes[0].url){
-            await interaction.editReply(res.data.memes[0].url);
+        const cooldown = checkCooldown(interaction.user.id, "meme", 5000);
+        if (cooldown.onCooldown) {
+            await interaction.reply({
+                content: `Wait ${cooldown.remainingTime}s.`,
+                ephemeral: true,
+            });
+            return;
         }
-        else{
-            await interaction.editReply("No meme found :(");
+
+        await interaction.deferReply();
+        try {
+            const res = await request('https://meme-api.com/gimme/1', {
+                signal: AbortSignal.timeout(5000)
+            });
+            const data = await res.body.json();
+            if (data.memes && data.memes[0] && data.memes[0].url){
+                await interaction.editReply(data.memes[0].url);
+                setCooldown(interaction.user.id, "meme", 5000);
+            } else {
+                await interaction.editReply("No meme found.");
+            }
+        } catch (error) {
+            console.error('Error fetching meme:', error);
+            await interaction.editReply("Failed to fetch meme.");
         }
 	},
 };
