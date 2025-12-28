@@ -1,5 +1,6 @@
 const { request } = require("undici");
 const { SlashCommandBuilder } = require("discord.js");
+const { checkCooldown, setCooldown } = require("../../utils/cooldowns");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -9,6 +10,15 @@ module.exports = {
             option.setName("cowspeak").setDescription("The text for cowspeak")
         ),
     async execute(interaction) {
+        const cooldown = checkCooldown(interaction.user.id, "moo", 5000);
+        if (cooldown.onCooldown) {
+            await interaction.reply({
+                content: `Wait ${cooldown.remainingTime}s.`,
+                ephemeral: true,
+            });
+            return;
+        }
+
         const cowspeakText =
             interaction.options.getString("cowspeak") ?? "HoW I sPeAk CoW?/";
         const encodedMessage = encodeURIComponent(cowspeakText);
@@ -23,9 +33,10 @@ module.exports = {
             );
             const { cow } = await mooURL.body.json();
             await interaction.editReply("```" + cow + "```");
+            setCooldown(interaction.user.id, "moo", 5000);
         } catch (error) {
             console.error("Error fetching cowspeak:", error);
-            await interaction.editReply("Failed to fetch cowspeak. Please try again later.");
+            await interaction.editReply("Failed to fetch cowspeak.");
         }
     },
 };

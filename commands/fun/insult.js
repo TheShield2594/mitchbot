@@ -1,5 +1,6 @@
 const { request } = require("undici");
 const { SlashCommandBuilder } = require("discord.js");
+const { checkCooldown, setCooldown } = require("../../utils/cooldowns");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -9,22 +10,22 @@ module.exports = {
             option.setName("user").setDescription("Let's insult somebody...")
         ),
     async execute(interaction) {
+        const cooldown = checkCooldown(interaction.user.id, "insult", 5000);
+        if (cooldown.onCooldown) {
+            await interaction.reply({
+                content: `Wait ${cooldown.remainingTime}s.`,
+                ephemeral: true,
+            });
+            return;
+        }
+
         await interaction.deferReply();
-        // Commented out to try different API
-        // const insultURL = await request(`https://insult.mattbas.org/api/insult.json`, {
-        //     signal: interaction.client.requestTimeout,
-        // });
-
-        // if (insultURL.status >= 400) {
-        //     await interaction.reply("Failed to fetch an insult. Please try again later bitch.");
-        //     return;
-        // }
-
-        // const { insult } = await insultURL.body.json();
 
         try {
-            const response = await fetch('https://evilinsult.com/generate_insult.php?lang=en&type=json');
-            const data = await response.json();
+            const response = await request('https://evilinsult.com/generate_insult.php?lang=en&type=json', {
+                signal: AbortSignal.timeout(5000)
+            });
+            const data = await response.body.json();
             const { insult } = data;
 
             const message = await interaction.editReply(
@@ -33,10 +34,10 @@ module.exports = {
                 } ${insult}`
             );
             message.react("🔥");
-        } catch (err) {
-            console.log('error: ', err);
-            await interaction.editReply("Failed to fetch an insult. Please try again later bitch.");
-            return;
+            setCooldown(interaction.user.id, "insult", 5000);
+        } catch (error) {
+            console.error('Error fetching insult:', error);
+            await interaction.editReply("Failed to fetch insult.");
         }
     },
 };
