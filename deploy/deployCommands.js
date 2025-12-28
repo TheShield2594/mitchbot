@@ -50,6 +50,6 @@ const deploy = async () => {
     })();
 }
 
-
+deploy();
 
 module.exports = deploy;

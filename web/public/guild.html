@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guild Management - Mitchbot</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <h1>🤖 Mitchbot</h1>
+    <div>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/auth/logout">Logout</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <h2 id="guild-name">Loading...</h2>
+      <div id="alert-container"></div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="automod">Automod</button>
+        <button class="tab" data-tab="logs">Moderation Logs</button>
+        <button class="tab" data-tab="birthdays">Birthdays</button>
+        <button class="tab" data-tab="settings">Settings</button>
+      </div>
+
+      <!-- Automod Tab -->
+      <div id="automod-tab" class="tab-content active">
+        <h3>Automod Configuration</h3>
+
+        <div class="form-group">
+          <label>
+            <label class="switch">
+              <input type="checkbox" id="automod-enabled">
+              <span class="slider"></span>
+            </label>
+            Enable Automod
+          </label>
+        </div>
+
+        <h4>Word Filter</h4>
+        <div class="form-group">
+          <label>
+            <label class="switch">
+              <input type="checkbox" id="wordfilter-enabled">
+              <span class="slider"></span>
+            </label>
+            Enable Word Filter
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>Filtered Words</label>
+          <div id="word-list" class="word-list"></div>
+          <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+            <input type="text" id="new-word" placeholder="Add word to filter...">
+            <button class="btn btn-primary" onclick="addWord()">Add Word</button>
+          </div>
+        </div>
+
+        <h4>Invite Filter</h4>
+        <div class="form-group">
+          <label>
+            <label class="switch">
+              <input type="checkbox" id="invitefilter-enabled">
+              <span class="slider"></span>
+            </label>
+            Block Server Invites
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="allow-own-server">
+            Allow invites to this server
+          </label>
+        </div>
+
+        <h4>Link Filter</h4>
+        <div class="form-group">
+          <label>
+            <label class="switch">
+              <input type="checkbox" id="linkfilter-enabled">
+              <span class="slider"></span>
+            </label>
+            Enable Link Filter
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>Whitelisted Domains</label>
+          <div id="whitelist" class="word-list"></div>
+          <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+            <input type="text" id="new-whitelist" placeholder="Add domain (e.g., youtube.com)...">
+            <button class="btn btn-primary" onclick="addWhitelist()">Add Domain</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Blacklisted Domains</label>
+          <div id="blacklist" class="word-list"></div>
+          <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+            <input type="text" id="new-blacklist" placeholder="Add domain (e.g., spam.com)...">
+            <button class="btn btn-primary" onclick="addBlacklist()">Add Domain</button>
+          </div>
+        </div>
+
+        <h4>Spam Detection</h4>
+        <div class="form-group">
+          <label>
+            <label class="switch">
+              <input type="checkbox" id="spam-enabled">
+              <span class="slider"></span>
+            </label>
+            Enable Spam Detection
+          </label>
+        </div>
+
+        <button class="btn btn-success" onclick="saveAutomod()">Save Automod Settings</button>
+      </div>
+
+      <!-- Logs Tab -->
+      <div id="logs-tab" class="tab-content">
+        <h3>Moderation Logs</h3>
+        <div id="logs-container">
+          <div class="loading">Loading logs...</div>
+        </div>
+      </div>
+
+      <!-- Birthdays Tab -->
+      <div id="birthdays-tab" class="tab-content">
+        <h3>Birthdays</h3>
+        <div id="birthdays-container">
+          <div class="loading">Loading birthdays...</div>
+        </div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div id="settings-tab" class="tab-content">
+        <h3>Bot Settings</h3>
+
+        <div class="form-group">
+          <label>Moderation Log Channel</label>
+          <select id="log-channel">
+            <option value="">None</option>
+          </select>
+        </div>
+
+        <button class="btn btn-success" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/guild.js"></script>
+</body>
+</html>

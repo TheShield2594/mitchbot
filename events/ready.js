@@ -2,6 +2,7 @@ const { Events } = require('discord.js');
 const schedule = require('node-schedule');
 const { getBirthdays } = require('../utils/birthdays');
 const { initReminders, schedulePendingReminders } = require('../utils/reminders');
+const { initModeration } = require('../utils/moderation');
 
 const CHANNEL_ID = process.env.BIRTHDAY_CHANNEL_ID;
 
@@ -32,6 +33,12 @@ module.exports = {
       await schedulePendingReminders(client);
     } catch (error) {
       console.error('Failed to initialize reminders', error);
+    }
+    try {
+      await initModeration();
+      console.log('✅ Moderation system initialized');
+    } catch (error) {
+      console.error('Failed to initialize moderation', error);
     }
   },
 };
