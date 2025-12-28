@@ -13,7 +13,7 @@ module.exports = {
     } catch (error) {
       console.error(error);
       const errorMessage = {
-        content: 'Something broke. Mitch is pretending this didn't happen.',
+        content: 'Something broke. Mitch is pretending this didn\'t happen.',
         ephemeral: true,
       };
 

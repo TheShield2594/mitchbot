@@ -8,7 +8,8 @@ const CHANNEL_ID = process.env.BIRTHDAY_CHANNEL_ID;
 async function checkBirthdays(client) {
   if (!CHANNEL_ID) return;
 
-  const today = new Date().toISOString().slice(5, 10);
+  const now = new Date();
+  const today = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   let channel;
   try {
@@ -23,7 +24,7 @@ async function checkBirthdays(client) {
     if (birthday === today) {
       try {
         const user = await client.users.fetch(userId);
-        if (user && channel) {
+        if (user) {
           await channel.send(`Happy Birthday, ${user.username}.`);
         }
       } catch (error) {
