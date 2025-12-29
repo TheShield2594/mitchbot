@@ -51,13 +51,14 @@ module.exports = {
 
       // Log the action
       const logEntry = addLog(interaction.guildId, {
-        type: 'unban',
+        actionType: 'unban',
         action: 'Member Unbanned',
-        targetId: userId,
+        targetUserId: userId,
         targetTag: bannedUser.user?.username || 'Unknown User',
         moderatorId: interaction.user.id,
         moderatorTag: interaction.user.username,
         reason,
+        duration: null,
       });
 
       await interaction.editReply(`Successfully unbanned user (ID: ${userId})\nReason: ${reason}\nCase #${logEntry.caseId}`);

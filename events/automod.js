@@ -210,21 +210,37 @@ module.exports = {
 
         // Log the violation
         addLog(message.guildId, {
-          type: 'automod',
+          actionType: 'automod',
           action: 'Automod Violation',
           violationType,
-          targetId: message.author.id,
+          targetUserId: message.author.id,
           targetTag: message.author.tag,
+          moderatorId: message.client.user.id,
+          moderatorTag: message.client.user.tag,
+          reason: violationType,
           channelId: message.channel.id,
           channelName: message.channel.name,
           content: message.content.substring(0, 100),
           actionTaken: action,
+          duration: null,
         });
 
         // Take action based on configuration
         if (action === 'warn' || action === 'timeout' || action === 'kick' || action === 'ban') {
           // Add warning
-          addWarning(message.guildId, message.author.id, `Automod: ${violationType}`, message.client.user.id);
+          const warningReason = `Automod: ${violationType}`;
+          addWarning(message.guildId, message.author.id, warningReason, message.client.user.id);
+
+          addLog(message.guildId, {
+            actionType: 'warn',
+            action: 'Automod Warning',
+            targetUserId: message.author.id,
+            targetTag: message.author.tag,
+            moderatorId: message.client.user.id,
+            moderatorTag: message.client.user.tag,
+            reason: warningReason,
+            duration: null,
+          });
 
           const warnings = getWarnings(message.guildId, message.author.id);
           const warningCount = warnings.length;
@@ -271,12 +287,15 @@ module.exports = {
                 await message.member.timeout(duration, `Automod: ${violationType} (${warningCount} warnings)`);
 
                 addLog(message.guildId, {
-                  type: 'automod_timeout',
+                  actionType: 'timeout',
                   action: 'Automod Timeout',
                   violationType,
-                  targetId: message.author.id,
+                  targetUserId: message.author.id,
                   targetTag: message.author.tag,
-                  duration: `${duration / 1000 / 60} minutes`,
+                  moderatorId: message.client.user.id,
+                  moderatorTag: message.client.user.tag,
+                  reason: `Automod: ${violationType} (${warningCount} warnings)`,
+                  duration,
                   warningCount,
                 });
               } catch (error) {
@@ -309,11 +328,15 @@ module.exports = {
                 await message.member.kick(`Automod: ${violationType}`);
 
                 addLog(message.guildId, {
-                  type: 'automod_kick',
+                  actionType: 'kick',
                   action: 'Automod Kick',
                   violationType,
-                  targetId: message.author.id,
+                  targetUserId: message.author.id,
                   targetTag: message.author.tag,
+                  moderatorId: message.client.user.id,
+                  moderatorTag: message.client.user.tag,
+                  reason: `Automod: ${violationType}`,
+                  duration: null,
                 });
               } catch (error) {
                 logger.error('Failed to kick user in automod', {
@@ -332,11 +355,15 @@ module.exports = {
                 await message.guild.members.ban(message.author.id, { reason: `Automod: ${violationType}` });
 
                 addLog(message.guildId, {
-                  type: 'automod_ban',
+                  actionType: 'ban',
                   action: 'Automod Ban',
                   violationType,
-                  targetId: message.author.id,
+                  targetUserId: message.author.id,
                   targetTag: message.author.tag,
+                  moderatorId: message.client.user.id,
+                  moderatorTag: message.client.user.tag,
+                  reason: `Automod: ${violationType}`,
+                  duration: null,
                 });
               } catch (error) {
                 logger.error('Failed to ban user in automod', {
@@ -358,11 +385,15 @@ module.exports = {
                 await message.member.ban({ reason: `Automod: ${violationType}` });
 
                 addLog(message.guildId, {
-                  type: 'automod_ban',
+                  actionType: 'ban',
                   action: 'Automod Ban',
                   violationType,
-                  targetId: message.author.id,
+                  targetUserId: message.author.id,
                   targetTag: message.author.tag,
+                  moderatorId: message.client.user.id,
+                  moderatorTag: message.client.user.tag,
+                  reason: `Automod: ${violationType}`,
+                  duration: null,
                 });
               } catch (error) {
                 logger.error('Failed to ban user in automod', {

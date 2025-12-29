@@ -50,14 +50,15 @@ module.exports = {
 
     // Log the action (non-blocking)
     addLog(interaction.guildId, {
-      type: 'clearwarnings',
+      actionType: 'clearwarnings',
       action: 'Warnings Cleared',
-      targetId: target.id,
+      targetUserId: target.id,
       targetTag: target.tag,
       moderatorId: interaction.user.id,
       moderatorTag: interaction.user.tag,
       clearedCount: warningCount,
       reason,
+      duration: null,
     });
 
     await interaction.editReply(`Successfully cleared ${warningCount} warning(s) for ${target.tag}\nReason: ${reason}`);

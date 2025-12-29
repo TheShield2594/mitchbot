@@ -84,13 +84,14 @@ module.exports = {
 
       // Log the action
       const logEntry = addLog(interaction.guildId, {
-        type: 'ban',
+        actionType: 'ban',
         action: 'Member Banned',
-        targetId: target.id,
+        targetUserId: target.id,
         targetTag: target.username,
         moderatorId: interaction.user.id,
         moderatorTag: interaction.user.username,
         reason,
+        duration: null,
         deleteDays,
       });
 

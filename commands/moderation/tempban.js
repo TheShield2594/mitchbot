@@ -89,14 +89,14 @@ module.exports = {
 
       // Log the action
       const logEntry = addLog(interaction.guildId, {
-        type: 'tempban',
+        actionType: 'tempban',
         action: 'Member Temporarily Banned',
-        targetId: target.id,
+        targetUserId: target.id,
         targetTag: target.username,
         moderatorId: interaction.user.id,
         moderatorTag: interaction.user.username,
         reason,
-        duration,
+        duration: duration * 60 * 1000,
         expiresAt,
         deleteDays,
       });
