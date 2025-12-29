@@ -1,10 +1,6 @@
 const { request } = require("undici");
 const { SlashCommandBuilder } = require("discord.js");
-
-async function fetchData(url, options) {
-    const response = await fetch(url, options);
-    return response;
-}
+const { checkCooldown, setCooldown } = require("../../utils/cooldowns");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -12,25 +8,36 @@ module.exports = {
         .setDescription("Here is a random fact."),
 
     async execute(interaction) {
+        const cooldown = checkCooldown(interaction.user.id, "fact", 5000);
+        if (cooldown.onCooldown) {
+            await interaction.reply({
+                content: `Wait ${cooldown.remainingTime}s.`,
+                ephemeral: true,
+            });
+            return;
+        }
+
         await interaction.deferReply();
         try {
-            const response = await fetchData("https://uselessfacts.jsph.pl/random.json?language=en", {
+            const response = await request("https://uselessfacts.jsph.pl/random.json?language=en", {
                 headers: {
                     Accept: "application/json"
-                }
+                },
+                signal: AbortSignal.timeout(5000)
             });
 
-            const data = await response.json(); //correctly parse the JSON from the response
-            const {text: fact } = data; //extract the fact from the parsed data
-            
+            const data = await response.body.json();
+            const { text: fact } = data;
+
             if (fact) {
                 await interaction.editReply(`${fact}`);
+                setCooldown(interaction.user.id, "fact", 5000);
             } else {
-                await interaction.editReply("No fact found :(");
+                await interaction.editReply("No fact found.");
             }
         } catch (error) {
-            console.error(error);
-            await interaction.editReply("An error occurred while fetching the fact. Please try again later.");
+            console.error('Error fetching fact:', error);
+            await interaction.editReply("Failed to fetch fact.");
         }
     }
 };
