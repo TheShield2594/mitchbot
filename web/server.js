@@ -9,8 +9,32 @@ const cors = require('cors');
 const logger = require('../utils/logger');
 const { ensureAuthenticated } = require('./middleware/auth');
 
+// Determine callback URL based on environment
+function determineCallbackURL(port, isProduction) {
+  // Use explicit CALLBACK_URL if set
+  if (process.env.CALLBACK_URL) {
+    return process.env.CALLBACK_URL;
+  }
+
+  // Production: try to auto-detect Railway deployment
+  if (isProduction) {
+    if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+      const url = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/auth/callback`;
+      logger.info('CALLBACK_URL not set, using Railway public domain', { callbackURL: url });
+      return url;
+    }
+    const error = 'CALLBACK_URL must be explicitly set in production (or deploy to Railway with RAILWAY_PUBLIC_DOMAIN)';
+    logger.error(error);
+    throw new Error(error);
+  }
+
+  // Development: use localhost
+  logger.warn('CALLBACK_URL not set, using localhost default (development only)');
+  return `http://localhost:${port}/auth/callback`;
+}
+
 // Validate required environment variables
-function validateEnvironment() {
+function validateEnvironment(port, isProduction) {
   const required = ['CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'SESSION_SECRET'];
   const missing = required.filter(key => !process.env[key]);
 
@@ -20,15 +44,8 @@ function validateEnvironment() {
     throw new Error(error);
   }
 
-  // Validate CALLBACK_URL
-  if (!process.env.CALLBACK_URL) {
-    if (process.env.NODE_ENV === 'production') {
-      const error = 'CALLBACK_URL must be explicitly set in production';
-      logger.error(error);
-      throw new Error(error);
-    }
-    logger.warn('CALLBACK_URL not set, using localhost default (development only)');
-  }
+  // Validate CALLBACK_URL (will throw if invalid in production)
+  determineCallbackURL(port, isProduction);
 }
 
 // Configure session store
@@ -80,12 +97,12 @@ function getSessionStore() {
 }
 
 module.exports = function startWebServer(client) {
-  // Validate environment before starting
-  validateEnvironment();
-
   const app = express();
   const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
   const isProduction = process.env.NODE_ENV === 'production';
+
+  // Validate environment before starting
+  validateEnvironment(PORT, isProduction);
 
   // Store client for API routes
   app.set('client', client);
@@ -176,12 +193,7 @@ module.exports = function startWebServer(client) {
   });
 
   // Discord OAuth2 Strategy
-  const callbackURL = process.env.CALLBACK_URL ||
-    (isProduction ? undefined : `http://localhost:${PORT}/auth/callback`);
-
-  if (!callbackURL) {
-    throw new Error('CALLBACK_URL must be set in production');
-  }
+  const callbackURL = determineCallbackURL(PORT, isProduction);
 
   passport.use(new DiscordStrategy({
     clientID: process.env.CLIENT_ID,
