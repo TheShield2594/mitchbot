@@ -1,4 +1,5 @@
 const { Events } = require('discord.js');
+const { recordCommandUsage } = require('../utils/stats');
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -17,6 +18,15 @@ module.exports = {
         console.error('Failed to send command-not-found message:', error);
       }
       return;
+    }
+
+    // Record command usage stats (only for guild commands)
+    if (interaction.guildId) {
+      try {
+        recordCommandUsage(interaction.guildId, interaction.commandName, interaction.user.id);
+      } catch (error) {
+        console.warn('Failed to record command stats', { error });
+      }
     }
 
     try {
