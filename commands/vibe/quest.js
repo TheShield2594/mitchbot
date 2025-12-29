@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('discord.js');
 
 const quests = [
   'Stare at something longer than normal.',
-  'Say “interesting” and mean it.',
+  'Say "interesting" and mean it.',
   'Open a game and close it immediately.',
   'Scroll without purpose.',
   'Stand up, then sit back down.',
