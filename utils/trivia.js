@@ -96,9 +96,8 @@ function getGuildTrivia(guildId) {
   return triviaData[guildId];
 }
 
-function recordTriviaWin(guildId, userId, username, difficulty = 'medium') {
-  const guildData = getGuildTrivia(guildId);
-
+// Helper to initialize or get leaderboard entry for a user
+function initLeaderboardUser(guildData, userId, username) {
   if (!guildData.leaderboard[userId]) {
     guildData.leaderboard[userId] = {
       points: 0,
@@ -109,6 +108,14 @@ function recordTriviaWin(guildId, userId, username, difficulty = 'medium') {
   }
 
   const userData = guildData.leaderboard[userId];
+  userData.username = username; // Update username in case it changed
+
+  return userData;
+}
+
+function recordTriviaWin(guildId, userId, username, difficulty = 'medium') {
+  const guildData = getGuildTrivia(guildId);
+  const userData = initLeaderboardUser(guildData, userId, username);
   const pointsEarned = POINTS_PER_WIN * (POINTS_MULTIPLIER[difficulty] || 1);
 
   userData.points += pointsEarned;
@@ -134,19 +141,9 @@ function recordTriviaWin(guildId, userId, username, difficulty = 'medium') {
 
 function recordTriviaAttempt(guildId, userId, username) {
   const guildData = getGuildTrivia(guildId);
+  const userData = initLeaderboardUser(guildData, userId, username);
 
-  if (!guildData.leaderboard[userId]) {
-    guildData.leaderboard[userId] = {
-      points: 0,
-      wins: 0,
-      totalAnswered: 0,
-      username: username,
-    };
-  }
-
-  const userData = guildData.leaderboard[userId];
   userData.totalAnswered += 1;
-  userData.username = username;
 
   saveTriviaData();
 }

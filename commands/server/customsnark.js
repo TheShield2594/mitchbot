@@ -26,6 +26,7 @@ module.exports = {
             .setName('content')
             .setDescription('The custom response text')
             .setRequired(true)
+            .setMaxLength(2000)
         )
     )
     .addSubcommand(subcommand =>
@@ -81,7 +82,16 @@ module.exports = {
     const type = interaction.options.getString('type');
 
     if (subcommand === 'add') {
-      const content = interaction.options.getString('content');
+      let content = interaction.options.getString('content');
+
+      // Server-side validation for length
+      if (content.length > 2000) {
+        await interaction.reply({
+          content: 'Content too long. Maximum 2000 characters.',
+          ephemeral: true,
+        });
+        return;
+      }
 
       const result = addCustomSnark(interaction.guildId, type, content);
 

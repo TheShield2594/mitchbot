@@ -2,14 +2,19 @@ const { request } = require('undici');
 const { SlashCommandBuilder } = require('discord.js');
 const { recordTriviaWin, recordTriviaAttempt, getWinMessage, getTimeoutMessage, POINTS_MULTIPLIER } = require('../../utils/trivia');
 
-// Decode HTML entities helper
+// Decode HTML entities helper - handles numeric and named entities
 function decodeHtml(html) {
+  if (typeof html !== 'string') return html;
+
   return html
     .replace(/&quot;/g, '"')
     .replace(/&#039;/g, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
+    .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+    .replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
 module.exports = {
@@ -81,6 +86,15 @@ module.exports = {
         `${answerList}\n\n` +
         `Type your answer (A, B, C, or D). You have 15 seconds.`
       );
+
+      // Check if channel is available for message collection
+      if (!interaction.channel) {
+        await interaction.followUp({
+          content: 'Cannot collect answers in this channel context.',
+          ephemeral: true,
+        });
+        return;
+      }
 
       // Create message collector
       const filter = (msg) => {

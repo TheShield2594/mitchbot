@@ -94,11 +94,13 @@ function addCustomSnark(guildId, type, content) {
   const guildData = getGuildSnark(guildId);
 
   const validTypes = ['roasts', 'compliments', 'quests'];
-  const fieldName = `custom${type.charAt(0).toUpperCase() + type.slice(1)}`;
 
+  // Validate type before using it
   if (!validTypes.includes(type)) {
     return { success: false, error: 'Invalid type. Use: roasts, compliments, or quests' };
   }
+
+  const fieldName = `custom${type.charAt(0).toUpperCase() + type.slice(1)}`;
 
   if (!guildData[fieldName]) {
     guildData[fieldName] = [];
@@ -143,13 +145,17 @@ function listCustomSnark(guildId, type) {
   const guildData = getGuildSnark(guildId);
 
   const validTypes = ['roasts', 'compliments', 'quests'];
-  const fieldName = `custom${type.charAt(0).toUpperCase() + type.slice(1)}`;
 
+  // Validate type before using it
   if (!validTypes.includes(type)) {
     return { success: false, error: 'Invalid type. Use: roasts, compliments, or quests' };
   }
 
-  return { success: true, items: guildData[fieldName] || [] };
+  const fieldName = `custom${type.charAt(0).toUpperCase() + type.slice(1)}`;
+
+  // Return shallow copy to prevent external mutations
+  const items = guildData[fieldName] || [];
+  return { success: true, items: [...items] };
 }
 
 function getRandomSnark(guildId, type, defaults) {

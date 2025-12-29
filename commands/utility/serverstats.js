@@ -43,7 +43,7 @@ module.exports = {
 
     // Add history if available
     if (stats.history.length > 0) {
-      const historyText = stats.history
+      const historyText = [...stats.history]
         .reverse()
         .map((week) => {
           const weekDate = new Date(week.weekStart);

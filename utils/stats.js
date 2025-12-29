@@ -168,6 +168,14 @@ function getWeeklyRecap(guildId) {
   };
 }
 
+// Command-specific snarky messages (update this mapping for new commands)
+const COMMAND_SNARK = {
+  '8ball': 'Priorities.',
+  'meme': 'Predictable.',
+  'trivia': 'Knowledge seekers, apparently.',
+  'quest': 'The grind continues.',
+};
+
 function generateRecapMessage(recap, guild) {
   if (recap.totalCommands === 0) {
     return 'This server ran 0 commands this week. Impressive commitment to silence.';
@@ -183,14 +191,9 @@ function generateRecapMessage(recap, guild) {
     const topCmd = recap.topCommands[0];
     const percentage = ((topCmd.count / recap.totalCommands) * 100).toFixed(0);
 
-    if (topCmd.command === '8ball') {
-      messages.push(`${topCmd.count} were \`/8ball\`. Priorities.`);
-    } else if (topCmd.command === 'meme') {
-      messages.push(`${topCmd.count} were \`/meme\`. Predictable.`);
-    } else if (topCmd.command === 'trivia') {
-      messages.push(`${topCmd.count} were \`/trivia\`. Knowledge seekers, apparently.`);
-    } else if (topCmd.command === 'quest') {
-      messages.push(`${topCmd.count} were \`/quest\`. The grind continues.`);
+    const snark = COMMAND_SNARK[topCmd.command];
+    if (snark) {
+      messages.push(`${topCmd.count} were \`/${topCmd.command}\`. ${snark}`);
     } else {
       messages.push(`Most popular: \`/${topCmd.command}\` (${topCmd.count} times). ${percentage}% of all activity.`);
     }

@@ -89,9 +89,10 @@ function getGuildQuests(guildId) {
   return questData[guildId];
 }
 
+// Returns YYYY-MM-DD in UTC to ensure consistent dates across timezones
 function getTodayDateString() {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
 }
 
 function recordQuestCompletion(guildId, userId, username = 'Unknown') {
@@ -120,10 +121,9 @@ function recordQuestCompletion(guildId, userId, username = 'Unknown') {
     };
   }
 
-  // Calculate if streak continues
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayString = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+  // Calculate if streak continues (using UTC for consistency)
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000); // Subtract one day in milliseconds
+  const yesterdayString = `${yesterday.getUTCFullYear()}-${String(yesterday.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterday.getUTCDate()).padStart(2, '0')}`;
 
   if (lastDate === yesterdayString) {
     // Streak continues
