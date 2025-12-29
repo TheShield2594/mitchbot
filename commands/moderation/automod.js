@@ -160,6 +160,24 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
+    // Verify bot has permissions needed for automod enforcement
+    const botMember = interaction.guild.members.me;
+    const requiredPerms = [
+      PermissionFlagsBits.ManageMessages,
+      PermissionFlagsBits.ModerateMembers,
+    ];
+
+    const missingPerms = requiredPerms.filter(perm => !botMember.permissions.has(perm));
+    if (missingPerms.length > 0) {
+      const permNames = missingPerms.map(perm => {
+        if (perm === PermissionFlagsBits.ManageMessages) return 'Manage Messages';
+        if (perm === PermissionFlagsBits.ModerateMembers) return 'Moderate Members';
+        return 'Unknown';
+      });
+      await interaction.editReply(`⚠️ I lack required permissions to enforce automod rules: ${permNames.join(', ')}.\nPlease grant these permissions before configuring automod.`);
+      return;
+    }
+
     const subcommand = interaction.options.getSubcommand();
     const config = getGuildConfig(interaction.guildId);
 

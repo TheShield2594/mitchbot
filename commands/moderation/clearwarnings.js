@@ -39,10 +39,16 @@ module.exports = {
       return;
     }
 
-    // Clear warnings
-    clearWarnings(interaction.guildId, target.id);
+    try {
+      // Clear warnings
+      await clearWarnings(interaction.guildId, target.id);
+    } catch (error) {
+      console.error('Error clearing warnings:', error);
+      await interaction.editReply('Failed to clear warnings. The changes may not have been saved.');
+      return;
+    }
 
-    // Log the action
+    // Log the action (non-blocking)
     addLog(interaction.guildId, {
       type: 'clearwarnings',
       action: 'Warnings Cleared',
