@@ -18,15 +18,73 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
-// Show alert
-function showAlert(message, type = 'success') {
-  const container = document.getElementById('alert-container');
-  const alert = document.createElement('div');
-  alert.className = `alert alert-${type}`;
-  alert.textContent = message;
-  container.appendChild(alert);
+// Toast notification system
+function showToast(title, message, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
 
-  setTimeout(() => alert.remove(), 5000);
+  const icons = {
+    success: '✓',
+    error: '✕',
+    warning: '⚠',
+    info: 'ℹ'
+  };
+
+  toast.innerHTML = `
+    <div class="toast-icon">${icons[type] || icons.info}</div>
+    <div class="toast-content">
+      <div class="toast-title">${title}</div>
+      ${message ? `<div class="toast-message">${message}</div>` : ''}
+    </div>
+    <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+  `;
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('removing');
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
+// Update status overview panel
+function updateStatusOverview() {
+  if (!config) return;
+
+  const updateStatus = (id, enabled) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.className = enabled ? 'status-indicator enabled' : 'status-indicator disabled';
+      element.innerHTML = `
+        <span class="status-dot"></span>
+        <span>${enabled ? 'On' : 'Off'}</span>
+      `;
+    }
+  };
+
+  updateStatus('status-automod', config.automod.enabled);
+  updateStatus('status-wordfilter', config.automod.wordFilter.enabled);
+  updateStatus('status-invitefilter', config.automod.inviteFilter.enabled);
+  updateStatus('status-linkfilter', config.automod.linkFilter.enabled);
+  updateStatus('status-spam', config.automod.spam.enabled);
+  updateStatus('status-logging', config.logging.enabled && config.logging.channelId);
+
+  // Update labels with counts
+  const wordCount = config.automod.wordFilter.words.length;
+  const whitelistCount = config.automod.linkFilter.whitelist.length;
+  const blacklistCount = config.automod.linkFilter.blacklist.length;
+
+  const wordLabel = document.getElementById('label-wordfilter');
+  if (wordLabel) {
+    wordLabel.textContent = `Word Filter${wordCount > 0 ? ` (${wordCount})` : ''}`;
+  }
+
+  const linkLabel = document.getElementById('label-linkfilter');
+  if (linkLabel) {
+    const total = whitelistCount + blacklistCount;
+    linkLabel.textContent = `Link Filter${total > 0 ? ` (${total})` : ''}`;
+  }
 }
 
 // Load guild info and config
@@ -63,9 +121,12 @@ async function loadGuildInfo() {
 
     // Load automod config
     loadAutomodConfig();
+
+    // Update status overview
+    updateStatusOverview();
   } catch (error) {
     console.error('Error loading guild info:', error);
-    showAlert('Failed to load guild information', 'error');
+    showToast('Error', 'Failed to load guild information', 'error');
   }
 }
 
@@ -81,6 +142,30 @@ function loadAutomodConfig() {
   renderWordList();
   renderWhitelist();
   renderBlacklist();
+
+  // Add real-time toggle listeners to update overview
+  const toggles = [
+    'automod-enabled',
+    'wordfilter-enabled',
+    'invitefilter-enabled',
+    'linkfilter-enabled',
+    'spam-enabled'
+  ];
+
+  toggles.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.addEventListener('change', () => {
+        // Update config preview (not saved yet)
+        if (id === 'automod-enabled') config.automod.enabled = element.checked;
+        if (id === 'wordfilter-enabled') config.automod.wordFilter.enabled = element.checked;
+        if (id === 'invitefilter-enabled') config.automod.inviteFilter.enabled = element.checked;
+        if (id === 'linkfilter-enabled') config.automod.linkFilter.enabled = element.checked;
+        if (id === 'spam-enabled') config.automod.spam.enabled = element.checked;
+        updateStatusOverview();
+      });
+    }
+  });
 }
 
 // Render word list
@@ -97,6 +182,8 @@ function renderWordList() {
     `;
     container.appendChild(tag);
   });
+
+  updateStatusOverview();
 }
 
 // Add word
@@ -133,6 +220,8 @@ function renderWhitelist() {
     `;
     container.appendChild(tag);
   });
+
+  updateStatusOverview();
 }
 
 // Add whitelist
@@ -169,6 +258,8 @@ function renderBlacklist() {
     `;
     container.appendChild(tag);
   });
+
+  updateStatusOverview();
 }
 
 // Add blacklist
@@ -230,10 +321,20 @@ async function saveAutomod() {
       throw new Error('Failed to save settings');
     }
 
-    showAlert('Automod settings saved successfully!', 'success');
+    // Update config with new values
+    config.automod.enabled = updates.enabled;
+    config.automod.wordFilter.enabled = updates.wordFilter.enabled;
+    config.automod.inviteFilter.enabled = updates.inviteFilter.enabled;
+    config.automod.linkFilter.enabled = updates.linkFilter.enabled;
+    config.automod.spam.enabled = updates.spam.enabled;
+
+    // Update status overview
+    updateStatusOverview();
+
+    showToast('Settings Saved', 'Automod configuration updated successfully', 'success');
   } catch (error) {
     console.error('Error saving automod settings:', error);
-    showAlert('Failed to save automod settings', 'error');
+    showToast('Save Failed', 'Could not save automod settings', 'error');
   }
 }
 
@@ -334,10 +435,17 @@ async function saveSettings() {
       throw new Error('Failed to save settings');
     }
 
-    showAlert('Settings saved successfully!', 'success');
+    // Update config with new values
+    config.logging.enabled = !!logChannelId;
+    config.logging.channelId = logChannelId || null;
+
+    // Update status overview
+    updateStatusOverview();
+
+    showToast('Settings Saved', 'Logging configuration updated successfully', 'success');
   } catch (error) {
     console.error('Error saving settings:', error);
-    showAlert('Failed to save settings', 'error');
+    showToast('Save Failed', 'Could not save logging settings', 'error');
   }
 }
 
