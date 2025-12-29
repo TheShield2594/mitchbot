@@ -23,11 +23,17 @@ function validateEnvironment() {
   // Validate CALLBACK_URL
   if (!process.env.CALLBACK_URL) {
     if (process.env.NODE_ENV === 'production') {
-      const error = 'CALLBACK_URL must be explicitly set in production';
-      logger.error(error);
-      throw new Error(error);
+      // Try to auto-detect Railway deployment
+      if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+        logger.info('CALLBACK_URL not set, using Railway public domain');
+      } else {
+        const error = 'CALLBACK_URL must be explicitly set in production (or deploy to Railway with RAILWAY_PUBLIC_DOMAIN)';
+        logger.error(error);
+        throw new Error(error);
+      }
+    } else {
+      logger.warn('CALLBACK_URL not set, using localhost default (development only)');
     }
-    logger.warn('CALLBACK_URL not set, using localhost default (development only)');
   }
 }
 
@@ -176,11 +182,20 @@ module.exports = function startWebServer(client) {
   });
 
   // Discord OAuth2 Strategy
-  const callbackURL = process.env.CALLBACK_URL ||
-    (isProduction ? undefined : `http://localhost:${PORT}/auth/callback`);
+  let callbackURL = process.env.CALLBACK_URL;
 
   if (!callbackURL) {
-    throw new Error('CALLBACK_URL must be set in production');
+    if (isProduction) {
+      // Try to auto-detect Railway deployment
+      if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+        callbackURL = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/auth/callback`;
+        logger.info('Using auto-detected Railway callback URL', { callbackURL });
+      } else {
+        throw new Error('CALLBACK_URL must be set in production');
+      }
+    } else {
+      callbackURL = `http://localhost:${PORT}/auth/callback`;
+    }
   }
 
   passport.use(new DiscordStrategy({
