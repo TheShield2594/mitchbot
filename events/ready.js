@@ -7,6 +7,7 @@ const { initEconomy } = require('../utils/economy');
 const { initQuests } = require('../utils/quests');
 const { initTrivia } = require('../utils/trivia');
 const { initStats, getWeeklyRecap, generateRecapMessage } = require('../utils/stats');
+const { initSnark } = require('../utils/snark');
 const logger = require('../utils/logger');
 
 const CHANNEL_ID = process.env.BIRTHDAY_CHANNEL_ID;
@@ -167,6 +168,13 @@ module.exports = {
       console.log('✅ Server stats tracking initialized');
     } catch (error) {
       console.error('Failed to initialize stats', error);
+    }
+
+    try {
+      await initSnark();
+      console.log('✅ Custom snark system initialized');
+    } catch (error) {
+      console.error('Failed to initialize snark', error);
     }
 
     // Check for expired tempbans every minute

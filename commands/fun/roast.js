@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
+const { getRandomSnark } = require('../../utils/snark');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -14,7 +15,7 @@ module.exports = {
   async execute(interaction) {
     const target = interaction.options.getUser('target') || interaction.user;
 
-    const roasts = [
+    const defaultRoasts = [
       `${target.username}, you're like a software update. Nobody wants you, but you show up anyway.`,
       `${target.username}, you have the energy of a browser with 47 tabs open.`,
       `${target.username}, you're the human equivalent of a typo in production.`,
@@ -32,7 +33,14 @@ module.exports = {
       `${target.username}, you're the reason we can't have nice things in production.`,
     ];
 
-    const randomRoast = roasts[Math.floor(Math.random() * roasts.length)];
-    await interaction.reply(randomRoast);
+    // Get roast (includes custom server roasts if configured)
+    const template = interaction.guildId
+      ? getRandomSnark(interaction.guildId, 'roasts', defaultRoasts)
+      : defaultRoasts[Math.floor(Math.random() * defaultRoasts.length)];
+
+    // Replace {username} placeholder if present in custom roasts
+    const roast = template.replace(/{username}/g, target.username);
+
+    await interaction.reply(roast);
   },
 };

@@ -1,7 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { recordQuestCompletion, getStreakMessage } = require('../../utils/quests');
+const { getRandomSnark } = require('../../utils/snark');
 
-const quests = [
+const defaultQuests = [
   'Stare at something longer than normal.',
   'Say "interesting" and mean it.',
   'Open a game and close it immediately.',
@@ -29,7 +30,8 @@ module.exports = {
 
     await interaction.deferReply();
 
-    const quest = quests[Math.floor(Math.random() * quests.length)];
+    // Get quest (includes custom server quests if configured)
+    const quest = getRandomSnark(interaction.guildId, 'quests', defaultQuests);
     const streakData = recordQuestCompletion(interaction.guildId, interaction.user.id);
 
     if (streakData.alreadyCompleted) {
