@@ -39,13 +39,15 @@ module.exports = {
 
       // Log the action
       addLog(interaction.guildId, {
-        type: 'lock',
+        actionType: 'lock',
         action: 'Channel Locked',
         channelId: interaction.channel.id,
         channelName: interaction.channel.name,
         moderatorId: interaction.user.id,
         moderatorTag: interaction.user.tag,
         reason,
+        targetUserId: null,
+        duration: null,
       });
 
       await interaction.editReply(`🔒 Channel locked.\nReason: ${reason}`);

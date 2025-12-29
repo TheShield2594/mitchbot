@@ -67,14 +67,15 @@ async function checkExpiredTempbans(client) {
 
         // Log the action
         addLog(guildId, {
-          type: 'unban',
+          actionType: 'unban',
           action: 'Temporary Ban Expired',
-          targetId: userId,
+          targetUserId: userId,
           targetTag: 'Unknown User',
           moderatorId: client.user.id,
           moderatorTag: client.user.username,
           reason: `Automatic unban - tempban expired (original case #${caseId})`,
           relatedCaseId: caseId,
+          duration: null,
         });
 
         logger.info('Tempban expired and user unbanned', { guildId, userId, caseId });

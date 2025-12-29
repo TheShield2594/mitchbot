@@ -76,14 +76,14 @@ module.exports = {
 
       // Log the action
       const logEntry = addLog(interaction.guildId, {
-        type: 'timeout',
+        actionType: 'timeout',
         action: 'Member Timed Out',
-        targetId: target.id,
+        targetUserId: target.id,
         targetTag: target.user.tag,
         moderatorId: interaction.user.id,
         moderatorTag: interaction.user.tag,
         reason,
-        duration: `${duration} minutes`,
+        duration: timeoutMs,
       });
 
       await interaction.editReply(`Successfully timed out ${target.user.tag} for ${duration} minutes\nReason: ${reason}\nCase #${logEntry.caseId}`);
