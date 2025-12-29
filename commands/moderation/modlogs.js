@@ -1,28 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { getLogs } = require('../../utils/moderation');
-
-function formatDuration(duration) {
-  if (duration === null || duration === undefined) {
-    return null;
-  }
-
-  if (typeof duration === 'string') {
-    return duration;
-  }
-
-  const totalSeconds = Math.floor(duration / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}m`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-  return `${seconds}s`;
-}
+const { formatDuration } = require('../../utils/formatting');
 
 module.exports = {
   data: new SlashCommandBuilder()

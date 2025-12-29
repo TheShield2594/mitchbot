@@ -1,19 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { getCasesByUser } = require('../../utils/moderation');
-
-function formatActionLabel(caseEntry) {
-  if (caseEntry.action) {
-    return caseEntry.action;
-  }
-
-  if (!caseEntry.actionType) {
-    return 'Case';
-  }
-
-  return caseEntry.actionType
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
+const { formatActionLabel } = require('../../utils/formatting');
 
 module.exports = {
   data: new SlashCommandBuilder()

@@ -130,6 +130,10 @@ function saveModerationData() {
 }
 
 function migrateGuildConfig(config) {
+  if (config._migrated) {
+    return config;
+  }
+
   if (!config.cases && Array.isArray(config.logs)) {
     config.cases = config.logs.map((log, index) => ({
       caseId: log.caseId || index + 1,
@@ -153,6 +157,7 @@ function migrateGuildConfig(config) {
     config.caseCounter = maxCaseId;
   }
 
+  config._migrated = true;
   return config;
 }
 
@@ -173,7 +178,13 @@ function getGuildConfig(guildId) {
       console.error('Failed to save new guild config', { guildId, error: err });
     });
   }
+  const wasMigrated = Boolean(moderationData[guildId]._migrated);
   moderationData[guildId] = migrateGuildConfig(moderationData[guildId]);
+  if (!wasMigrated && moderationData[guildId]._migrated) {
+    saveModerationData().catch(err => {
+      console.error('Failed to save migrated guild config', { guildId, error: err });
+    });
+  }
   return moderationData[guildId];
 }
 
@@ -238,6 +249,7 @@ function addCase(guildId, caseEntry) {
   const targetUserId = caseEntry.targetUserId || caseEntry.targetId || null;
   const reason = caseEntry.reason || null;
   const duration = caseEntry.duration ?? null;
+  // Explicit/normalized fields below intentionally override any matching properties from caseEntry.
   const caseRecord = {
     id: randomUUID(),
     timestamp: new Date().toISOString(),
@@ -252,7 +264,7 @@ function addCase(guildId, caseEntry) {
 
   config.cases.push(caseRecord);
 
-  // Keep only last 1000 cases per guild
+  // Keep only the most recent 1000 cases; caseCounter continues incrementing to avoid caseId reuse.
   if (config.cases.length > 1000) {
     config.cases = config.cases.slice(-1000);
   }
