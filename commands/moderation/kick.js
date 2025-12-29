@@ -24,12 +24,7 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    // Runtime permission check
-    if (!interaction.member.permissions.has(PermissionFlagsBits.KickMembers)) {
-      await interaction.editReply('You do not have permission to kick members.');
-      return;
-    }
-
+    // Verify bot has required permissions
     if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.KickMembers)) {
       await interaction.editReply('I do not have permission to kick members. Please check my role permissions.');
       return;

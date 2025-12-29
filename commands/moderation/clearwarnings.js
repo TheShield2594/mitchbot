@@ -23,12 +23,6 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    // Runtime permission check
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      await interaction.editReply('You do not have permission to clear warnings.');
-      return;
-    }
-
     const target = interaction.options.getUser('target');
     const reason = interaction.options.getString('reason') || 'No reason provided';
 

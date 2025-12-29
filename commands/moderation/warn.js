@@ -23,12 +23,6 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    // Runtime permission check
-    if (!interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-      await interaction.editReply('You do not have permission to warn members.');
-      return;
-    }
-
     const target = interaction.options.getMember('target');
     const reason = interaction.options.getString('reason');
 

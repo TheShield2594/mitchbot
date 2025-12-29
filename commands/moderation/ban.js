@@ -32,12 +32,7 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    // Runtime permission check
-    if (!interaction.member.permissions.has(PermissionFlagsBits.BanMembers)) {
-      await interaction.editReply('You do not have permission to ban members.');
-      return;
-    }
-
+    // Verify bot has required permissions
     if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.BanMembers)) {
       await interaction.editReply('I do not have permission to ban members. Please check my role permissions.');
       return;

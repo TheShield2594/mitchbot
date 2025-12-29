@@ -25,12 +25,7 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    // Runtime permission check
-    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-      await interaction.editReply('You do not have permission to manage channels.');
-      return;
-    }
-
+    // Verify bot has required permissions
     if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels)) {
       await interaction.editReply('I do not have permission to manage channels. Please check my role permissions.');
       return;
@@ -41,8 +36,10 @@ module.exports = {
       ChannelType.GuildText,
       ChannelType.GuildVoice,
       ChannelType.GuildForum,
+      ChannelType.GuildAnnouncement,
       ChannelType.PublicThread,
       ChannelType.PrivateThread,
+      ChannelType.AnnouncementThread,
     ];
 
     if (!validChannelTypes.includes(interaction.channel.type)) {
