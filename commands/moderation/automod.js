@@ -1,6 +1,43 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { getGuildConfig, updateGuildConfig } = require('../../utils/moderation');
 
+// Helper function to validate and normalize domain names
+function validateAndNormalizeDomain(input) {
+  if (!input || typeof input !== 'string') {
+    return null;
+  }
+
+  // Trim and lowercase
+  let domain = input.trim().toLowerCase();
+
+  if (domain.length === 0) {
+    return null;
+  }
+
+  // Strip URL scheme if present
+  domain = domain.replace(/^https?:\/\//, '');
+  domain = domain.replace(/^\/\//, '');
+
+  // Strip path, query params, and hash if present
+  domain = domain.split('/')[0];
+  domain = domain.split('?')[0];
+  domain = domain.split('#')[0];
+
+  // Strip port if present
+  domain = domain.split(':')[0];
+
+  // Validate domain pattern (basic check for valid hostname)
+  // Allows: letters, numbers, hyphens, dots
+  // Must have at least one dot for TLD
+  const domainRegex = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+
+  if (!domainRegex.test(domain)) {
+    return null;
+  }
+
+  return domain;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('automod')
@@ -190,22 +227,35 @@ module.exports = {
       const word = interaction.options.getString('word');
 
       if (action === 'enable') {
-        config.automod.wordFilter.enabled = true;
-        updateGuildConfig(interaction.guildId, { automod: config.automod });
+        const newAutomod = {
+          ...config.automod,
+          wordFilter: { ...config.automod.wordFilter, enabled: true },
+        };
+        updateGuildConfig(interaction.guildId, { automod: newAutomod });
         await interaction.editReply('✅ Word filter enabled.');
       } else if (action === 'disable') {
-        config.automod.wordFilter.enabled = false;
-        updateGuildConfig(interaction.guildId, { automod: config.automod });
+        const newAutomod = {
+          ...config.automod,
+          wordFilter: { ...config.automod.wordFilter, enabled: false },
+        };
+        updateGuildConfig(interaction.guildId, { automod: newAutomod });
         await interaction.editReply('❌ Word filter disabled.');
       } else if (action === 'add') {
         if (!word) {
           await interaction.editReply('❌ Please provide a word to add.');
           return;
         }
-        if (!config.automod.wordFilter.words.includes(word.toLowerCase())) {
-          config.automod.wordFilter.words.push(word.toLowerCase());
-          updateGuildConfig(interaction.guildId, { automod: config.automod });
-          await interaction.editReply(`✅ Added "${word}" to word filter.`);
+        const normalizedWord = word.toLowerCase();
+        const currentWords = [...config.automod.wordFilter.words];
+
+        if (!currentWords.includes(normalizedWord)) {
+          const newWords = [...currentWords, normalizedWord];
+          const newAutomod = {
+            ...config.automod,
+            wordFilter: { ...config.automod.wordFilter, words: newWords },
+          };
+          updateGuildConfig(interaction.guildId, { automod: newAutomod });
+          await interaction.editReply(`✅ Added "${normalizedWord}" to word filter.`);
         } else {
           await interaction.editReply('❌ That word is already in the filter.');
         }
@@ -214,11 +264,18 @@ module.exports = {
           await interaction.editReply('❌ Please provide a word to remove.');
           return;
         }
-        const index = config.automod.wordFilter.words.indexOf(word.toLowerCase());
+        const normalizedWord = word.toLowerCase();
+        const currentWords = [...config.automod.wordFilter.words];
+        const index = currentWords.indexOf(normalizedWord);
+
         if (index > -1) {
-          config.automod.wordFilter.words.splice(index, 1);
-          updateGuildConfig(interaction.guildId, { automod: config.automod });
-          await interaction.editReply(`✅ Removed "${word}" from word filter.`);
+          const newWords = currentWords.filter((w, i) => i !== index);
+          const newAutomod = {
+            ...config.automod,
+            wordFilter: { ...config.automod.wordFilter, words: newWords },
+          };
+          updateGuildConfig(interaction.guildId, { automod: newAutomod });
+          await interaction.editReply(`✅ Removed "${normalizedWord}" from word filter.`);
         } else {
           await interaction.editReply('❌ That word is not in the filter.');
         }
@@ -255,63 +312,119 @@ module.exports = {
     // Link Filter
     if (subcommand === 'linkfilter') {
       const action = interaction.options.getString('action');
-      const domain = interaction.options.getString('domain');
+      const domainInput = interaction.options.getString('domain');
 
       if (action === 'enable') {
-        config.automod.linkFilter.enabled = true;
-        updateGuildConfig(interaction.guildId, { automod: config.automod });
+        const newAutomod = {
+          ...config.automod,
+          linkFilter: { ...config.automod.linkFilter, enabled: true },
+        };
+        updateGuildConfig(interaction.guildId, { automod: newAutomod });
         await interaction.editReply('✅ Link filter enabled.');
       } else if (action === 'disable') {
-        config.automod.linkFilter.enabled = false;
-        updateGuildConfig(interaction.guildId, { automod: config.automod });
+        const newAutomod = {
+          ...config.automod,
+          linkFilter: { ...config.automod.linkFilter, enabled: false },
+        };
+        updateGuildConfig(interaction.guildId, { automod: newAutomod });
         await interaction.editReply('❌ Link filter disabled.');
       } else if (action === 'whitelist') {
-        if (!domain) {
+        if (!domainInput) {
           await interaction.editReply('❌ Please provide a domain to whitelist.');
           return;
         }
-        if (!config.automod.linkFilter.whitelist.includes(domain)) {
-          config.automod.linkFilter.whitelist.push(domain);
-          updateGuildConfig(interaction.guildId, { automod: config.automod });
-          await interaction.editReply(`✅ Added "${domain}" to whitelist.`);
+
+        const normalizedDomain = validateAndNormalizeDomain(domainInput);
+        if (!normalizedDomain) {
+          await interaction.editReply(`❌ Invalid domain: "${domainInput}". Please provide a valid domain name (e.g., youtube.com)`);
+          return;
+        }
+
+        const currentWhitelist = [...config.automod.linkFilter.whitelist];
+        if (!currentWhitelist.includes(normalizedDomain)) {
+          const newWhitelist = [...currentWhitelist, normalizedDomain];
+          const newAutomod = {
+            ...config.automod,
+            linkFilter: { ...config.automod.linkFilter, whitelist: newWhitelist },
+          };
+          updateGuildConfig(interaction.guildId, { automod: newAutomod });
+          await interaction.editReply(`✅ Added "${normalizedDomain}" to whitelist.`);
         } else {
           await interaction.editReply('❌ That domain is already whitelisted.');
         }
       } else if (action === 'blacklist') {
-        if (!domain) {
+        if (!domainInput) {
           await interaction.editReply('❌ Please provide a domain to blacklist.');
           return;
         }
-        if (!config.automod.linkFilter.blacklist.includes(domain)) {
-          config.automod.linkFilter.blacklist.push(domain);
-          updateGuildConfig(interaction.guildId, { automod: config.automod });
-          await interaction.editReply(`✅ Added "${domain}" to blacklist.`);
+
+        const normalizedDomain = validateAndNormalizeDomain(domainInput);
+        if (!normalizedDomain) {
+          await interaction.editReply(`❌ Invalid domain: "${domainInput}". Please provide a valid domain name (e.g., spam.com)`);
+          return;
+        }
+
+        const currentBlacklist = [...config.automod.linkFilter.blacklist];
+        if (!currentBlacklist.includes(normalizedDomain)) {
+          const newBlacklist = [...currentBlacklist, normalizedDomain];
+          const newAutomod = {
+            ...config.automod,
+            linkFilter: { ...config.automod.linkFilter, blacklist: newBlacklist },
+          };
+          updateGuildConfig(interaction.guildId, { automod: newAutomod });
+          await interaction.editReply(`✅ Added "${normalizedDomain}" to blacklist.`);
         } else {
           await interaction.editReply('❌ That domain is already blacklisted.');
         }
       } else if (action === 'remove_whitelist') {
-        if (!domain) {
+        if (!domainInput) {
           await interaction.editReply('❌ Please provide a domain to remove.');
           return;
         }
-        const index = config.automod.linkFilter.whitelist.indexOf(domain);
+
+        const normalizedDomain = validateAndNormalizeDomain(domainInput);
+        if (!normalizedDomain) {
+          await interaction.editReply(`❌ Invalid domain: "${domainInput}".`);
+          return;
+        }
+
+        const currentWhitelist = [...config.automod.linkFilter.whitelist];
+        const index = currentWhitelist.indexOf(normalizedDomain);
+
         if (index > -1) {
-          config.automod.linkFilter.whitelist.splice(index, 1);
-          updateGuildConfig(interaction.guildId, { automod: config.automod });
-          await interaction.editReply(`✅ Removed "${domain}" from whitelist.`);
+          const newWhitelist = currentWhitelist.filter((d, i) => i !== index);
+          const newAutomod = {
+            ...config.automod,
+            linkFilter: { ...config.automod.linkFilter, whitelist: newWhitelist },
+          };
+          updateGuildConfig(interaction.guildId, { automod: newAutomod });
+          await interaction.editReply(`✅ Removed "${normalizedDomain}" from whitelist.`);
         } else {
           await interaction.editReply('❌ That domain is not in the whitelist.');
         }
       } else if (action === 'remove_blacklist') {
-        if (!domain) {
+        if (!domainInput) {
           await interaction.editReply('❌ Please provide a domain to remove.');
           return;
         }
-        const index = config.automod.linkFilter.blacklist.indexOf(domain);
+
+        const normalizedDomain = validateAndNormalizeDomain(domainInput);
+        if (!normalizedDomain) {
+          await interaction.editReply(`❌ Invalid domain: "${domainInput}".`);
+          return;
+        }
+
+        const currentBlacklist = [...config.automod.linkFilter.blacklist];
+        const index = currentBlacklist.indexOf(normalizedDomain);
+
         if (index > -1) {
-          config.automod.linkFilter.blacklist.splice(index, 1);
-          updateGuildConfig(interaction.guildId, { automod: config.automod });
-          await interaction.editReply(`✅ Removed "${domain}" from blacklist.`);
+          const newBlacklist = currentBlacklist.filter((d, i) => i !== index);
+          const newAutomod = {
+            ...config.automod,
+            linkFilter: { ...config.automod.linkFilter, blacklist: newBlacklist },
+          };
+          updateGuildConfig(interaction.guildId, { automod: newAutomod });
+          await interaction.editReply(`✅ Removed "${normalizedDomain}" from blacklist.`);
         } else {
           await interaction.editReply('❌ That domain is not in the blacklist.');
         }

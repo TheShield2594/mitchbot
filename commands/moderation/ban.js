@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { addLog } = require('../../utils/moderation');
+const logger = require('../../utils/logger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -61,7 +62,13 @@ module.exports = {
         await target.send(`You have been banned from **${interaction.guild.name}**\nReason: ${reason}`);
       } catch (error) {
         // User has DMs disabled or blocked the bot
-        console.log('Could not DM banned user');
+        logger.warn('Could not DM banned user', {
+          command: 'ban',
+          targetId: target.id,
+          targetTag: target.tag,
+          guildId: interaction.guildId,
+          error,
+        });
       }
 
       // Ban the user
@@ -84,7 +91,15 @@ module.exports = {
 
       await interaction.editReply(`Successfully banned ${target.tag}\nReason: ${reason}`);
     } catch (error) {
-      console.error('Error banning user:', error);
+      logger.error('Failed to ban user', {
+        command: 'ban',
+        targetId: target.id,
+        targetTag: target.tag,
+        guildId: interaction.guildId,
+        interactionId: interaction.id,
+        moderatorId: interaction.user.id,
+        error,
+      });
       await interaction.editReply('Failed to ban the user. Please check my permissions.');
     }
   },

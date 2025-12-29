@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { addLog } = require('../../utils/moderation');
+const logger = require('../../utils/logger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -49,7 +50,13 @@ module.exports = {
         await target.send(`You have been kicked from **${interaction.guild.name}**\nReason: ${reason}`);
       } catch (error) {
         // User has DMs disabled or blocked the bot
-        console.log('Could not DM kicked user');
+        logger.warn('Could not DM kicked user', {
+          command: 'kick',
+          targetId: target.id,
+          targetTag: target.user.tag,
+          guildId: interaction.guildId,
+          error,
+        });
       }
 
       // Kick the user
@@ -68,7 +75,15 @@ module.exports = {
 
       await interaction.editReply(`Successfully kicked ${target.user.tag}\nReason: ${reason}`);
     } catch (error) {
-      console.error('Error kicking user:', error);
+      logger.error('Failed to kick user', {
+        command: 'kick',
+        targetId: target.id,
+        targetTag: target.user.tag,
+        guildId: interaction.guildId,
+        interactionId: interaction.id,
+        moderatorId: interaction.user.id,
+        error,
+      });
       await interaction.editReply('Failed to kick the user. Please check my permissions.');
     }
   },
