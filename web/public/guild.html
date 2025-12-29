@@ -15,10 +15,61 @@
     </div>
   </nav>
 
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
   <div class="container">
     <div class="card">
       <h2 id="guild-name">Loading...</h2>
-      <div id="alert-container"></div>
+
+      <!-- Settings Overview Panel -->
+      <div class="overview-panel" id="overview-panel">
+        <h3>⚡ Active Features</h3>
+        <div class="overview-grid" id="overview-grid">
+          <div class="overview-item">
+            <span class="overview-item-label">Automod</span>
+            <span class="status-indicator disabled" id="status-automod">
+              <span class="status-dot"></span>
+              <span>Off</span>
+            </span>
+          </div>
+          <div class="overview-item">
+            <span class="overview-item-label" id="label-wordfilter">Word Filter</span>
+            <span class="status-indicator disabled" id="status-wordfilter">
+              <span class="status-dot"></span>
+              <span>Off</span>
+            </span>
+          </div>
+          <div class="overview-item">
+            <span class="overview-item-label">Invite Filter</span>
+            <span class="status-indicator disabled" id="status-invitefilter">
+              <span class="status-dot"></span>
+              <span>Off</span>
+            </span>
+          </div>
+          <div class="overview-item">
+            <span class="overview-item-label" id="label-linkfilter">Link Filter</span>
+            <span class="status-indicator disabled" id="status-linkfilter">
+              <span class="status-dot"></span>
+              <span>Off</span>
+            </span>
+          </div>
+          <div class="overview-item">
+            <span class="overview-item-label">Spam Detection</span>
+            <span class="status-indicator disabled" id="status-spam">
+              <span class="status-dot"></span>
+              <span>Off</span>
+            </span>
+          </div>
+          <div class="overview-item">
+            <span class="overview-item-label">Mod Logging</span>
+            <span class="status-indicator disabled" id="status-logging">
+              <span class="status-dot"></span>
+              <span>Off</span>
+            </span>
+          </div>
+        </div>
+      </div>
 
       <div class="tabs">
         <button class="tab active" data-tab="automod">Automod</button>
