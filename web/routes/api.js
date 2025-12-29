@@ -16,7 +16,7 @@ router.get('/guild/:guildId/config', ensureServerManager, (req, res) => {
 });
 
 // Update automod configuration
-router.post('/guild/:guildId/automod', ensureServerManager, (req, res) => {
+router.post('/guild/:guildId/automod', ensureServerManager, async (req, res) => {
   try {
     const config = getGuildConfig(req.params.guildId);
     const updates = req.body;
@@ -58,7 +58,7 @@ router.post('/guild/:guildId/automod', ensureServerManager, (req, res) => {
       config.automod.whitelistedChannels = updates.whitelistedChannels;
     }
 
-    updateGuildConfig(req.params.guildId, { automod: config.automod });
+    await updateGuildConfig(req.params.guildId, { automod: config.automod });
 
     res.json({ success: true, config: getGuildConfig(req.params.guildId) });
   } catch (error) {
@@ -68,13 +68,13 @@ router.post('/guild/:guildId/automod', ensureServerManager, (req, res) => {
 });
 
 // Update logging configuration
-router.post('/guild/:guildId/logging', ensureServerManager, (req, res) => {
+router.post('/guild/:guildId/logging', ensureServerManager, async (req, res) => {
   try {
     const config = getGuildConfig(req.params.guildId);
     const updates = req.body;
 
     config.logging = { ...config.logging, ...updates };
-    updateGuildConfig(req.params.guildId, { logging: config.logging });
+    await updateGuildConfig(req.params.guildId, { logging: config.logging });
 
     res.json({ success: true, config: getGuildConfig(req.params.guildId) });
   } catch (error) {
