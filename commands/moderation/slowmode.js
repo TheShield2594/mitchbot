@@ -56,7 +56,7 @@ module.exports = {
 
       // Log the action
       addLog(interaction.guildId, {
-        type: 'slowmode',
+        actionType: 'slowmode',
         action: 'Slowmode Updated',
         channelId: interaction.channel.id,
         channelName: interaction.channel.name,
@@ -64,6 +64,8 @@ module.exports = {
         moderatorTag: interaction.user.tag,
         slowmode: seconds,
         reason,
+        targetUserId: null,
+        duration: null,
       });
 
       if (seconds === 0) {

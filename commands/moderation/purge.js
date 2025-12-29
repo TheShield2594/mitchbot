@@ -68,15 +68,17 @@ module.exports = {
 
       // Log the action
       const logEntry = addLog(interaction.guildId, {
-        type: 'purge',
+        actionType: 'purge',
         action: 'Messages Purged',
         channelId: interaction.channel.id,
         channelName: interaction.channel.name,
         moderatorId: interaction.user.id,
         moderatorTag: interaction.user.tag,
         amount: deleted.size,
-        targetId: target?.id,
+        targetUserId: target?.id || null,
         targetTag: target?.tag,
+        reason: null,
+        duration: null,
       });
 
       await interaction.editReply(`Successfully deleted ${deleted.size} message(s)${target ? ` from ${target.tag}` : ''}.\nCase #${logEntry.caseId}`);

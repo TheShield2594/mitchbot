@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { getLogs } = require('../../utils/moderation');
+const { formatDuration } = require('../../utils/formatting');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -35,30 +36,31 @@ module.exports = {
 
     for (const log of logs) {
       const date = new Date(log.timestamp).toLocaleString();
-      let value = `**Moderator:** <@${log.moderatorId}>\n`;
+      let value = `**Moderator:** ${log.moderatorId ? `<@${log.moderatorId}>` : 'Unknown'}\n`;
 
-      if (log.targetId) {
-        value += `**Target:** <@${log.targetId}>\n`;
+      if (log.targetUserId) {
+        value += `**Target:** <@${log.targetUserId}>\n`;
       }
 
       if (log.reason) {
         value += `**Reason:** ${log.reason}\n`;
       }
 
-      if (log.duration) {
-        value += `**Duration:** ${log.duration}\n`;
+      const duration = formatDuration(log.duration);
+      if (duration) {
+        value += `**Duration:** ${duration}\n`;
       }
 
       if (log.amount) {
         value += `**Amount:** ${log.amount}\n`;
       }
 
-      if (log.channelId && log.type !== 'purge') {
+      if (log.channelId && log.actionType !== 'purge') {
         value += `**Channel:** <#${log.channelId}>\n`;
       }
 
       embed.addFields({
-        name: `${log.action} - ${date}`,
+        name: `${log.action || log.actionType} - ${date}`,
         value,
       });
     }

@@ -85,8 +85,8 @@ function getDefaultGuildConfig() {
     // Warnings
     warnings: {},
 
-    // Moderation logs with case management
-    logs: [],
+    // Moderation cases
+    cases: [],
     caseCounter: 0,
 
     // Tempban tracking
@@ -129,8 +129,43 @@ function saveModerationData() {
   return writeQueue;
 }
 
+function migrateGuildConfig(config) {
+  if (config._migrated) {
+    return config;
+  }
+
+  if (!config.cases && Array.isArray(config.logs)) {
+    config.cases = config.logs.map((log, index) => ({
+      caseId: log.caseId || index + 1,
+      timestamp: log.timestamp || new Date().toISOString(),
+      ...log,
+      actionType: log.actionType || log.type || 'log',
+      moderatorId: log.moderatorId || null,
+      targetUserId: log.targetUserId || log.targetId || null,
+      reason: log.reason || null,
+      duration: log.duration ?? null,
+    }));
+    delete config.logs;
+  }
+
+  if (!Array.isArray(config.cases)) {
+    config.cases = [];
+  }
+
+  const maxCaseId = config.cases.reduce((max, entry) => Math.max(max, entry.caseId || 0), 0);
+  if (!config.caseCounter || config.caseCounter < maxCaseId) {
+    config.caseCounter = maxCaseId;
+  }
+
+  config._migrated = true;
+  return config;
+}
+
 async function initModeration() {
   moderationData = await loadModerationData();
+  for (const [guildId, config] of Object.entries(moderationData)) {
+    moderationData[guildId] = migrateGuildConfig(config);
+  }
 }
 
 // Get or create guild config
@@ -141,6 +176,13 @@ function getGuildConfig(guildId) {
     // The save will happen in the background
     saveModerationData().catch(err => {
       console.error('Failed to save new guild config', { guildId, error: err });
+    });
+  }
+  const wasMigrated = Boolean(moderationData[guildId]._migrated);
+  moderationData[guildId] = migrateGuildConfig(moderationData[guildId]);
+  if (!wasMigrated && moderationData[guildId]._migrated) {
+    saveModerationData().catch(err => {
+      console.error('Failed to save migrated guild config', { guildId, error: err });
     });
   }
   return moderationData[guildId];
@@ -196,50 +238,65 @@ async function clearWarnings(guildId, userId) {
   await saveModerationData();
 }
 
-// Logging system with case management (non-blocking, fires in background)
-function addLog(guildId, logEntry) {
+function addCase(guildId, caseEntry) {
   const config = getGuildConfig(guildId);
 
   // Increment case counter
   config.caseCounter = (config.caseCounter || 0) + 1;
 
-  const log = {
+  const actionType = caseEntry.actionType || caseEntry.type || 'log';
+  const moderatorId = caseEntry.moderatorId || null;
+  const targetUserId = caseEntry.targetUserId || caseEntry.targetId || null;
+  const reason = caseEntry.reason || null;
+  const duration = caseEntry.duration ?? null;
+  // Explicit/normalized fields below intentionally override any matching properties from caseEntry.
+  const caseRecord = {
     id: randomUUID(),
-    caseId: config.caseCounter,
     timestamp: new Date().toISOString(),
-    ...logEntry,
+    ...caseEntry,
+    caseId: config.caseCounter,
+    actionType,
+    moderatorId,
+    targetUserId,
+    reason,
+    duration,
   };
 
-  config.logs.push(log);
+  config.cases.push(caseRecord);
 
-  // Keep only last 1000 logs per guild
-  if (config.logs.length > 1000) {
-    config.logs = config.logs.slice(-1000);
+  // Keep only the most recent 1000 cases; caseCounter continues incrementing to avoid caseId reuse.
+  if (config.cases.length > 1000) {
+    config.cases = config.cases.slice(-1000);
   }
 
   // Save in background, don't block
   saveModerationData().catch(err => {
-    console.error('Failed to save moderation log', { guildId, logId: log.id, error: err });
+    console.error('Failed to save moderation log', { guildId, logId: caseRecord.id, error: err });
   });
 
-  return log;
+  return caseRecord;
+}
+
+// Logging system with case management (non-blocking, fires in background)
+function addLog(guildId, logEntry) {
+  return addCase(guildId, logEntry);
 }
 
 function getLogs(guildId, limit = 50) {
   const config = getGuildConfig(guildId);
-  return config.logs.slice(-limit).reverse();
+  return config.cases.slice(-limit).reverse();
 }
 
 // Get specific case by case ID
 function getCase(guildId, caseId) {
   const config = getGuildConfig(guildId);
-  return config.logs.find(log => log.caseId === caseId);
+  return config.cases.find(log => log.caseId === caseId);
 }
 
 // Update case reason
 function updateCaseReason(guildId, caseId, newReason) {
   const config = getGuildConfig(guildId);
-  const caseLog = config.logs.find(log => log.caseId === caseId);
+  const caseLog = config.cases.find(log => log.caseId === caseId);
 
   if (!caseLog) {
     return null;
@@ -259,18 +316,25 @@ function updateCaseReason(guildId, caseId, newReason) {
 // Delete case
 function deleteCase(guildId, caseId) {
   const config = getGuildConfig(guildId);
-  const index = config.logs.findIndex(log => log.caseId === caseId);
+  const index = config.cases.findIndex(log => log.caseId === caseId);
 
   if (index === -1) {
     return false;
   }
 
-  config.logs.splice(index, 1);
+  config.cases.splice(index, 1);
   // Save in background, don't block
   saveModerationData().catch(err => {
     console.error('Failed to save case deletion', { guildId, caseId, error: err });
   });
   return true;
+}
+
+function getCasesByUser(guildId, userId) {
+  const config = getGuildConfig(guildId);
+  return config.cases
+    .filter(entry => entry.targetUserId === userId)
+    .sort((a, b) => b.caseId - a.caseId);
 }
 
 // User spam tracking (in-memory, doesn't persist)
@@ -443,11 +507,13 @@ module.exports = {
   addWarning,
   getWarnings,
   clearWarnings,
+  addCase,
   addLog,
   getLogs,
   getCase,
   updateCaseReason,
   deleteCase,
+  getCasesByUser,
   trackUserMessage,
   getUserRecentMessages,
   isWhitelisted,
