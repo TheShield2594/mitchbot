@@ -3,6 +3,9 @@ const schedule = require('node-schedule');
 const { getBirthdays } = require('../utils/birthdays');
 const { initReminders, schedulePendingReminders } = require('../utils/reminders');
 const { initModeration, getAllTempbans, removeTempban, addLog } = require('../utils/moderation');
+const { initEconomy } = require('../utils/economy');
+const { initQuests } = require('../utils/quests');
+const { initTrivia } = require('../utils/trivia');
 const logger = require('../utils/logger');
 
 const CHANNEL_ID = process.env.BIRTHDAY_CHANNEL_ID;
@@ -110,6 +113,27 @@ module.exports = {
       console.log('✅ Moderation system initialized');
     } catch (error) {
       console.error('Failed to initialize moderation', error);
+    }
+
+    try {
+      await initEconomy();
+      console.log('✅ Economy system initialized');
+    } catch (error) {
+      console.error('Failed to initialize economy', error);
+    }
+
+    try {
+      await initQuests();
+      console.log('✅ Quest streak system initialized');
+    } catch (error) {
+      console.error('Failed to initialize quests', error);
+    }
+
+    try {
+      await initTrivia();
+      console.log('✅ Trivia leaderboard system initialized');
+    } catch (error) {
+      console.error('Failed to initialize trivia', error);
     }
 
     // Check for expired tempbans every minute
