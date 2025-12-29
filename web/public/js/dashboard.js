@@ -84,7 +84,14 @@
     // Add click handlers
     document.querySelectorAll('.server-card').forEach(card => {
       card.addEventListener('click', function(e) {
-        if (!e.target.closest('.server-card__action')) {
+        const button = e.target.closest('.server-card__action');
+        if (button) {
+          // Button clicked - navigate to guild page
+          e.stopPropagation();
+          const guildId = button.getAttribute('data-guild-id');
+          window.location.href = `/guild/${guildId}`;
+        } else {
+          // Card clicked (but not button) - also navigate
           const guildId = this.getAttribute('data-guild-id');
           window.location.href = `/guild/${guildId}`;
         }
@@ -131,7 +138,7 @@
             <span class="status-badge__dot"></span>
             <span>${hasBot ? 'Active' : 'Add Bot'}</span>
           </span>
-          <button class="btn btn-sm btn-primary server-card__action" onclick="event.stopPropagation(); window.location.href='/guild/${guild.id}'">
+          <button class="btn btn-sm btn-primary server-card__action" data-guild-id="${guild.id}">
             Manage
           </button>
         </div>
