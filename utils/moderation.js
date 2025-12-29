@@ -138,7 +138,7 @@ function getGuildConfig(guildId) {
 }
 
 // Update guild config
-function updateGuildConfig(guildId, updates) {
+async function updateGuildConfig(guildId, updates) {
   const config = getGuildConfig(guildId);
 
   // Deep merge updates
@@ -150,7 +150,7 @@ function updateGuildConfig(guildId, updates) {
   }
 
   moderationData[guildId] = config;
-  saveModerationData();
+  await saveModerationData();
 
   return config;
 }
