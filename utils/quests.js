@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { updateUserStats } = require('./achievements');
 
 const fsp = fs.promises;
 
@@ -93,7 +94,7 @@ function getTodayDateString() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function recordQuestCompletion(guildId, userId) {
+function recordQuestCompletion(guildId, userId, username = 'Unknown') {
   const guildData = getGuildQuests(guildId);
   const today = getTodayDateString();
 
@@ -140,6 +141,16 @@ function recordQuestCompletion(guildId, userId) {
   userStreak.bestStreak = Math.max(userStreak.bestStreak, userStreak.currentStreak);
 
   saveQuestData();
+
+  // Update achievements
+  try {
+    updateUserStats(guildId, userId, username, {
+      questsCompleted: 1,
+      bestQuestStreak: userStreak.bestStreak,
+    });
+  } catch (error) {
+    console.warn('Failed to update quest achievements', { error });
+  }
 
   return {
     alreadyCompleted: false,

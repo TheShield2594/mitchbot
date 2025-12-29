@@ -32,7 +32,7 @@ module.exports = {
 
     // Get quest (includes custom server quests if configured)
     const quest = getRandomSnark(interaction.guildId, 'quests', defaultQuests);
-    const streakData = recordQuestCompletion(interaction.guildId, interaction.user.id);
+    const streakData = recordQuestCompletion(interaction.guildId, interaction.user.id, interaction.user.username);
 
     if (streakData.alreadyCompleted) {
       await interaction.editReply(

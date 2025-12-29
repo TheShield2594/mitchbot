@@ -8,6 +8,7 @@ const { initQuests } = require('../utils/quests');
 const { initTrivia } = require('../utils/trivia');
 const { initStats, getWeeklyRecap, generateRecapMessage } = require('../utils/stats');
 const { initSnark } = require('../utils/snark');
+const { initAchievements } = require('../utils/achievements');
 const logger = require('../utils/logger');
 
 const CHANNEL_ID = process.env.BIRTHDAY_CHANNEL_ID;
@@ -175,6 +176,13 @@ module.exports = {
       console.log('✅ Custom snark system initialized');
     } catch (error) {
       console.error('Failed to initialize snark', error);
+    }
+
+    try {
+      await initAchievements();
+      console.log('✅ Anti-achievements system initialized');
+    } catch (error) {
+      console.error('Failed to initialize achievements', error);
     }
 
     // Check for expired tempbans every minute

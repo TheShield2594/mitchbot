@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { updateUserStats } = require('./achievements');
 
 const fsp = fs.promises;
 
@@ -116,6 +117,13 @@ function recordTriviaWin(guildId, userId, username, difficulty = 'medium') {
   userData.username = username; // Update username in case it changed
 
   saveTriviaData();
+
+  // Update achievements
+  try {
+    updateUserStats(guildId, userId, username, { triviaWins: 1 });
+  } catch (error) {
+    console.warn('Failed to update trivia achievements', { error });
+  }
 
   return {
     pointsEarned,
