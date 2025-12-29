@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const { addLog } = require('../../utils/moderation');
 
 module.exports = {
@@ -16,6 +16,23 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
+
+    // Runtime permission check
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      await interaction.editReply('You do not have permission to manage channels.');
+      return;
+    }
+
+    if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      await interaction.editReply('I do not have permission to manage channels. Please check my role permissions.');
+      return;
+    }
+
+    // Check if this is a guild channel that supports permission overwrites
+    if (!interaction.channel.isTextBased() || interaction.channel.isDMBased()) {
+      await interaction.editReply('This command can only be used in server text channels.');
+      return;
+    }
 
     const reason = interaction.options.getString('reason') || 'No reason provided';
 

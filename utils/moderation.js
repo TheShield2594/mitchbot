@@ -122,7 +122,8 @@ function saveModerationData() {
       await fsp.rename(tmpPath, moderationPath);
     })
     .catch((error) => {
-      console.warn('Failed to save moderation data', { error });
+      console.error('Failed to save moderation data', { error });
+      throw error; // Re-throw so callers can handle it
     });
 
   return writeQueue;
@@ -136,7 +137,11 @@ async function initModeration() {
 function getGuildConfig(guildId) {
   if (!moderationData[guildId]) {
     moderationData[guildId] = getDefaultGuildConfig();
-    saveModerationData();
+    // Don't await here to keep this function synchronous
+    // The save will happen in the background
+    saveModerationData().catch(err => {
+      console.error('Failed to save new guild config', { guildId, error: err });
+    });
   }
   return moderationData[guildId];
 }
@@ -160,7 +165,7 @@ async function updateGuildConfig(guildId, updates) {
 }
 
 // Warning system
-function addWarning(guildId, userId, reason, moderatorId) {
+async function addWarning(guildId, userId, reason, moderatorId) {
   const config = getGuildConfig(guildId);
 
   if (!config.warnings[userId]) {
@@ -175,7 +180,7 @@ function addWarning(guildId, userId, reason, moderatorId) {
   };
 
   config.warnings[userId].push(warning);
-  saveModerationData();
+  await saveModerationData();
 
   return warning;
 }
@@ -185,13 +190,13 @@ function getWarnings(guildId, userId) {
   return config.warnings[userId] || [];
 }
 
-function clearWarnings(guildId, userId) {
+async function clearWarnings(guildId, userId) {
   const config = getGuildConfig(guildId);
   config.warnings[userId] = [];
-  saveModerationData();
+  await saveModerationData();
 }
 
-// Logging system with case management
+// Logging system with case management (non-blocking, fires in background)
 function addLog(guildId, logEntry) {
   const config = getGuildConfig(guildId);
 
@@ -212,7 +217,10 @@ function addLog(guildId, logEntry) {
     config.logs = config.logs.slice(-1000);
   }
 
-  saveModerationData();
+  // Save in background, don't block
+  saveModerationData().catch(err => {
+    console.error('Failed to save moderation log', { guildId, logId: log.id, error: err });
+  });
 
   return log;
 }
@@ -241,7 +249,10 @@ function updateCaseReason(guildId, caseId, newReason) {
   caseLog.edited = true;
   caseLog.editedAt = new Date().toISOString();
 
-  saveModerationData();
+  // Save in background, don't block
+  saveModerationData().catch(err => {
+    console.error('Failed to save case update', { guildId, caseId, error: err });
+  });
   return caseLog;
 }
 
@@ -255,7 +266,10 @@ function deleteCase(guildId, caseId) {
   }
 
   config.logs.splice(index, 1);
-  saveModerationData();
+  // Save in background, don't block
+  saveModerationData().catch(err => {
+    console.error('Failed to save case deletion', { guildId, caseId, error: err });
+  });
   return true;
 }
 
@@ -330,7 +344,10 @@ function addTempban(guildId, userId, expiresAt, caseId) {
     guildId,
   };
 
-  saveModerationData();
+  // Save in background, don't block
+  saveModerationData().catch(err => {
+    console.error('Failed to save tempban', { guildId, userId, error: err });
+  });
 }
 
 function removeTempban(guildId, userId) {
@@ -342,7 +359,10 @@ function removeTempban(guildId, userId) {
 
   if (config.tempbans[userId]) {
     delete config.tempbans[userId];
-    saveModerationData();
+    // Save in background, don't block
+    saveModerationData().catch(err => {
+      console.error('Failed to save tempban removal', { guildId, userId, error: err });
+    });
     return true;
   }
 

@@ -8,6 +8,7 @@ const {
   getWarnings,
   addLog,
 } = require('../utils/moderation');
+const logger = require('../utils/logger');
 
 module.exports = {
   name: Events.MessageCreate,
@@ -192,7 +193,20 @@ module.exports = {
     if (violated) {
       try {
         // Delete message
-        await message.delete().catch(() => {});
+        let messageDeleted = false;
+        try {
+          await message.delete();
+          messageDeleted = true;
+        } catch (deleteError) {
+          logger.warn('Failed to delete message in automod', {
+            guildId: message.guildId,
+            channelId: message.channel.id,
+            messageId: message.id,
+            userId: message.author.id,
+            violationType,
+            error: deleteError,
+          });
+        }
 
         // Log the violation
         addLog(message.guildId, {
@@ -238,48 +252,126 @@ module.exports = {
           if (action === 'timeout' || (action === 'warn' && warningCount >= warnThreshold)) {
             const duration = config.automod.spam.timeoutDuration || 300000; // 5 minutes default
 
-            try {
-              await message.member.timeout(duration, `Automod: ${violationType} (${warningCount} warnings)`);
-
-              addLog(message.guildId, {
-                type: 'automod_timeout',
-                action: 'Automod Timeout',
+            // Check if member exists and is moderatable
+            if (!message.member) {
+              logger.error('Cannot timeout user: member not found', {
+                guildId: message.guildId,
+                userId: message.author.id,
                 violationType,
-                targetId: message.author.id,
-                targetTag: message.author.tag,
-                duration: `${duration / 1000 / 60} minutes`,
-                warningCount,
               });
-            } catch (error) {
-              console.error('Failed to timeout user:', error);
+            } else if (!message.member.moderatable) {
+              logger.warn('Cannot timeout user: not moderatable', {
+                guildId: message.guildId,
+                userId: message.author.id,
+                targetRolePosition: message.member.roles.highest.position,
+                violationType,
+              });
+            } else {
+              try {
+                await message.member.timeout(duration, `Automod: ${violationType} (${warningCount} warnings)`);
+
+                addLog(message.guildId, {
+                  type: 'automod_timeout',
+                  action: 'Automod Timeout',
+                  violationType,
+                  targetId: message.author.id,
+                  targetTag: message.author.tag,
+                  duration: `${duration / 1000 / 60} minutes`,
+                  warningCount,
+                });
+              } catch (error) {
+                logger.error('Failed to timeout user in automod', {
+                  guildId: message.guildId,
+                  userId: message.author.id,
+                  violationType,
+                  warningCount,
+                  error,
+                });
+              }
             }
           } else if (action === 'kick') {
-            try {
-              await message.member.kick(`Automod: ${violationType}`);
-
-              addLog(message.guildId, {
-                type: 'automod_kick',
-                action: 'Automod Kick',
+            // Check if member exists and is kickable
+            if (!message.member) {
+              logger.error('Cannot kick user: member not found', {
+                guildId: message.guildId,
+                userId: message.author.id,
                 violationType,
-                targetId: message.author.id,
-                targetTag: message.author.tag,
               });
-            } catch (error) {
-              console.error('Failed to kick user:', error);
+            } else if (!message.member.kickable) {
+              logger.warn('Cannot kick user: not kickable', {
+                guildId: message.guildId,
+                userId: message.author.id,
+                targetRolePosition: message.member.roles.highest.position,
+                violationType,
+              });
+            } else {
+              try {
+                await message.member.kick(`Automod: ${violationType}`);
+
+                addLog(message.guildId, {
+                  type: 'automod_kick',
+                  action: 'Automod Kick',
+                  violationType,
+                  targetId: message.author.id,
+                  targetTag: message.author.tag,
+                });
+              } catch (error) {
+                logger.error('Failed to kick user in automod', {
+                  guildId: message.guildId,
+                  userId: message.author.id,
+                  violationType,
+                  error,
+                });
+              }
             }
           } else if (action === 'ban') {
-            try {
-              await message.member.ban({ reason: `Automod: ${violationType}` });
+            // Check if member exists and is bannable
+            if (!message.member) {
+              // User not in guild, try to ban by user ID
+              try {
+                await message.guild.members.ban(message.author.id, { reason: `Automod: ${violationType}` });
 
-              addLog(message.guildId, {
-                type: 'automod_ban',
-                action: 'Automod Ban',
+                addLog(message.guildId, {
+                  type: 'automod_ban',
+                  action: 'Automod Ban',
+                  violationType,
+                  targetId: message.author.id,
+                  targetTag: message.author.tag,
+                });
+              } catch (error) {
+                logger.error('Failed to ban user in automod', {
+                  guildId: message.guildId,
+                  userId: message.author.id,
+                  violationType,
+                  error,
+                });
+              }
+            } else if (!message.member.bannable) {
+              logger.warn('Cannot ban user: not bannable', {
+                guildId: message.guildId,
+                userId: message.author.id,
+                targetRolePosition: message.member.roles.highest.position,
                 violationType,
-                targetId: message.author.id,
-                targetTag: message.author.tag,
               });
-            } catch (error) {
-              console.error('Failed to ban user:', error);
+            } else {
+              try {
+                await message.member.ban({ reason: `Automod: ${violationType}` });
+
+                addLog(message.guildId, {
+                  type: 'automod_ban',
+                  action: 'Automod Ban',
+                  violationType,
+                  targetId: message.author.id,
+                  targetTag: message.author.tag,
+                });
+              } catch (error) {
+                logger.error('Failed to ban user in automod', {
+                  guildId: message.guildId,
+                  userId: message.author.id,
+                  violationType,
+                  error,
+                });
+              }
             }
           }
         }
@@ -288,13 +380,23 @@ module.exports = {
         if (config.logging.enabled && config.logging.channelId && config.logging.logAutomod) {
           try {
             const logChannel = await message.client.channels.fetch(config.logging.channelId);
-            if (logChannel) {
+            if (logChannel && logChannel.isTextBased()) {
               await logChannel.send({
-                content: `🚨 **Automod Violation**\n**Type:** ${violationType}\n**User:** ${message.author.tag} (${message.author.id})\n**Channel:** ${message.channel.name}\n**Action:** ${action}\n**Content:** \`${message.content.substring(0, 100)}\``,
+                content: `🚨 **Automod Violation**\n**Type:** ${violationType}\n**User:** ${message.author.tag} (${message.author.id})\n**Channel:** ${message.channel.name}\n**Action:** ${action}${messageDeleted ? '' : ' (message delete failed)'}\n**Content:** \`${message.content.substring(0, 100)}\``,
+              });
+            } else {
+              logger.warn('Mod log channel is not text-based or not found', {
+                guildId: message.guildId,
+                channelId: config.logging.channelId,
+                channelType: logChannel?.type,
               });
             }
           } catch (error) {
-            console.error('Failed to send to mod log channel:', error);
+            logger.error('Failed to send to mod log channel', {
+              guildId: message.guildId,
+              channelId: config.logging.channelId,
+              error,
+            });
           }
         }
       } catch (error) {

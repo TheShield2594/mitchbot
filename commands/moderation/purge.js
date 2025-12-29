@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const { addLog } = require('../../utils/moderation');
 
 module.exports = {
@@ -24,6 +24,31 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
+
+    // Runtime permission check
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      await interaction.editReply('You do not have permission to manage messages.');
+      return;
+    }
+
+    if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      await interaction.editReply('I do not have permission to manage messages. Please check my role permissions.');
+      return;
+    }
+
+    // Check if this is a text-based channel that supports bulk delete
+    const validChannelTypes = [
+      ChannelType.GuildText,
+      ChannelType.GuildAnnouncement,
+      ChannelType.PublicThread,
+      ChannelType.PrivateThread,
+      ChannelType.AnnouncementThread,
+    ];
+
+    if (!validChannelTypes.includes(interaction.channel.type)) {
+      await interaction.editReply('This command can only be used in text channels, announcement channels, or threads.');
+      return;
+    }
 
     const amount = interaction.options.getInteger('amount');
     const target = interaction.options.getUser('target');

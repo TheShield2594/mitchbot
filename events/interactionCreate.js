@@ -6,7 +6,18 @@ module.exports = {
     if (!interaction.isChatInputCommand()) return;
 
     const command = interaction.client.commands.get(interaction.commandName);
-    if (!command) return;
+    if (!command) {
+      console.error(`Command not found: ${interaction.commandName}`);
+      try {
+        await interaction.reply({
+          content: `Command \`/${interaction.commandName}\` is not registered. Please contact a server administrator to run \`npm run deploy\` to update slash commands.`,
+          ephemeral: true,
+        });
+      } catch (error) {
+        console.error('Failed to send command-not-found message:', error);
+      }
+      return;
+    }
 
     try {
       await command.execute(interaction);
