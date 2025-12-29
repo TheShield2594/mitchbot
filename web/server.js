@@ -84,7 +84,7 @@ module.exports = function startWebServer(client) {
   validateEnvironment();
 
   const app = express();
-  const PORT = process.env.WEB_PORT || 3000;
+  const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
   const isProduction = process.env.NODE_ENV === 'production';
 
   // Store client for API routes
@@ -226,13 +226,13 @@ module.exports = function startWebServer(client) {
   });
 
   // Start server
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     logger.info(`Web dashboard started`, {
       port: PORT,
       environment: process.env.NODE_ENV || 'development',
       callbackURL,
     });
-    console.log(`🌐 Web dashboard running on http://localhost:${PORT}`);
+    console.log(`🌐 Web dashboard running on port ${PORT}`);
   });
 
   return app;
