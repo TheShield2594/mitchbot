@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const { addLog } = require('../../utils/moderation');
 
 module.exports = {
@@ -24,6 +24,28 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
+
+    // Verify bot has required permissions
+    if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      await interaction.editReply('I do not have permission to manage channels. Please check my role permissions.');
+      return;
+    }
+
+    // Check if this is a text-based channel that supports slowmode
+    const validChannelTypes = [
+      ChannelType.GuildText,
+      ChannelType.GuildVoice,
+      ChannelType.GuildForum,
+      ChannelType.GuildAnnouncement,
+      ChannelType.PublicThread,
+      ChannelType.PrivateThread,
+      ChannelType.AnnouncementThread,
+    ];
+
+    if (!validChannelTypes.includes(interaction.channel.type)) {
+      await interaction.editReply('This command can only be used in channels that support slowmode (text, voice, forum, or threads).');
+      return;
+    }
 
     const seconds = interaction.options.getInteger('seconds');
     const reason = interaction.options.getString('reason') || 'No reason provided';

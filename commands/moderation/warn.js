@@ -40,7 +40,7 @@ module.exports = {
 
     try {
       // Add warning
-      const warning = addWarning(interaction.guildId, target.id, reason, interaction.user.id);
+      const warning = await addWarning(interaction.guildId, target.id, reason, interaction.user.id);
 
       // Get total warnings
       const warnings = getWarnings(interaction.guildId, target.id);
@@ -70,7 +70,7 @@ module.exports = {
       await interaction.editReply(`Successfully warned ${target.user.tag}\nReason: ${reason}\nTotal warnings: ${warningCount}\nCase #${logEntry.caseId}`);
     } catch (error) {
       console.error('Error warning user:', error);
-      await interaction.editReply('Failed to warn the user.');
+      await interaction.editReply('Failed to warn the user. The warning may not have been saved.');
     }
   },
 };
