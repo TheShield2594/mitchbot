@@ -1,0 +1,75 @@
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { addWarning, getWarnings, addLog } = require('../../utils/moderation');
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('warn')
+    .setDescription('Warn a member')
+    .addUserOption(option =>
+      option
+        .setName('target')
+        .setDescription('The member to warn')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('reason')
+        .setDescription('Reason for warning')
+        .setRequired(true)
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+    .setDMPermission(false),
+
+  async execute(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+
+    const target = interaction.options.getMember('target');
+    const reason = interaction.options.getString('reason');
+
+    if (!target) {
+      await interaction.editReply('User not found in this server.');
+      return;
+    }
+
+    // Check if moderator has higher role
+    if (target.roles.highest.position >= interaction.member.roles.highest.position) {
+      await interaction.editReply('You cannot warn this user as they have equal or higher role than you.');
+      return;
+    }
+
+    try {
+      // Add warning
+      const warning = addWarning(interaction.guildId, target.id, reason, interaction.user.id);
+
+      // Get total warnings
+      const warnings = getWarnings(interaction.guildId, target.id);
+      const warningCount = warnings.length;
+
+      // Try to DM the user
+      try {
+        await target.send(`⚠️ You have been warned in **${interaction.guild.name}**\nReason: ${reason}\n\nTotal warnings: ${warningCount}`);
+      } catch (error) {
+        // User has DMs disabled or blocked the bot
+        console.log('Could not DM warned user');
+      }
+
+      // Log the action
+      addLog(interaction.guildId, {
+        type: 'warn',
+        action: 'Member Warned',
+        targetId: target.id,
+        targetTag: target.user.tag,
+        moderatorId: interaction.user.id,
+        moderatorTag: interaction.user.tag,
+        reason,
+        warningId: warning.id,
+        totalWarnings: warningCount,
+      });
+
+      await interaction.editReply(`Successfully warned ${target.user.tag}\nReason: ${reason}\n\nTotal warnings: ${warningCount}`);
+    } catch (error) {
+      console.error('Error warning user:', error);
+      await interaction.editReply('Failed to warn the user.');
+    }
+  },
+};
