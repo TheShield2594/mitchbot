@@ -18,9 +18,13 @@ function getDefaultGuildStats() {
 }
 
 function ensureStatsFile() {
-  if (!fs.existsSync(statsPath)) {
-    fs.mkdirSync(path.dirname(statsPath), { recursive: true });
-    fs.writeFileSync(statsPath, JSON.stringify({}, null, 2));
+  try {
+    if (!fs.existsSync(statsPath)) {
+      fs.mkdirSync(path.dirname(statsPath), { recursive: true });
+      fs.writeFileSync(statsPath, JSON.stringify({}, null, 2));
+    }
+  } catch (error) {
+    console.warn('Failed to ensure stats file', { error });
   }
 }
 

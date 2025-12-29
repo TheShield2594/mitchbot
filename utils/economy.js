@@ -23,9 +23,13 @@ function getDefaultGuildEconomy() {
 }
 
 function ensureEconomyFile() {
-  if (!fs.existsSync(economyPath)) {
-    fs.mkdirSync(path.dirname(economyPath), { recursive: true });
-    fs.writeFileSync(economyPath, JSON.stringify({}, null, 2));
+  try {
+    if (!fs.existsSync(economyPath)) {
+      fs.mkdirSync(path.dirname(economyPath), { recursive: true });
+      fs.writeFileSync(economyPath, JSON.stringify({}, null, 2));
+    }
+  } catch (error) {
+    console.warn('Failed to ensure economy file', { error });
   }
 }
 

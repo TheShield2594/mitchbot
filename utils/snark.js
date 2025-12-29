@@ -17,9 +17,13 @@ function getDefaultGuildSnark() {
 }
 
 function ensureSnarkFile() {
-  if (!fs.existsSync(snarkPath)) {
-    fs.mkdirSync(path.dirname(snarkPath), { recursive: true });
-    fs.writeFileSync(snarkPath, JSON.stringify({}, null, 2));
+  try {
+    if (!fs.existsSync(snarkPath)) {
+      fs.mkdirSync(path.dirname(snarkPath), { recursive: true });
+      fs.writeFileSync(snarkPath, JSON.stringify({}, null, 2));
+    }
+  } catch (error) {
+    console.warn('Failed to ensure snark file', { error });
   }
 }
 

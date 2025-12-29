@@ -15,9 +15,13 @@ function getDefaultGuildAchievements() {
 }
 
 function ensureAchievementsFile() {
-  if (!fs.existsSync(achievementsPath)) {
-    fs.mkdirSync(path.dirname(achievementsPath), { recursive: true });
-    fs.writeFileSync(achievementsPath, JSON.stringify({}, null, 2));
+  try {
+    if (!fs.existsSync(achievementsPath)) {
+      fs.mkdirSync(path.dirname(achievementsPath), { recursive: true });
+      fs.writeFileSync(achievementsPath, JSON.stringify({}, null, 2));
+    }
+  } catch (error) {
+    console.warn('Failed to ensure achievements file', { error });
   }
 }
 

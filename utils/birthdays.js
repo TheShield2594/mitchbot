@@ -4,9 +4,13 @@ const path = require('path');
 const birthdaysPath = path.join(__dirname, '..', 'data', 'birthdays.json');
 
 function ensureBirthdaysFile() {
-  if (!fs.existsSync(birthdaysPath)) {
-    fs.mkdirSync(path.dirname(birthdaysPath), { recursive: true });
-    fs.writeFileSync(birthdaysPath, JSON.stringify({}, null, 4));
+  try {
+    if (!fs.existsSync(birthdaysPath)) {
+      fs.mkdirSync(path.dirname(birthdaysPath), { recursive: true });
+      fs.writeFileSync(birthdaysPath, JSON.stringify({}, null, 4));
+    }
+  } catch (error) {
+    console.warn('Failed to ensure birthdays file', { error });
   }
 }
 
