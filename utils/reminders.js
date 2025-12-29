@@ -10,9 +10,13 @@ let reminders = [];
 let writeQueue = Promise.resolve();
 
 function ensureRemindersFile() {
-  if (!fs.existsSync(remindersPath)) {
-    fs.mkdirSync(path.dirname(remindersPath), { recursive: true });
-    fs.writeFileSync(remindersPath, JSON.stringify([], null, 4));
+  try {
+    if (!fs.existsSync(remindersPath)) {
+      fs.mkdirSync(path.dirname(remindersPath), { recursive: true });
+      fs.writeFileSync(remindersPath, JSON.stringify([], null, 4));
+    }
+  } catch (error) {
+    console.warn('Failed to ensure reminders file', { error });
   }
 }
 

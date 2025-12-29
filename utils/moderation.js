@@ -95,9 +95,13 @@ function getDefaultGuildConfig() {
 }
 
 function ensureModerationFile() {
-  if (!fs.existsSync(moderationPath)) {
-    fs.mkdirSync(path.dirname(moderationPath), { recursive: true });
-    fs.writeFileSync(moderationPath, JSON.stringify({}, null, 2));
+  try {
+    if (!fs.existsSync(moderationPath)) {
+      fs.mkdirSync(path.dirname(moderationPath), { recursive: true });
+      fs.writeFileSync(moderationPath, JSON.stringify({}, null, 2));
+    }
+  } catch (error) {
+    console.warn('Failed to ensure moderation file', { error });
   }
 }
 

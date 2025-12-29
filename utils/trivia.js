@@ -23,9 +23,13 @@ function getDefaultGuildTrivia() {
 }
 
 function ensureTriviaFile() {
-  if (!fs.existsSync(triviaPath)) {
-    fs.mkdirSync(path.dirname(triviaPath), { recursive: true });
-    fs.writeFileSync(triviaPath, JSON.stringify({}, null, 2));
+  try {
+    if (!fs.existsSync(triviaPath)) {
+      fs.mkdirSync(path.dirname(triviaPath), { recursive: true });
+      fs.writeFileSync(triviaPath, JSON.stringify({}, null, 2));
+    }
+  } catch (error) {
+    console.warn('Failed to ensure trivia file', { error });
   }
 }
 

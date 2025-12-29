@@ -16,9 +16,13 @@ function getDefaultGuildQuests() {
 }
 
 function ensureQuestsFile() {
-  if (!fs.existsSync(questsPath)) {
-    fs.mkdirSync(path.dirname(questsPath), { recursive: true });
-    fs.writeFileSync(questsPath, JSON.stringify({}, null, 2));
+  try {
+    if (!fs.existsSync(questsPath)) {
+      fs.mkdirSync(path.dirname(questsPath), { recursive: true });
+      fs.writeFileSync(questsPath, JSON.stringify({}, null, 2));
+    }
+  } catch (error) {
+    console.warn('Failed to ensure quests file', { error });
   }
 }
 
