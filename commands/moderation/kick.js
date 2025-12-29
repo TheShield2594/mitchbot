@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { addLog } = require('../../utils/moderation');
+const { addLog, canModerate } = require('../../utils/moderation');
 const logger = require('../../utils/logger');
 
 module.exports = {
@@ -32,15 +32,16 @@ module.exports = {
       return;
     }
 
-    // Check if target is kickable
-    if (!target.kickable) {
-      await interaction.editReply('I cannot kick this user. They may have higher permissions than me.');
+    // Safety checks using centralized moderation helper
+    const moderationCheck = canModerate(interaction.guild, interaction.member, target);
+    if (!moderationCheck.canModerate) {
+      await interaction.editReply(moderationCheck.reason);
       return;
     }
 
-    // Check if moderator has higher role
-    if (target.roles.highest.position >= interaction.member.roles.highest.position) {
-      await interaction.editReply('You cannot kick this user as they have equal or higher role than you.');
+    // Check if target is kickable
+    if (!target.kickable) {
+      await interaction.editReply('I cannot kick this user. They may have higher permissions than me.');
       return;
     }
 
@@ -63,7 +64,7 @@ module.exports = {
       await target.kick(reason);
 
       // Log the action
-      addLog(interaction.guildId, {
+      const logEntry = addLog(interaction.guildId, {
         type: 'kick',
         action: 'Member Kicked',
         targetId: target.id,
@@ -73,7 +74,7 @@ module.exports = {
         reason,
       });
 
-      await interaction.editReply(`Successfully kicked ${target.user.username}\nReason: ${reason}`);
+      await interaction.editReply(`Successfully kicked ${target.user.username}\nReason: ${reason}\nCase #${logEntry.caseId}`);
     } catch (error) {
       logger.error('Failed to kick user', {
         command: 'kick',

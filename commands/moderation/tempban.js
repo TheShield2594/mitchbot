@@ -1,15 +1,23 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { addLog, canModerate } = require('../../utils/moderation');
+const { addLog, addTempban, canModerate } = require('../../utils/moderation');
 const logger = require('../../utils/logger');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('ban')
-    .setDescription('Ban a member from the server')
+    .setName('tempban')
+    .setDescription('Temporarily ban a member from the server')
     .addUserOption(option =>
       option
         .setName('target')
         .setDescription('The member to ban')
+        .setRequired(true)
+    )
+    .addIntegerOption(option =>
+      option
+        .setName('duration')
+        .setDescription('Duration in minutes')
+        .setMinValue(1)
+        .setMaxValue(43200) // 30 days max
         .setRequired(true)
     )
     .addStringOption(option =>
@@ -34,6 +42,7 @@ module.exports = {
 
     const target = interaction.options.getUser('target');
     const member = interaction.options.getMember('target');
+    const duration = interaction.options.getInteger('duration');
     const reason = interaction.options.getString('reason') || 'No reason provided';
     const deleteDays = interaction.options.getInteger('delete_days') || 0;
 
@@ -42,7 +51,7 @@ module.exports = {
       return;
     }
 
-    // Safety checks using centralized moderation helper
+    // Safety checks
     const moderationCheck = canModerate(interaction.guild, interaction.member, member || target);
     if (!moderationCheck.canModerate) {
       await interaction.editReply(moderationCheck.reason);
@@ -55,14 +64,16 @@ module.exports = {
       return;
     }
 
+    const expiresAt = Date.now() + (duration * 60 * 1000);
+    const expiryDate = new Date(expiresAt);
+
     try {
       // Try to DM the user first
       try {
-        await target.send(`You have been banned from **${interaction.guild.name}**\nReason: ${reason}`);
+        await target.send(`You have been temporarily banned from **${interaction.guild.name}** for ${duration} minutes\nReason: ${reason}\nBan expires: ${expiryDate.toUTCString()}`);
       } catch (error) {
-        // User has DMs disabled or blocked the bot
-        logger.warn('Could not DM banned user', {
-          command: 'ban',
+        logger.warn('Could not DM tempbanned user', {
+          command: 'tempban',
           targetId: target.id,
           targetTag: target.username,
           guildId: interaction.guildId,
@@ -73,25 +84,30 @@ module.exports = {
       // Ban the user
       await interaction.guild.members.ban(target, {
         deleteMessageSeconds: deleteDays * 24 * 60 * 60,
-        reason,
+        reason: `${reason} (Temporary ban for ${duration} minutes)`,
       });
 
       // Log the action
       const logEntry = addLog(interaction.guildId, {
-        type: 'ban',
-        action: 'Member Banned',
+        type: 'tempban',
+        action: 'Member Temporarily Banned',
         targetId: target.id,
         targetTag: target.username,
         moderatorId: interaction.user.id,
         moderatorTag: interaction.user.username,
         reason,
+        duration,
+        expiresAt,
         deleteDays,
       });
 
-      await interaction.editReply(`Successfully banned ${target.username}\nReason: ${reason}\nCase #${logEntry.caseId}`);
+      // Add to tempban tracking
+      addTempban(interaction.guildId, target.id, expiresAt, logEntry.caseId);
+
+      await interaction.editReply(`Successfully temporarily banned ${target.username} for ${duration} minutes\nReason: ${reason}\nExpires: ${expiryDate.toUTCString()}\nCase #${logEntry.caseId}`);
     } catch (error) {
-      logger.error('Failed to ban user', {
-        command: 'ban',
+      logger.error('Failed to tempban user', {
+        command: 'tempban',
         targetId: target.id,
         targetTag: target.username,
         guildId: interaction.guildId,

@@ -4,18 +4,18 @@ const logger = require('../../utils/logger');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('ban')
-    .setDescription('Ban a member from the server')
+    .setName('softban')
+    .setDescription('Ban and immediately unban a member to delete their messages')
     .addUserOption(option =>
       option
         .setName('target')
-        .setDescription('The member to ban')
+        .setDescription('The member to softban')
         .setRequired(true)
     )
     .addStringOption(option =>
       option
         .setName('reason')
-        .setDescription('Reason for banning')
+        .setDescription('Reason for softbanning')
         .setRequired(false)
     )
     .addIntegerOption(option =>
@@ -35,14 +35,14 @@ module.exports = {
     const target = interaction.options.getUser('target');
     const member = interaction.options.getMember('target');
     const reason = interaction.options.getString('reason') || 'No reason provided';
-    const deleteDays = interaction.options.getInteger('delete_days') || 0;
+    const deleteDays = interaction.options.getInteger('delete_days') || 7;
 
     if (!target) {
       await interaction.editReply('User not found.');
       return;
     }
 
-    // Safety checks using centralized moderation helper
+    // Safety checks
     const moderationCheck = canModerate(interaction.guild, interaction.member, member || target);
     if (!moderationCheck.canModerate) {
       await interaction.editReply(moderationCheck.reason);
@@ -58,11 +58,10 @@ module.exports = {
     try {
       // Try to DM the user first
       try {
-        await target.send(`You have been banned from **${interaction.guild.name}**\nReason: ${reason}`);
+        await target.send(`You have been softbanned from **${interaction.guild.name}**\nReason: ${reason}\nYour messages have been deleted, but you can rejoin immediately.`);
       } catch (error) {
-        // User has DMs disabled or blocked the bot
-        logger.warn('Could not DM banned user', {
-          command: 'ban',
+        logger.warn('Could not DM softbanned user', {
+          command: 'softban',
           targetId: target.id,
           targetTag: target.username,
           guildId: interaction.guildId,
@@ -73,13 +72,16 @@ module.exports = {
       // Ban the user
       await interaction.guild.members.ban(target, {
         deleteMessageSeconds: deleteDays * 24 * 60 * 60,
-        reason,
+        reason: `Softban: ${reason}`,
       });
+
+      // Immediately unban
+      await interaction.guild.members.unban(target.id, `Softban unban: ${reason}`);
 
       // Log the action
       const logEntry = addLog(interaction.guildId, {
-        type: 'ban',
-        action: 'Member Banned',
+        type: 'softban',
+        action: 'Member Softbanned',
         targetId: target.id,
         targetTag: target.username,
         moderatorId: interaction.user.id,
@@ -88,10 +90,10 @@ module.exports = {
         deleteDays,
       });
 
-      await interaction.editReply(`Successfully banned ${target.username}\nReason: ${reason}\nCase #${logEntry.caseId}`);
+      await interaction.editReply(`Successfully softbanned ${target.username}\nReason: ${reason}\nDeleted ${deleteDays} day(s) of messages\nCase #${logEntry.caseId}`);
     } catch (error) {
-      logger.error('Failed to ban user', {
-        command: 'ban',
+      logger.error('Failed to softban user', {
+        command: 'softban',
         targetId: target.id,
         targetTag: target.username,
         guildId: interaction.guildId,
@@ -99,7 +101,7 @@ module.exports = {
         moderatorId: interaction.user.id,
         error,
       });
-      await interaction.editReply('Failed to ban the user. Please check my permissions.');
+      await interaction.editReply('Failed to softban the user. Please check my permissions.');
     }
   },
 };

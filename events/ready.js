@@ -2,7 +2,8 @@ const { Events } = require('discord.js');
 const schedule = require('node-schedule');
 const { getBirthdays } = require('../utils/birthdays');
 const { initReminders, schedulePendingReminders } = require('../utils/reminders');
-const { initModeration } = require('../utils/moderation');
+const { initModeration, getAllTempbans, removeTempban, addLog } = require('../utils/moderation');
+const logger = require('../utils/logger');
 
 const CHANNEL_ID = process.env.BIRTHDAY_CHANNEL_ID;
 
@@ -35,6 +36,62 @@ async function checkBirthdays(client) {
   }
 }
 
+async function checkExpiredTempbans(client) {
+  try {
+    const expiredTempbans = getAllTempbans();
+
+    for (const tempban of expiredTempbans) {
+      const { userId, guildId, caseId } = tempban;
+
+      try {
+        const guild = await client.guilds.fetch(guildId);
+        if (!guild) {
+          logger.warn('Guild not found for tempban expiry', { guildId, userId });
+          removeTempban(guildId, userId);
+          continue;
+        }
+
+        // Check if user is still banned
+        const bans = await guild.bans.fetch();
+        if (!bans.has(userId)) {
+          // Already unbanned manually, just remove from tracking
+          removeTempban(guildId, userId);
+          continue;
+        }
+
+        // Unban the user
+        await guild.members.unban(userId, 'Temporary ban expired');
+
+        // Remove from tempban tracking
+        removeTempban(guildId, userId);
+
+        // Log the action
+        addLog(guildId, {
+          type: 'unban',
+          action: 'Temporary Ban Expired',
+          targetId: userId,
+          targetTag: 'Unknown User',
+          moderatorId: client.user.id,
+          moderatorTag: client.user.username,
+          reason: `Automatic unban - tempban expired (original case #${caseId})`,
+          relatedCaseId: caseId,
+        });
+
+        logger.info('Tempban expired and user unbanned', { guildId, userId, caseId });
+      } catch (error) {
+        logger.error('Failed to process expired tempban', {
+          guildId,
+          userId,
+          caseId,
+          error,
+        });
+      }
+    }
+  } catch (error) {
+    logger.error('Failed to check expired tempbans', { error });
+  }
+}
+
 module.exports = {
   name: Events.ClientReady,
   once: true,
@@ -53,5 +110,9 @@ module.exports = {
     } catch (error) {
       console.error('Failed to initialize moderation', error);
     }
+
+    // Check for expired tempbans every minute
+    schedule.scheduleJob('* * * * *', () => checkExpiredTempbans(client));
+    console.log('✅ Tempban scheduler initialized');
   },
 };

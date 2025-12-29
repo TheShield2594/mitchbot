@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { addLog } = require('../../utils/moderation');
+const { addLog, canModerate } = require('../../utils/moderation');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -40,15 +40,16 @@ module.exports = {
       return;
     }
 
-    // Check if target is moderatable
-    if (!target.moderatable) {
-      await interaction.editReply('I cannot timeout this user. They may have higher permissions than me.');
+    // Safety checks using centralized moderation helper
+    const moderationCheck = canModerate(interaction.guild, interaction.member, target);
+    if (!moderationCheck.canModerate) {
+      await interaction.editReply(moderationCheck.reason);
       return;
     }
 
-    // Check if moderator has higher role
-    if (target.roles.highest.position >= interaction.member.roles.highest.position) {
-      await interaction.editReply('You cannot timeout this user as they have equal or higher role than you.');
+    // Check if target is moderatable
+    if (!target.moderatable) {
+      await interaction.editReply('I cannot timeout this user. They may have higher permissions than me.');
       return;
     }
 
@@ -68,7 +69,7 @@ module.exports = {
       await target.timeout(timeoutMs, reason);
 
       // Log the action
-      addLog(interaction.guildId, {
+      const logEntry = addLog(interaction.guildId, {
         type: 'timeout',
         action: 'Member Timed Out',
         targetId: target.id,
@@ -79,7 +80,7 @@ module.exports = {
         duration: `${duration} minutes`,
       });
 
-      await interaction.editReply(`Successfully timed out ${target.user.tag} for ${duration} minutes\nReason: ${reason}`);
+      await interaction.editReply(`Successfully timed out ${target.user.tag} for ${duration} minutes\nReason: ${reason}\nCase #${logEntry.caseId}`);
     } catch (error) {
       console.error('Error timing out user:', error);
       await interaction.editReply('Failed to timeout the user. Please check my permissions.');
