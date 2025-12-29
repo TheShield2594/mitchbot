@@ -41,6 +41,18 @@ async function loadEconomyData() {
   }
 }
 
+function loadEconomyDataSync() {
+  ensureEconomyFile();
+
+  try {
+    const data = fs.readFileSync(economyPath, "utf8");
+    return JSON.parse(data);
+  } catch (error) {
+    console.warn("Failed to load economy data", { error });
+    return {};
+  }
+}
+
 function saveEconomyData() {
   const payload = JSON.stringify(economyData, null, 2);
   writeQueue = writeQueue
@@ -65,7 +77,18 @@ async function initEconomy() {
   hasLoaded = true;
 }
 
+function ensureEconomyDataLoaded() {
+  if (hasLoaded) {
+    return;
+  }
+
+  economyData = loadEconomyDataSync();
+  hasLoaded = true;
+}
+
 function getGuildEconomy(guildId) {
+  ensureEconomyDataLoaded();
+
   if (!economyData[guildId]) {
     economyData[guildId] = getDefaultGuildEconomy();
   }
