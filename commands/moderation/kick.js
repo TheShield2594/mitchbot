@@ -71,13 +71,14 @@ module.exports = {
 
       // Log the action
       const logEntry = addLog(interaction.guildId, {
-        type: 'kick',
+        actionType: 'kick',
         action: 'Member Kicked',
-        targetId: target.id,
+        targetUserId: target.id,
         targetTag: target.user.username,
         moderatorId: interaction.user.id,
         moderatorTag: interaction.user.username,
         reason,
+        duration: null,
       });
 
       await interaction.editReply(`Successfully kicked ${target.user.username}\nReason: ${reason}\nCase #${logEntry.caseId}`);

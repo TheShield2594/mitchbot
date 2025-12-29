@@ -110,13 +110,14 @@ module.exports = {
 
         // Log the action
         const logEntry = addLog(interaction.guildId, {
-          type: 'ban',
+          actionType: 'ban',
           action: 'Member Banned (Mass Ban)',
-          targetId: userId,
+          targetUserId: userId,
           targetTag: targetUser?.username || 'Unknown User',
           moderatorId: interaction.user.id,
           moderatorTag: interaction.user.username,
           reason: `Mass ban: ${reason}`,
+          duration: null,
           deleteDays,
         });
 

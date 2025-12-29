@@ -56,13 +56,14 @@ module.exports = {
 
       // Log the action
       const logEntry = addLog(interaction.guildId, {
-        type: 'warn',
+        actionType: 'warn',
         action: 'Member Warned',
-        targetId: target.id,
+        targetUserId: target.id,
         targetTag: target.user.tag,
         moderatorId: interaction.user.id,
         moderatorTag: interaction.user.tag,
         reason,
+        duration: null,
         warningId: warning.id,
         totalWarnings: warningCount,
       });
