@@ -1,29 +1,169 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - Mitchbot</title>
+  <title>My Servers - Mitchbot Dashboard</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+  <!-- Navigation -->
   <nav class="navbar">
-    <h1>🤖 Mitchbot</h1>
-    <div>
-      <a href="/dashboard">Dashboard</a>
-      <a href="/auth/logout">Logout</a>
+    <div class="navbar__container">
+      <div class="navbar__brand">
+        <span class="navbar__logo">🤖</span>
+        <span class="navbar__title">Mitchbot</span>
+        <span class="navbar__badge">v2.0</span>
+      </div>
+      <div class="navbar__nav">
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+          <span class="theme-toggle__icon">🌙</span>
+        </button>
+        <div class="user-menu" id="user-menu">
+          <div class="user-menu__avatar" id="user-avatar">
+            <div class="loading-spinner"></div>
+          </div>
+          <div class="user-menu__dropdown" id="user-dropdown">
+            <div class="user-menu__info">
+              <div class="user-menu__name" id="user-name">Loading...</div>
+              <div class="user-menu__tag" id="user-tag">#0000</div>
+            </div>
+            <div class="user-menu__divider"></div>
+            <a href="/auth/logout" class="user-menu__item user-menu__item--danger">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Logout
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   </nav>
 
-  <div class="container">
-    <div class="card">
-      <h2>Select a Server</h2>
+  <!-- Main Content -->
+  <div class="dashboard-container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+      <div class="dashboard-header__content">
+        <h1 class="dashboard-header__title">My Servers</h1>
+        <p class="dashboard-header__description">
+          Select a server to configure Mitchbot settings and features
+        </p>
+      </div>
+
+      <div class="dashboard-header__actions">
+        <div class="search-box">
+          <svg class="search-box__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input type="text" id="server-search" class="search-box__input" placeholder="Search servers...">
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-card__icon stat-card__icon--primary">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="stat-card__content">
+          <div class="stat-card__value" id="total-servers">0</div>
+          <div class="stat-card__label">Total Servers</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card__icon stat-card__icon--success">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+        <div class="stat-card__content">
+          <div class="stat-card__value" id="active-servers">0</div>
+          <div class="stat-card__label">Active Configurations</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card__icon stat-card__icon--warning">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div class="stat-card__content">
+          <div class="stat-card__value" id="protected-servers">0</div>
+          <div class="stat-card__label">Protected Servers</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card__icon stat-card__icon--info">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
+        </div>
+        <div class="stat-card__content">
+          <div class="stat-card__value" id="manageable-servers">0</div>
+          <div class="stat-card__label">Manageable</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server List -->
+    <div class="server-section">
+      <div class="server-section__header">
+        <h2 class="server-section__title">Your Servers</h2>
+        <div class="filter-tabs">
+          <button class="filter-tab filter-tab--active" data-filter="all">All Servers</button>
+          <button class="filter-tab" data-filter="managed">Managed</button>
+          <button class="filter-tab" data-filter="available">Available</button>
+        </div>
+      </div>
+
       <div id="server-list" class="server-grid">
-        <div class="loading">Loading your servers...</div>
+        <!-- Loading State -->
+        <div class="server-loading">
+          <div class="loading-spinner-large"></div>
+          <p>Loading your servers...</p>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="empty-state" style="display: none;">
+        <div class="empty-state__icon">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <h3 class="empty-state__title">No Servers Found</h3>
+        <p class="empty-state__description">
+          You don't have any servers with Mitchbot yet. Add Mitchbot to your server to get started!
+        </p>
+        <a href="https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands"
+           class="btn btn-primary" target="_blank">
+          Add Mitchbot to Server
+        </a>
       </div>
     </div>
   </div>
 
+  <script src="/js/theme.js"></script>
   <script src="/js/dashboard.js"></script>
 </body>
 </html>
