@@ -10,7 +10,7 @@ const defaultQuests = [
   'Stand up, then sit back down.',
   'Think about doing something productive.',
   'Check the same app twice in a row.',
-  'Pretend you're about to start working.',
+  'Pretend you\'re about to start working.',
   'Reconsider your life choices.',
   'Look at your backlog and do nothing.',
 ];
