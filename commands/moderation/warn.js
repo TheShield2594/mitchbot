@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { addWarning, getWarnings, addLog } = require('../../utils/moderation');
+const { addWarning, getWarnings, addLog, canModerate } = require('../../utils/moderation');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -31,9 +31,10 @@ module.exports = {
       return;
     }
 
-    // Check if moderator has higher role
-    if (target.roles.highest.position >= interaction.member.roles.highest.position) {
-      await interaction.editReply('You cannot warn this user as they have equal or higher role than you.');
+    // Safety checks using centralized moderation helper
+    const moderationCheck = canModerate(interaction.guild, interaction.member, target);
+    if (!moderationCheck.canModerate) {
+      await interaction.editReply(moderationCheck.reason);
       return;
     }
 
@@ -54,7 +55,7 @@ module.exports = {
       }
 
       // Log the action
-      addLog(interaction.guildId, {
+      const logEntry = addLog(interaction.guildId, {
         type: 'warn',
         action: 'Member Warned',
         targetId: target.id,
@@ -66,7 +67,7 @@ module.exports = {
         totalWarnings: warningCount,
       });
 
-      await interaction.editReply(`Successfully warned ${target.user.tag}\nReason: ${reason}\n\nTotal warnings: ${warningCount}`);
+      await interaction.editReply(`Successfully warned ${target.user.tag}\nReason: ${reason}\nTotal warnings: ${warningCount}\nCase #${logEntry.caseId}`);
     } catch (error) {
       console.error('Error warning user:', error);
       await interaction.editReply('Failed to warn the user.');

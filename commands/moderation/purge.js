@@ -47,7 +47,7 @@ module.exports = {
       const deleted = await interaction.channel.bulkDelete(filteredMessages, true);
 
       // Log the action
-      addLog(interaction.guildId, {
+      const logEntry = addLog(interaction.guildId, {
         type: 'purge',
         action: 'Messages Purged',
         channelId: interaction.channel.id,
@@ -59,7 +59,7 @@ module.exports = {
         targetTag: target?.tag,
       });
 
-      await interaction.editReply(`Successfully deleted ${deleted.size} message(s)${target ? ` from ${target.tag}` : ''}.`);
+      await interaction.editReply(`Successfully deleted ${deleted.size} message(s)${target ? ` from ${target.tag}` : ''}.\nCase #${logEntry.caseId}`);
     } catch (error) {
       console.error('Error purging messages:', error);
       await interaction.editReply('Failed to purge messages. Note: I can only delete messages less than 14 days old.');

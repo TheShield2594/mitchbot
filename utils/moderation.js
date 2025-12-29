@@ -85,8 +85,12 @@ function getDefaultGuildConfig() {
     // Warnings
     warnings: {},
 
-    // Moderation logs
+    // Moderation logs with case management
     logs: [],
+    caseCounter: 0,
+
+    // Tempban tracking
+    tempbans: {}, // { userId: { expiresAt: timestamp, caseId: number } }
   };
 }
 
@@ -187,12 +191,16 @@ function clearWarnings(guildId, userId) {
   saveModerationData();
 }
 
-// Logging system
+// Logging system with case management
 function addLog(guildId, logEntry) {
   const config = getGuildConfig(guildId);
 
+  // Increment case counter
+  config.caseCounter = (config.caseCounter || 0) + 1;
+
   const log = {
     id: randomUUID(),
+    caseId: config.caseCounter,
     timestamp: new Date().toISOString(),
     ...logEntry,
   };
@@ -212,6 +220,43 @@ function addLog(guildId, logEntry) {
 function getLogs(guildId, limit = 50) {
   const config = getGuildConfig(guildId);
   return config.logs.slice(-limit).reverse();
+}
+
+// Get specific case by case ID
+function getCase(guildId, caseId) {
+  const config = getGuildConfig(guildId);
+  return config.logs.find(log => log.caseId === caseId);
+}
+
+// Update case reason
+function updateCaseReason(guildId, caseId, newReason) {
+  const config = getGuildConfig(guildId);
+  const caseLog = config.logs.find(log => log.caseId === caseId);
+
+  if (!caseLog) {
+    return null;
+  }
+
+  caseLog.reason = newReason;
+  caseLog.edited = true;
+  caseLog.editedAt = new Date().toISOString();
+
+  saveModerationData();
+  return caseLog;
+}
+
+// Delete case
+function deleteCase(guildId, caseId) {
+  const config = getGuildConfig(guildId);
+  const index = config.logs.findIndex(log => log.caseId === caseId);
+
+  if (index === -1) {
+    return false;
+  }
+
+  config.logs.splice(index, 1);
+  saveModerationData();
+  return true;
 }
 
 // User spam tracking (in-memory, doesn't persist)
@@ -271,6 +316,106 @@ function isWhitelisted(guildId, member, channelId) {
   return false;
 }
 
+// Tempban management
+function addTempban(guildId, userId, expiresAt, caseId) {
+  const config = getGuildConfig(guildId);
+
+  if (!config.tempbans) {
+    config.tempbans = {};
+  }
+
+  config.tempbans[userId] = {
+    expiresAt,
+    caseId,
+    guildId,
+  };
+
+  saveModerationData();
+}
+
+function removeTempban(guildId, userId) {
+  const config = getGuildConfig(guildId);
+
+  if (!config.tempbans) {
+    return false;
+  }
+
+  if (config.tempbans[userId]) {
+    delete config.tempbans[userId];
+    saveModerationData();
+    return true;
+  }
+
+  return false;
+}
+
+function getExpiredTempbans(guildId) {
+  const config = getGuildConfig(guildId);
+
+  if (!config.tempbans) {
+    return [];
+  }
+
+  const now = Date.now();
+  const expired = [];
+
+  for (const [userId, tempban] of Object.entries(config.tempbans)) {
+    if (tempban.expiresAt <= now) {
+      expired.push({ userId, ...tempban });
+    }
+  }
+
+  return expired;
+}
+
+function getAllTempbans() {
+  const allExpired = [];
+
+  for (const [guildId, guildData] of Object.entries(moderationData)) {
+    if (guildData.tempbans) {
+      const now = Date.now();
+      for (const [userId, tempban] of Object.entries(guildData.tempbans)) {
+        if (tempban.expiresAt <= now) {
+          allExpired.push({ userId, guildId, ...tempban });
+        }
+      }
+    }
+  }
+
+  return allExpired;
+}
+
+// Safety check helpers
+function canModerate(guild, moderator, target) {
+  // Can't moderate yourself
+  if (moderator.id === target.id) {
+    return { canModerate: false, reason: 'You cannot moderate yourself.' };
+  }
+
+  // Can't moderate the bot
+  if (target.id === guild.members.me.id) {
+    return { canModerate: false, reason: 'You cannot moderate the bot.' };
+  }
+
+  // Can't moderate the server owner
+  if (target.id === guild.ownerId) {
+    return { canModerate: false, reason: 'You cannot moderate the server owner.' };
+  }
+
+  // If target is a member, check role hierarchy
+  if (target.roles) {
+    if (target.roles.highest.position >= moderator.roles.highest.position) {
+      return { canModerate: false, reason: 'You cannot moderate this user as they have equal or higher role than you.' };
+    }
+
+    if (target.roles.highest.position >= guild.members.me.roles.highest.position) {
+      return { canModerate: false, reason: 'I cannot moderate this user. They may have higher permissions than me.' };
+    }
+  }
+
+  return { canModerate: true };
+}
+
 module.exports = {
   initModeration,
   getGuildConfig,
@@ -280,8 +425,16 @@ module.exports = {
   clearWarnings,
   addLog,
   getLogs,
+  getCase,
+  updateCaseReason,
+  deleteCase,
   trackUserMessage,
   getUserRecentMessages,
   isWhitelisted,
   getDefaultGuildConfig,
+  addTempban,
+  removeTempban,
+  getExpiredTempbans,
+  getAllTempbans,
+  canModerate,
 };
