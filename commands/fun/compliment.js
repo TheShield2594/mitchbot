@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
+const { getRandomSnark } = require('../../utils/snark');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -14,7 +15,7 @@ module.exports = {
   async execute(interaction) {
     const target = interaction.options.getUser('target') || interaction.user;
 
-    const compliments = [
+    const defaultCompliments = [
       `${target.username}, you're doing great. For you.`,
       `${target.username}, you're smarter than you look.`,
       `${target.username}, you're not as bad as people say.`,
@@ -32,7 +33,14 @@ module.exports = {
       `${target.username}, you're doing better than expected. The bar was low.`,
     ];
 
-    const randomCompliment = compliments[Math.floor(Math.random() * compliments.length)];
-    await interaction.reply(randomCompliment);
+    // Get compliment (includes custom server compliments if configured)
+    const template = interaction.guildId
+      ? getRandomSnark(interaction.guildId, 'compliments', defaultCompliments)
+      : defaultCompliments[Math.floor(Math.random() * defaultCompliments.length)];
+
+    // Replace {username} placeholder if present in custom compliments
+    const compliment = template.replace(/{username}/g, target.username);
+
+    await interaction.reply(compliment);
   },
 };

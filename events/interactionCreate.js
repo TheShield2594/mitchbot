@@ -1,4 +1,6 @@
 const { Events } = require('discord.js');
+const { recordCommandUsage } = require('../utils/stats');
+const { updateUserStats } = require('../utils/achievements');
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -17,6 +19,41 @@ module.exports = {
         console.error('Failed to send command-not-found message:', error);
       }
       return;
+    }
+
+    // Record command usage stats and check achievements (only for guild commands)
+    if (interaction.guildId) {
+      try {
+        recordCommandUsage(interaction.guildId, interaction.commandName, interaction.user.id);
+
+        // Update achievement stats
+        const newAchievements = updateUserStats(
+          interaction.guildId,
+          interaction.user.id,
+          interaction.user.username,
+          { commandsUsed: 1 }
+        );
+
+        // Notify user of new achievements (send after command execution)
+        if (newAchievements.length > 0) {
+          setTimeout(async () => {
+            try {
+              const achievementMsg = newAchievements
+                .map(a => `${a.emoji} **${a.name}** - ${a.description}`)
+                .join('\n');
+
+              await interaction.followUp({
+                content: `${interaction.user} unlocked:\n${achievementMsg}`,
+                ephemeral: false,
+              });
+            } catch (error) {
+              console.warn('Failed to send achievement notification', { error });
+            }
+          }, 1000);
+        }
+      } catch (error) {
+        console.warn('Failed to record command stats', { error });
+      }
     }
 
     try {
