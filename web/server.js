@@ -118,10 +118,10 @@ module.exports = function startWebServer(client) {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'"], // For inline scripts in HTML
-        styleSrc: ["'self'", "'unsafe-inline'"], // For inline styles
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], // For inline styles and Google Fonts
         imgSrc: ["'self'", 'data:', 'https://cdn.discordapp.com'], // Discord avatars
         connectSrc: ["'self'"],
-        fontSrc: ["'self'"],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'], // Google Fonts
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
         frameSrc: ["'none'"],

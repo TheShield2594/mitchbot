@@ -8,26 +8,41 @@
   // Fetch and display servers
   async function loadServers() {
     try {
+      console.log('Fetching user data from /auth/me...');
       const response = await fetch('/auth/me');
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
+        console.error('Not authenticated, redirecting to login');
         window.location.href = '/auth/login';
         return;
       }
 
       const user = await response.json();
+      console.log('User data received:', user);
 
       // Load user info
       displayUserInfo(user);
 
-      // Filter manageable guilds
-      const manageableGuilds = user.guilds.filter(guild => {
-        const permissions = parseInt(guild.permissions);
-        return (permissions & 0x20) === 0x20; // MANAGE_SERVER
-      });
+      // Check if user.guilds exists
+      if (!user.guilds || !Array.isArray(user.guilds)) {
+        console.error('No guilds data found:', user.guilds);
+        showEmptyState();
+        hideLoading();
+        return;
+      }
+
+      console.log('Total guilds:', user.guilds.length);
+
+      // Filter manageable guilds - backend already filters, so use all guilds
+      const manageableGuilds = user.guilds;
+
+      console.log('Manageable guilds:', manageableGuilds.length);
 
       if (manageableGuilds.length === 0) {
         showEmptyState();
+        hideLoading();
         return;
       }
 
@@ -36,6 +51,7 @@
       hideLoading();
     } catch (error) {
       console.error('Error loading servers:', error);
+      hideLoading();
       showError();
     }
   }
