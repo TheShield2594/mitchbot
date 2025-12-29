@@ -1,43 +1,394 @@
+// ============================================
+// MITCHBOT DASHBOARD - CLIENT-SIDE JAVASCRIPT
+// ============================================
+
 const guildId = window.location.pathname.split('/').pop();
 let config = null;
+let healthMonitor = null;
 
-// Tab switching
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+// ============================================
+// FEATURE HEALTH MONITOR
+// ============================================
 
-    tab.classList.add('active');
-    document.getElementById(`${tab.dataset.tab}-tab`).classList.add('active');
+class FeatureHealthMonitor {
+  constructor(config) {
+    this.config = config;
+    this.features = [
+      {
+        id: 'automod',
+        name: 'Automod',
+        type: 'toggle',
+        path: 'automod',
+        key: 'enabled'
+      },
+      {
+        id: 'wordfilter',
+        name: 'Word Filter',
+        type: 'list',
+        path: 'automod.wordFilter',
+        key: 'enabled',
+        listKey: 'words'
+      },
+      {
+        id: 'invitefilter',
+        name: 'Invite Filter',
+        type: 'toggle',
+        path: 'automod.inviteFilter',
+        key: 'enabled'
+      },
+      {
+        id: 'linkfilter',
+        name: 'Link Filter',
+        type: 'list',
+        path: 'automod.linkFilter',
+        key: 'enabled',
+        listKey: 'whitelist'
+      },
+      {
+        id: 'spam',
+        name: 'Spam Detection',
+        type: 'toggle',
+        path: 'automod.spam',
+        key: 'enabled'
+      },
+      {
+        id: 'logging',
+        name: 'Mod Logging',
+        type: 'channel',
+        path: 'logging',
+        key: 'channelId'
+      }
+    ];
+  }
 
-    if (tab.dataset.tab === 'logs') {
-      loadLogs();
-    } else if (tab.dataset.tab === 'birthdays') {
-      loadBirthdays();
+  getFeatureData(feature) {
+    const path = feature.path.split('.');
+    let data = this.config;
+    for (const key of path) {
+      data = data[key];
+      if (!data) return null;
     }
-  });
-});
+    return data;
+  }
 
-// Toast notification system
+  calculateStatus(feature) {
+    const data = this.getFeatureData(feature);
+    if (!data) return 'inactive';
+
+    // Check if feature is enabled
+    const isEnabled = feature.key === 'channelId'
+      ? !!data[feature.key]
+      : data[feature.key] === true;
+
+    if (!isEnabled) return 'inactive';
+
+    // For list-based features, check if items exist
+    if (feature.type === 'list') {
+      const listData = data[feature.listKey];
+      const blacklistData = data.blacklist || [];
+      const totalItems = (Array.isArray(listData) ? listData.length : 0) +
+                        (Array.isArray(blacklistData) ? blacklistData.length : 0);
+      return totalItems > 0 ? 'active' : 'needs-setup';
+    }
+
+    // For channel-based features, check if channel is set
+    if (feature.type === 'channel') {
+      return data[feature.key] ? 'active' : 'needs-setup';
+    }
+
+    return 'active';
+  }
+
+  getStatusDetails(feature, data) {
+    if (feature.type === 'list') {
+      const listCount = Array.isArray(data[feature.listKey]) ? data[feature.listKey].length : 0;
+      const blacklistCount = Array.isArray(data.blacklist) ? data.blacklist.length : 0;
+      const total = listCount + blacklistCount;
+
+      if (total === 0) return 'No items configured';
+      if (feature.id === 'wordfilter') return `${listCount} word${listCount !== 1 ? 's' : ''} filtered`;
+      if (feature.id === 'linkfilter') {
+        const parts = [];
+        if (listCount > 0) parts.push(`${listCount} whitelisted`);
+        if (blacklistCount > 0) parts.push(`${blacklistCount} blacklisted`);
+        return parts.join(', ');
+      }
+      return `${total} item${total !== 1 ? 's' : ''}`;
+    }
+
+    if (feature.type === 'channel') {
+      return data[feature.key] ? `Logging to channel` : 'No channel set';
+    }
+
+    return 'Monitoring active';
+  }
+
+  getHealthSummary() {
+    const summary = {
+      active: [],
+      needsSetup: [],
+      inactive: []
+    };
+
+    this.features.forEach(feature => {
+      const status = this.calculateStatus(feature);
+      const data = this.getFeatureData(feature);
+
+      const item = {
+        id: feature.id,
+        name: feature.name,
+        details: status !== 'inactive' ? this.getStatusDetails(feature, data) : null
+      };
+
+      if (status === 'active') {
+        summary.active.push(item);
+      } else if (status === 'needs-setup') {
+        summary.needsSetup.push(item);
+      } else {
+        summary.inactive.push(item);
+      }
+    });
+
+    return summary;
+  }
+
+  updateUI() {
+    const summary = this.getHealthSummary();
+
+    // Update counts
+    document.getElementById('health-count-active').textContent = summary.active.length;
+    document.getElementById('health-count-warning').textContent = summary.needsSetup.length;
+    document.getElementById('health-count-inactive').textContent = summary.inactive.length;
+
+    // Update sections
+    this.updateHealthSection('active', summary.active, '🟢');
+    this.updateHealthSection('warning', summary.needsSetup, '🟡');
+    this.updateHealthSection('inactive', summary.inactive, '⚪');
+
+    // Update individual card states
+    this.features.forEach(feature => {
+      const status = this.calculateStatus(feature);
+      this.updateCardState(feature.id, status);
+      this.updateBadge(feature.id, status);
+      this.updateWarnings(feature.id, status);
+    });
+  }
+
+  updateHealthSection(type, items, icon) {
+    const section = document.getElementById(`health-${type}-section`);
+    const list = document.getElementById(`health-${type}-list`);
+
+    if (items.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+    list.innerHTML = '';
+
+    items.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'health-section__item';
+
+      const detailText = item.details ? ` - ${item.details}` : '';
+      const actionText = type === 'warning' ? '<span class="health-section__item-action">→ Configure now</span>' : '';
+
+      li.innerHTML = `
+        <span class="health-section__item-bullet">•</span>
+        <div>
+          <strong>${item.name}</strong>${detailText}
+          ${actionText}
+        </div>
+      `;
+
+      // Make clickable to scroll to section
+      if (type === 'warning') {
+        const action = li.querySelector('.health-section__item-action');
+        if (action) {
+          action.addEventListener('click', () => {
+            document.getElementById(`section-${item.id}`).scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          });
+        }
+      }
+
+      list.appendChild(li);
+    });
+  }
+
+  updateCardState(featureId, status) {
+    const card = document.getElementById(`card-${featureId}`);
+    if (!card) return;
+
+    // Remove all state classes
+    card.classList.remove('card--active', 'card--needs-setup', 'card--inactive');
+
+    // Add appropriate state class
+    if (status === 'active') {
+      card.classList.add('card--active');
+    } else if (status === 'needs-setup') {
+      card.classList.add('card--needs-setup');
+    } else {
+      card.classList.add('card--inactive');
+    }
+  }
+
+  updateBadge(featureId, status) {
+    const badge = document.getElementById(`badge-${featureId}`);
+    if (!badge) return;
+
+    // Remove all badge classes
+    badge.classList.remove('status-badge--active', 'status-badge--warning', 'status-badge--inactive');
+
+    // Update badge content and class
+    if (status === 'active') {
+      badge.classList.add('status-badge--active');
+      badge.innerHTML = '<span class="status-badge__dot"></span><span>Active</span>';
+    } else if (status === 'needs-setup') {
+      badge.classList.add('status-badge--warning');
+      badge.innerHTML = '<span class="status-badge__dot"></span><span>Needs Setup</span>';
+    } else {
+      badge.classList.add('status-badge--inactive');
+      badge.innerHTML = '<span class="status-badge__dot"></span><span>Disabled</span>';
+    }
+  }
+
+  updateWarnings(featureId, status) {
+    const warning = document.getElementById(`${featureId}-warning`);
+    if (warning) {
+      warning.style.display = status === 'needs-setup' ? 'flex' : 'none';
+    }
+  }
+
+  updateSubtitles() {
+    // Word filter subtitle
+    const wordCount = this.config.automod.wordFilter.words.length;
+    const wordSubtitle = document.getElementById('wordfilter-subtitle');
+    if (wordSubtitle) {
+      wordSubtitle.textContent = wordCount > 0
+        ? `${wordCount} word${wordCount !== 1 ? 's' : ''} configured`
+        : 'No words configured';
+    }
+
+    // Link filter subtitle
+    const whitelistCount = this.config.automod.linkFilter.whitelist.length;
+    const blacklistCount = this.config.automod.linkFilter.blacklist.length;
+    const totalDomains = whitelistCount + blacklistCount;
+    const linkSubtitle = document.getElementById('linkfilter-subtitle');
+    if (linkSubtitle) {
+      linkSubtitle.textContent = totalDomains > 0
+        ? `${totalDomains} domain${totalDomains !== 1 ? 's' : ''} configured`
+        : 'No domains configured';
+    }
+  }
+}
+
+// ============================================
+// PROGRESSIVE DISCLOSURE
+// ============================================
+
+class ProgressiveDisclosure {
+  constructor(element) {
+    this.element = element;
+    this.trigger = element.querySelector('[data-disclosure-trigger]');
+    this.content = element.querySelector('[data-disclosure-content]');
+    this.isExpanded = false;
+
+    if (this.trigger && this.content) {
+      this.init();
+    }
+  }
+
+  init() {
+    this.trigger.addEventListener('click', () => this.toggle());
+
+    // Restore state from localStorage
+    const savedState = localStorage.getItem(`disclosure-${this.trigger.id}`);
+    if (savedState === 'expanded') {
+      this.expand(false);
+    }
+  }
+
+  toggle() {
+    this.isExpanded ? this.collapse() : this.expand();
+  }
+
+  expand(animated = true) {
+    this.isExpanded = true;
+    this.trigger.setAttribute('aria-expanded', 'true');
+    this.trigger.querySelector('span:first-child').textContent = 'Hide advanced options';
+    this.content.hidden = false;
+
+    if (animated) {
+      const height = this.content.scrollHeight;
+      this.content.style.height = '0px';
+      requestAnimationFrame(() => {
+        this.content.style.height = `${height}px`;
+        setTimeout(() => {
+          this.content.style.height = 'auto';
+        }, 350);
+      });
+    }
+
+    if (this.trigger.id) {
+      localStorage.setItem(`disclosure-${this.trigger.id}`, 'expanded');
+    }
+  }
+
+  collapse() {
+    this.isExpanded = false;
+    this.trigger.setAttribute('aria-expanded', 'false');
+    this.trigger.querySelector('span:first-child').textContent = 'Show advanced options';
+
+    const height = this.content.scrollHeight;
+    this.content.style.height = `${height}px`;
+
+    requestAnimationFrame(() => {
+      this.content.style.height = '0px';
+      setTimeout(() => {
+        this.content.hidden = true;
+        this.content.style.height = '';
+      }, 350);
+    });
+
+    if (this.trigger.id) {
+      localStorage.removeItem(`disclosure-${this.trigger.id}`);
+    }
+  }
+}
+
+// Initialize all disclosure widgets
+function initializeDisclosures() {
+  document.querySelectorAll('[data-disclosure]').forEach(el => {
+    new ProgressiveDisclosure(el);
+  });
+}
+
+// ============================================
+// TOAST NOTIFICATION SYSTEM
+// ============================================
+
 function showToast(title, message, type = 'success') {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
+  toast.className = `toast toast--${type}`;
 
   const icons = {
     success: '✓',
     error: '✕',
     warning: '⚠',
-    info: 'ℹ'
+    info: 'ℹ️'
   };
 
   toast.innerHTML = `
-    <div class="toast-icon">${icons[type] || icons.info}</div>
-    <div class="toast-content">
-      <div class="toast-title">${title}</div>
-      ${message ? `<div class="toast-message">${message}</div>` : ''}
+    <div class="toast__icon">${icons[type] || icons.info}</div>
+    <div class="toast__content">
+      <div class="toast__title">${title}</div>
+      ${message ? `<div class="toast__message">${message}</div>` : ''}
     </div>
-    <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+    <button class="toast__close" onclick="this.parentElement.remove()">×</button>
   `;
 
   container.appendChild(toast);
@@ -48,46 +399,77 @@ function showToast(title, message, type = 'success') {
   }, 5000);
 }
 
-// Update status overview panel
-function updateStatusOverview() {
-  if (!config) return;
+// ============================================
+// ENHANCED SAVE FEEDBACK
+// ============================================
 
-  const updateStatus = (id, enabled) => {
-    const element = document.getElementById(id);
-    if (element) {
-      element.className = enabled ? 'status-indicator enabled' : 'status-indicator disabled';
-      element.innerHTML = `
-        <span class="status-dot"></span>
-        <span>${enabled ? 'On' : 'Off'}</span>
-      `;
-    }
-  };
-
-  updateStatus('status-automod', config.automod.enabled);
-  updateStatus('status-wordfilter', config.automod.wordFilter.enabled);
-  updateStatus('status-invitefilter', config.automod.inviteFilter.enabled);
-  updateStatus('status-linkfilter', config.automod.linkFilter.enabled);
-  updateStatus('status-spam', config.automod.spam.enabled);
-  updateStatus('status-logging', config.logging.enabled && config.logging.channelId);
-
-  // Update labels with counts
-  const wordCount = config.automod.wordFilter.words.length;
-  const whitelistCount = config.automod.linkFilter.whitelist.length;
-  const blacklistCount = config.automod.linkFilter.blacklist.length;
-
-  const wordLabel = document.getElementById('label-wordfilter');
-  if (wordLabel) {
-    wordLabel.textContent = `Word Filter${wordCount > 0 ? ` (${wordCount})` : ''}`;
+class SaveButton {
+  constructor(button, saveFunction) {
+    this.button = button;
+    this.saveFunction = saveFunction;
+    this.originalText = button.textContent;
+    this.originalClass = button.className;
   }
 
-  const linkLabel = document.getElementById('label-linkfilter');
-  if (linkLabel) {
-    const total = whitelistCount + blacklistCount;
-    linkLabel.textContent = `Link Filter${total > 0 ? ` (${total})` : ''}`;
+  async execute() {
+    this.setLoading();
+
+    try {
+      await this.saveFunction();
+      this.setSuccess();
+      setTimeout(() => this.reset(), 2000);
+    } catch (error) {
+      this.setError();
+      setTimeout(() => this.reset(), 3000);
+      throw error;
+    }
+  }
+
+  setLoading() {
+    this.button.disabled = true;
+    this.button.innerHTML = '<span class="spinner"></span> Saving...';
+  }
+
+  setSuccess() {
+    this.button.className = 'btn btn-success';
+    this.button.innerHTML = '✓ Saved';
+    this.button.disabled = true;
+  }
+
+  setError() {
+    this.button.disabled = false;
+    this.button.className = 'btn btn-danger';
+    this.button.innerHTML = '✕ Failed - Retry';
+  }
+
+  reset() {
+    this.button.disabled = false;
+    this.button.className = this.originalClass;
+    this.button.textContent = this.originalText;
   }
 }
 
-// Load guild info and config
+// ============================================
+// HEALTH OVERVIEW TOGGLE
+// ============================================
+
+function initializeHealthToggle() {
+  const toggle = document.getElementById('health-toggle');
+  const content = document.getElementById('health-content');
+  let isExpanded = true;
+
+  toggle.addEventListener('click', () => {
+    isExpanded = !isExpanded;
+    toggle.setAttribute('aria-expanded', isExpanded.toString());
+    toggle.textContent = isExpanded ? 'Collapse' : 'Expand';
+    content.style.display = isExpanded ? 'block' : 'none';
+  });
+}
+
+// ============================================
+// LOAD GUILD INFO
+// ============================================
+
 async function loadGuildInfo() {
   try {
     const [infoRes, configRes] = await Promise.all([
@@ -104,12 +486,13 @@ async function loadGuildInfo() {
 
     config = configData;
 
+    // Set guild name
     document.getElementById('guild-name').textContent = info.name;
 
     // Populate log channel dropdown
     const logChannelSelect = document.getElementById('log-channel');
-    logChannelSelect.innerHTML = '<option value="">None</option>';
-    info.channels.filter(c => c.type === 0).forEach(channel => { // Text channels
+    logChannelSelect.innerHTML = '<option value="">None - Disable Logging</option>';
+    info.channels.filter(c => c.type === 0).forEach(channel => {
       const option = document.createElement('option');
       option.value = channel.id;
       option.textContent = `#${channel.name}`;
@@ -122,15 +505,26 @@ async function loadGuildInfo() {
     // Load automod config
     loadAutomodConfig();
 
-    // Update status overview
-    updateStatusOverview();
+    // Initialize health monitor
+    healthMonitor = new FeatureHealthMonitor(config);
+    healthMonitor.updateUI();
+    healthMonitor.updateSubtitles();
+
+    // Load logs
+    loadLogs();
+
+    // Load birthdays
+    loadBirthdays();
   } catch (error) {
     console.error('Error loading guild info:', error);
     showToast('Error', 'Failed to load guild information', 'error');
   }
 }
 
-// Load automod configuration
+// ============================================
+// LOAD AUTOMOD CONFIG
+// ============================================
+
 function loadAutomodConfig() {
   document.getElementById('automod-enabled').checked = config.automod.enabled;
   document.getElementById('wordfilter-enabled').checked = config.automod.wordFilter.enabled;
@@ -143,7 +537,7 @@ function loadAutomodConfig() {
   renderWhitelist();
   renderBlacklist();
 
-  // Add real-time toggle listeners to update overview
+  // Add real-time toggle listeners
   const toggles = [
     'automod-enabled',
     'wordfilter-enabled',
@@ -156,37 +550,56 @@ function loadAutomodConfig() {
     const element = document.getElementById(id);
     if (element) {
       element.addEventListener('change', () => {
-        // Update config preview (not saved yet)
         if (id === 'automod-enabled') config.automod.enabled = element.checked;
         if (id === 'wordfilter-enabled') config.automod.wordFilter.enabled = element.checked;
         if (id === 'invitefilter-enabled') config.automod.inviteFilter.enabled = element.checked;
         if (id === 'linkfilter-enabled') config.automod.linkFilter.enabled = element.checked;
         if (id === 'spam-enabled') config.automod.spam.enabled = element.checked;
-        updateStatusOverview();
+
+        if (healthMonitor) {
+          healthMonitor.updateUI();
+          healthMonitor.updateSubtitles();
+        }
       });
     }
   });
+
+  // Log channel change listener
+  const logChannel = document.getElementById('log-channel');
+  if (logChannel) {
+    logChannel.addEventListener('change', () => {
+      config.logging.channelId = logChannel.value || null;
+      if (healthMonitor) {
+        healthMonitor.updateUI();
+      }
+    });
+  }
 }
 
-// Render word list
+// ============================================
+// WORD LIST FUNCTIONS
+// ============================================
+
 function renderWordList() {
   const container = document.getElementById('word-list');
   container.innerHTML = '';
 
   config.automod.wordFilter.words.forEach(word => {
     const tag = document.createElement('div');
-    tag.className = 'word-tag';
+    tag.className = 'tag';
     tag.innerHTML = `
-      <span>${word}</span>
-      <button onclick="removeWord('${word}')">×</button>
+      <span>${escapeHtml(word)}</span>
+      <button class="tag__remove" onclick="removeWord('${escapeHtml(word)}')">×</button>
     `;
     container.appendChild(tag);
   });
 
-  updateStatusOverview();
+  if (healthMonitor) {
+    healthMonitor.updateUI();
+    healthMonitor.updateSubtitles();
+  }
 }
 
-// Add word
 function addWord() {
   const input = document.getElementById('new-word');
   const word = input.value.trim().toLowerCase();
@@ -200,31 +613,35 @@ function addWord() {
   }
 }
 
-// Remove word
 function removeWord(word) {
   config.automod.wordFilter.words = config.automod.wordFilter.words.filter(w => w !== word);
   renderWordList();
 }
 
-// Render whitelist
+// ============================================
+// WHITELIST FUNCTIONS
+// ============================================
+
 function renderWhitelist() {
   const container = document.getElementById('whitelist');
   container.innerHTML = '';
 
   config.automod.linkFilter.whitelist.forEach(domain => {
     const tag = document.createElement('div');
-    tag.className = 'word-tag';
+    tag.className = 'tag';
     tag.innerHTML = `
-      <span>${domain}</span>
-      <button onclick="removeWhitelist('${domain}')">×</button>
+      <span>${escapeHtml(domain)}</span>
+      <button class="tag__remove" onclick="removeWhitelist('${escapeHtml(domain)}')">×</button>
     `;
     container.appendChild(tag);
   });
 
-  updateStatusOverview();
+  if (healthMonitor) {
+    healthMonitor.updateUI();
+    healthMonitor.updateSubtitles();
+  }
 }
 
-// Add whitelist
 function addWhitelist() {
   const input = document.getElementById('new-whitelist');
   const domain = input.value.trim().toLowerCase();
@@ -238,31 +655,35 @@ function addWhitelist() {
   }
 }
 
-// Remove whitelist
 function removeWhitelist(domain) {
   config.automod.linkFilter.whitelist = config.automod.linkFilter.whitelist.filter(d => d !== domain);
   renderWhitelist();
 }
 
-// Render blacklist
+// ============================================
+// BLACKLIST FUNCTIONS
+// ============================================
+
 function renderBlacklist() {
   const container = document.getElementById('blacklist');
   container.innerHTML = '';
 
   config.automod.linkFilter.blacklist.forEach(domain => {
     const tag = document.createElement('div');
-    tag.className = 'word-tag';
+    tag.className = 'tag';
     tag.innerHTML = `
-      <span>${domain}</span>
-      <button onclick="removeBlacklist('${domain}')">×</button>
+      <span>${escapeHtml(domain)}</span>
+      <button class="tag__remove" onclick="removeBlacklist('${escapeHtml(domain)}')">×</button>
     `;
     container.appendChild(tag);
   });
 
-  updateStatusOverview();
+  if (healthMonitor) {
+    healthMonitor.updateUI();
+    healthMonitor.updateSubtitles();
+  }
 }
 
-// Add blacklist
 function addBlacklist() {
   const input = document.getElementById('new-blacklist');
   const domain = input.value.trim().toLowerCase();
@@ -276,13 +697,15 @@ function addBlacklist() {
   }
 }
 
-// Remove blacklist
 function removeBlacklist(domain) {
   config.automod.linkFilter.blacklist = config.automod.linkFilter.blacklist.filter(d => d !== domain);
   renderBlacklist();
 }
 
-// Save automod settings
+// ============================================
+// SAVE FUNCTIONS
+// ============================================
+
 async function saveAutomod() {
   try {
     const updates = {
@@ -321,103 +744,25 @@ async function saveAutomod() {
       throw new Error('Failed to save settings');
     }
 
-    // Update config with new values
+    // Update config
     config.automod.enabled = updates.enabled;
     config.automod.wordFilter.enabled = updates.wordFilter.enabled;
     config.automod.inviteFilter.enabled = updates.inviteFilter.enabled;
     config.automod.linkFilter.enabled = updates.linkFilter.enabled;
     config.automod.spam.enabled = updates.spam.enabled;
 
-    // Update status overview
-    updateStatusOverview();
+    if (healthMonitor) {
+      healthMonitor.updateUI();
+    }
 
     showToast('Settings Saved', 'Automod configuration updated successfully', 'success');
   } catch (error) {
     console.error('Error saving automod settings:', error);
     showToast('Save Failed', 'Could not save automod settings', 'error');
+    throw error;
   }
 }
 
-// Load logs
-async function loadLogs() {
-  try {
-    const container = document.getElementById('logs-container');
-    container.innerHTML = '<div class="loading">Loading logs...</div>';
-
-    const response = await fetch(`/api/guild/${guildId}/logs?limit=25`);
-
-    if (!response.ok) {
-      throw new Error('Failed to load logs');
-    }
-
-    const logs = await response.json();
-
-    if (logs.length === 0) {
-      container.innerHTML = '<p>No moderation logs found.</p>';
-      return;
-    }
-
-    container.innerHTML = '';
-
-    logs.forEach(log => {
-      const entry = document.createElement('div');
-      entry.className = 'log-entry';
-
-      const date = new Date(log.timestamp).toLocaleString();
-
-      entry.innerHTML = `
-        <div class="log-header">
-          <span>${log.action}</span>
-          <span class="log-time">${date}</span>
-        </div>
-        ${log.targetTag ? `<div><strong>Target:</strong> ${log.targetTag}</div>` : ''}
-        ${log.moderatorTag ? `<div><strong>Moderator:</strong> ${log.moderatorTag}</div>` : ''}
-        ${log.reason ? `<div><strong>Reason:</strong> ${log.reason}</div>` : ''}
-        ${log.duration ? `<div><strong>Duration:</strong> ${log.duration}</div>` : ''}
-        ${log.violationType ? `<div><strong>Violation:</strong> ${log.violationType}</div>` : ''}
-      `;
-
-      container.appendChild(entry);
-    });
-  } catch (error) {
-    console.error('Error loading logs:', error);
-    document.getElementById('logs-container').innerHTML = '<p>Failed to load logs.</p>';
-  }
-}
-
-// Load birthdays
-async function loadBirthdays() {
-  try {
-    const container = document.getElementById('birthdays-container');
-    container.innerHTML = '<div class="loading">Loading birthdays...</div>';
-
-    const response = await fetch(`/api/guild/${guildId}/birthdays`);
-
-    if (!response.ok) {
-      throw new Error('Failed to load birthdays');
-    }
-
-    const birthdays = await response.json();
-
-    if (Object.keys(birthdays).length === 0) {
-      container.innerHTML = '<p>No birthdays configured.</p>';
-      return;
-    }
-
-    container.innerHTML = '<ul>';
-
-    for (const [userId, date] of Object.entries(birthdays)) {
-      container.innerHTML += `<li>User ${userId}: ${date}</li>`;
-    }
-
-    container.innerHTML += '</ul>';
-  } catch (error) {
-    console.error('Error loading birthdays:', error);
-    document.getElementById('birthdays-container').innerHTML = '<p>Failed to load birthdays.</p>';
-  }
-}
-
-// Save settings
 async function saveSettings() {
   try {
     const logChannelId = document.getElementById('log-channel').value;
@@ -435,19 +780,128 @@ async function saveSettings() {
       throw new Error('Failed to save settings');
     }
 
-    // Update config with new values
     config.logging.enabled = !!logChannelId;
     config.logging.channelId = logChannelId || null;
 
-    // Update status overview
-    updateStatusOverview();
+    if (healthMonitor) {
+      healthMonitor.updateUI();
+    }
 
     showToast('Settings Saved', 'Logging configuration updated successfully', 'success');
   } catch (error) {
     console.error('Error saving settings:', error);
     showToast('Save Failed', 'Could not save logging settings', 'error');
+    throw error;
   }
 }
 
-// Initialize
-loadGuildInfo();
+// ============================================
+// LOAD LOGS
+// ============================================
+
+async function loadLogs() {
+  try {
+    const container = document.getElementById('logs-container');
+    container.innerHTML = '<div class="loading">Loading logs...</div>';
+
+    const response = await fetch(`/api/guild/${guildId}/logs?limit=25`);
+
+    if (!response.ok) {
+      throw new Error('Failed to load logs');
+    }
+
+    const logs = await response.json();
+
+    if (logs.length === 0) {
+      container.innerHTML = '<p class="text-muted text-center">No moderation logs found.</p>';
+      return;
+    }
+
+    container.innerHTML = '';
+
+    logs.forEach(log => {
+      const entry = document.createElement('div');
+      entry.className = 'alert alert--info';
+      entry.style.marginBottom = 'var(--space-3)';
+
+      const date = new Date(log.timestamp).toLocaleString();
+
+      const details = [];
+      if (log.targetTag) details.push(`<strong>Target:</strong> ${escapeHtml(log.targetTag)}`);
+      if (log.moderatorTag) details.push(`<strong>Moderator:</strong> ${escapeHtml(log.moderatorTag)}`);
+      if (log.reason) details.push(`<strong>Reason:</strong> ${escapeHtml(log.reason)}`);
+      if (log.duration) details.push(`<strong>Duration:</strong> ${escapeHtml(log.duration)}`);
+      if (log.violationType) details.push(`<strong>Violation:</strong> ${escapeHtml(log.violationType)}`);
+
+      entry.innerHTML = `
+        <span class="alert__icon">📋</span>
+        <div class="alert__content">
+          <div class="alert__title">${escapeHtml(log.action)} <span style="color: var(--text-tertiary); font-weight: normal; font-size: var(--text-xs);">${date}</span></div>
+          ${details.length > 0 ? `<div class="alert__message">${details.join(' • ')}</div>` : ''}
+        </div>
+      `;
+
+      container.appendChild(entry);
+    });
+  } catch (error) {
+    console.error('Error loading logs:', error);
+    document.getElementById('logs-container').innerHTML =
+      '<p class="text-muted text-center">Failed to load logs.</p>';
+  }
+}
+
+// ============================================
+// LOAD BIRTHDAYS
+// ============================================
+
+async function loadBirthdays() {
+  try {
+    const container = document.getElementById('birthdays-container');
+    container.innerHTML = '<div class="loading">Loading birthdays...</div>';
+
+    const response = await fetch(`/api/guild/${guildId}/birthdays`);
+
+    if (!response.ok) {
+      throw new Error('Failed to load birthdays');
+    }
+
+    const birthdays = await response.json();
+
+    if (Object.keys(birthdays).length === 0) {
+      container.innerHTML = '<p class="text-muted">No birthdays configured.</p>';
+      return;
+    }
+
+    container.innerHTML = '<ul style="list-style: none; padding: 0;">';
+
+    for (const [userId, date] of Object.entries(birthdays)) {
+      container.innerHTML += `<li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--border-color-light);">User ${escapeHtml(userId)}: ${escapeHtml(date)}</li>`;
+    }
+
+    container.innerHTML += '</ul>';
+  } catch (error) {
+    console.error('Error loading birthdays:', error);
+    document.getElementById('birthdays-container').innerHTML =
+      '<p class="text-muted">Failed to load birthdays.</p>';
+  }
+}
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ============================================
+// INITIALIZATION
+// ============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadGuildInfo();
+  initializeDisclosures();
+  initializeHealthToggle();
+});
