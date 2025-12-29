@@ -295,15 +295,23 @@ module.exports = {
       const allowOwn = interaction.options.getBoolean('allow_own_server');
 
       if (action === 'enable') {
-        config.automod.inviteFilter.enabled = true;
-        if (allowOwn !== null) {
-          config.automod.inviteFilter.allowOwnServer = allowOwn;
-        }
-        updateGuildConfig(interaction.guildId, { automod: config.automod });
+        const newInviteFilter = {
+          ...config.automod.inviteFilter,
+          enabled: true,
+          ...(allowOwn !== null && { allowOwnServer: allowOwn }),
+        };
+        const newAutomod = {
+          ...config.automod,
+          inviteFilter: newInviteFilter,
+        };
+        updateGuildConfig(interaction.guildId, { automod: newAutomod });
         await interaction.editReply('✅ Invite filter enabled.');
       } else if (action === 'disable') {
-        config.automod.inviteFilter.enabled = false;
-        updateGuildConfig(interaction.guildId, { automod: config.automod });
+        const newAutomod = {
+          ...config.automod,
+          inviteFilter: { ...config.automod.inviteFilter, enabled: false },
+        };
+        updateGuildConfig(interaction.guildId, { automod: newAutomod });
         await interaction.editReply('❌ Invite filter disabled.');
       }
       return;
@@ -444,16 +452,22 @@ module.exports = {
       const action = interaction.options.getString('action');
 
       if (action === 'enable') {
-        config.automod.spam.enabled = true;
-        config.automod.mentionSpam.enabled = true;
-        config.automod.capsSpam.enabled = true;
-        updateGuildConfig(interaction.guildId, { automod: config.automod });
+        const newAutomod = {
+          ...config.automod,
+          spam: { ...config.automod.spam, enabled: true },
+          mentionSpam: { ...config.automod.mentionSpam, enabled: true },
+          capsSpam: { ...config.automod.capsSpam, enabled: true },
+        };
+        updateGuildConfig(interaction.guildId, { automod: newAutomod });
         await interaction.editReply('✅ Spam detection enabled (message spam, mention spam, caps spam).');
       } else if (action === 'disable') {
-        config.automod.spam.enabled = false;
-        config.automod.mentionSpam.enabled = false;
-        config.automod.capsSpam.enabled = false;
-        updateGuildConfig(interaction.guildId, { automod: config.automod });
+        const newAutomod = {
+          ...config.automod,
+          spam: { ...config.automod.spam, enabled: false },
+          mentionSpam: { ...config.automod.mentionSpam, enabled: false },
+          capsSpam: { ...config.automod.capsSpam, enabled: false },
+        };
+        updateGuildConfig(interaction.guildId, { automod: newAutomod });
         await interaction.editReply('❌ Spam detection disabled.');
       }
       return;
@@ -464,14 +478,20 @@ module.exports = {
       const channel = interaction.options.getChannel('channel');
 
       if (!channel) {
-        config.logging.enabled = false;
-        config.logging.channelId = null;
-        updateGuildConfig(interaction.guildId, { logging: config.logging });
+        const newLogging = {
+          ...config.logging,
+          enabled: false,
+          channelId: null,
+        };
+        updateGuildConfig(interaction.guildId, { logging: newLogging });
         await interaction.editReply('❌ Mod log channel removed.');
       } else {
-        config.logging.enabled = true;
-        config.logging.channelId = channel.id;
-        updateGuildConfig(interaction.guildId, { logging: config.logging });
+        const newLogging = {
+          ...config.logging,
+          enabled: true,
+          channelId: channel.id,
+        };
+        updateGuildConfig(interaction.guildId, { logging: newLogging });
         await interaction.editReply(`✅ Mod log channel set to ${channel}.`);
       }
       return;

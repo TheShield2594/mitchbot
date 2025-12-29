@@ -53,7 +53,7 @@ module.exports = {
         logger.warn('Could not DM kicked user', {
           command: 'kick',
           targetId: target.id,
-          targetTag: target.user.tag,
+          targetTag: target.user.username,
           guildId: interaction.guildId,
           error,
         });
@@ -67,18 +67,18 @@ module.exports = {
         type: 'kick',
         action: 'Member Kicked',
         targetId: target.id,
-        targetTag: target.user.tag,
+        targetTag: target.user.username,
         moderatorId: interaction.user.id,
-        moderatorTag: interaction.user.tag,
+        moderatorTag: interaction.user.username,
         reason,
       });
 
-      await interaction.editReply(`Successfully kicked ${target.user.tag}\nReason: ${reason}`);
+      await interaction.editReply(`Successfully kicked ${target.user.username}\nReason: ${reason}`);
     } catch (error) {
       logger.error('Failed to kick user', {
         command: 'kick',
         targetId: target.id,
-        targetTag: target.user.tag,
+        targetTag: target.user.username,
         guildId: interaction.guildId,
         interactionId: interaction.id,
         moderatorId: interaction.user.id,

@@ -64,12 +64,20 @@ router.get('/me', (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
+  // Filter guilds to only show those where user has MANAGE_GUILD permission
+  // MANAGE_GUILD permission bit is 0x00000020 (32)
+  const MANAGE_GUILD = 0x00000020;
+  const manageableGuilds = req.user.guilds ? req.user.guilds.filter(guild => {
+    // Check if user has MANAGE_GUILD permission
+    return guild.permissions && (BigInt(guild.permissions) & BigInt(MANAGE_GUILD)) === BigInt(MANAGE_GUILD);
+  }) : [];
+
   res.json({
     id: req.user.id,
     username: req.user.username,
     discriminator: req.user.discriminator,
     avatar: req.user.avatar,
-    guilds: req.user.guilds,
+    guilds: manageableGuilds,
   });
 });
 

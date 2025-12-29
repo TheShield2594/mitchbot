@@ -1,4 +1,5 @@
 const fs = require('fs');
+const fsPromises = require('fs').promises;
 const path = require('path');
 
 const LOG_LEVELS = {
@@ -28,44 +29,80 @@ function formatLogEntry(level, message, context = {}) {
   });
 }
 
-// Sanitize context to avoid logging sensitive data
-function sanitizeContext(context) {
-  const sanitized = { ...context };
-
-  // Remove sensitive fields
-  const sensitiveKeys = ['token', 'password', 'secret', 'apiKey', 'sessionId'];
-  for (const key of sensitiveKeys) {
-    if (sanitized[key]) {
-      sanitized[key] = '[REDACTED]';
-    }
+// Recursively sanitize values to avoid logging sensitive data
+function sanitizeValue(value) {
+  // Handle null/undefined
+  if (value === null || value === undefined) {
+    return value;
   }
 
-  // Sanitize error objects
-  if (sanitized.error && sanitized.error instanceof Error) {
-    sanitized.error = {
-      name: sanitized.error.name,
-      message: sanitized.error.message,
-      code: sanitized.error.code,
+  // Handle Error objects
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      code: value.code,
       // Don't include full stack in production
-      stack: process.env.NODE_ENV === 'development' ? sanitized.error.stack : undefined,
+      stack: process.env.NODE_ENV === 'development' ? value.stack : undefined,
     };
   }
 
-  return sanitized;
+  // Handle arrays recursively
+  if (Array.isArray(value)) {
+    return value.map(item => sanitizeValue(item));
+  }
+
+  // Handle objects recursively
+  if (typeof value === 'object') {
+    const sanitized = {};
+    const sensitiveKeys = ['token', 'password', 'secret', 'apiKey', 'sessionId', 'clientSecret'];
+
+    for (const key in value) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        // Check if key contains sensitive information
+        const isSensitive = sensitiveKeys.some(sensitiveKey =>
+          key.toLowerCase().includes(sensitiveKey.toLowerCase())
+        );
+
+        if (isSensitive) {
+          sanitized[key] = '[REDACTED]';
+        } else {
+          sanitized[key] = sanitizeValue(value[key]);
+        }
+      }
+    }
+
+    return sanitized;
+  }
+
+  // Primitives (string, number, boolean) return as-is
+  return value;
 }
 
-// Write to log file
-function writeToFile(level, entry) {
+// Sanitize context to avoid logging sensitive data
+function sanitizeContext(context) {
+  return sanitizeValue(context);
+}
+
+// Write to log file asynchronously
+async function writeToFile(level, entry) {
   const filename = path.join(LOG_DIR, `${level.toLowerCase()}.log`);
-  fs.appendFileSync(filename, entry + '\n', 'utf8');
+  try {
+    await fsPromises.appendFile(filename, entry + '\n', 'utf8');
+  } catch (error) {
+    // Fallback to console if file writing fails
+    console.error('Failed to write to log file:', error.message);
+  }
 }
 
 // Main logging function
 function log(level, message, context = {}) {
   const entry = formatLogEntry(level, message, context);
 
-  // Always write to file
-  writeToFile(level, entry);
+  // Always write to file (fire-and-forget async)
+  writeToFile(level, entry).catch(err => {
+    // Error already handled in writeToFile, this is just to prevent unhandled rejection
+  });
 
   // Also log to console based on level and environment
   if (process.env.NODE_ENV !== 'production' || level === LOG_LEVELS.ERROR) {

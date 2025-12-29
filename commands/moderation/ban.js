@@ -65,7 +65,7 @@ module.exports = {
         logger.warn('Could not DM banned user', {
           command: 'ban',
           targetId: target.id,
-          targetTag: target.tag,
+          targetTag: target.username,
           guildId: interaction.guildId,
           error,
         });
@@ -82,19 +82,19 @@ module.exports = {
         type: 'ban',
         action: 'Member Banned',
         targetId: target.id,
-        targetTag: target.tag,
+        targetTag: target.username,
         moderatorId: interaction.user.id,
-        moderatorTag: interaction.user.tag,
+        moderatorTag: interaction.user.username,
         reason,
         deleteDays,
       });
 
-      await interaction.editReply(`Successfully banned ${target.tag}\nReason: ${reason}`);
+      await interaction.editReply(`Successfully banned ${target.username}\nReason: ${reason}`);
     } catch (error) {
       logger.error('Failed to ban user', {
         command: 'ban',
         targetId: target.id,
-        targetTag: target.tag,
+        targetTag: target.username,
         guildId: interaction.guildId,
         interactionId: interaction.id,
         moderatorId: interaction.user.id,
