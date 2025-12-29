@@ -272,6 +272,15 @@ module.exports = function startWebServer(client) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Health check endpoint for Railway/monitoring
+  app.get('/health', (req, res) => {
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    });
+  });
+
   // Routes
   app.use('/auth', require('./routes/auth'));
   app.use('/api', require('./routes/api'));
