@@ -204,14 +204,20 @@ a:hover {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  background: rgba(255, 255, 255, 0.95);
   border-bottom: 1px solid var(--border-color);
   height: var(--navbar-height);
   display: flex;
   align-items: center;
   padding: 0 var(--space-8);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .navbar {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+  }
 }
 
 .navbar__container {
@@ -370,7 +376,7 @@ a:hover {
 }
 
 .health-card--active {
-  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  background: linear-gradient(135deg, var(--info-50) 0%, var(--info-100) 100%);
   border-color: var(--info-500);
 }
 
@@ -380,7 +386,7 @@ a:hover {
 }
 
 .health-card--warning {
-  background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+  background: linear-gradient(135deg, var(--warning-50) 0%, var(--warning-100) 100%);
   border-color: var(--warning-500);
 }
 
@@ -390,7 +396,7 @@ a:hover {
 }
 
 .health-card--inactive {
-  background: linear-gradient(135deg, #FAFAFA 0%, #F5F5F5 100%);
+  background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%);
   border-color: var(--gray-200);
 }
 
@@ -409,6 +415,7 @@ a:hover {
 }
 
 .health-card--active .health-card__count {
+  color: var(--info-600);
   background: linear-gradient(135deg, var(--info-600), var(--info-500));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -416,6 +423,7 @@ a:hover {
 }
 
 .health-card--warning .health-card__count {
+  color: var(--warning-600);
   background: linear-gradient(135deg, var(--warning-600), var(--warning-500));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -566,7 +574,23 @@ a:hover {
 }
 
 .card--inactive {
-  opacity: 0.6;
+  background: var(--bg-tertiary);
+  border-color: var(--gray-300);
+}
+
+.card--inactive .card__title,
+.card--inactive .card__description,
+.card--inactive .form-label,
+.card--inactive .toggle-label {
+  color: var(--text-secondary);
+}
+
+.card--inactive .card__subtitle {
+  color: var(--text-tertiary);
+}
+
+.card--inactive .card__icon {
+  opacity: 0.5;
 }
 
 .card--error {
