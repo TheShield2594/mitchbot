@@ -27,8 +27,10 @@ async function ensureServerManager(req, res, next) {
       return res.status(403).json({ error: 'You are not a member of this server' });
     }
 
-    // Check if user has MANAGE_SERVER permission (0x20)
-    const hasPermission = (parseInt(guild.permissions) & 0x20) === 0x20;
+    // Check if user has MANAGE_GUILD permission (0x20)
+    const MANAGE_GUILD = 0x00000020;
+    const hasPermission = guild.permissions &&
+      (BigInt(guild.permissions) & BigInt(MANAGE_GUILD)) === BigInt(MANAGE_GUILD);
 
     if (!hasPermission) {
       return res.status(403).json({ error: 'You do not have permission to manage this server' });

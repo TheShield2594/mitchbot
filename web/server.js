@@ -6,6 +6,7 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
+const { fetch } = require('undici');
 const logger = require('../utils/logger');
 const { ensureAuthenticated } = require('./middleware/auth');
 
@@ -200,9 +201,44 @@ module.exports = function startWebServer(client) {
     clientSecret: process.env.DISCORD_CLIENT_SECRET,
     callbackURL,
     scope: ['identify', 'guilds'],
-  }, (accessToken, refreshToken, profile, done) => {
-    logger.info('Discord OAuth callback received', { userId: profile.id });
-    return done(null, profile);
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      logger.info('Discord OAuth callback received', { userId: profile.id });
+
+      // Fetch guilds data from Discord API
+      const guildsResponse = await fetch('https://discord.com/api/users/@me/guilds', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!guildsResponse.ok) {
+        logger.error('Failed to fetch guilds from Discord API', {
+          userId: profile.id,
+          status: guildsResponse.status,
+          statusText: guildsResponse.statusText,
+        });
+        // Continue without guilds data rather than failing auth
+        profile.guilds = [];
+      } else {
+        const guilds = await guildsResponse.json();
+        profile.guilds = guilds;
+        logger.info('Successfully fetched guilds for user', {
+          userId: profile.id,
+          guildCount: guilds.length,
+        });
+      }
+
+      return done(null, profile);
+    } catch (error) {
+      logger.error('Error in Discord OAuth callback', {
+        userId: profile.id,
+        error: error.message,
+      });
+      // Continue with auth even if guild fetch fails
+      profile.guilds = [];
+      return done(null, profile);
+    }
   }));
 
   app.use(passport.initialize());

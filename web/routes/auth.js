@@ -64,6 +64,14 @@ router.get('/me', (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
+  // Log if guilds data is missing
+  if (!req.user.guilds) {
+    logger.warn('User guilds data is missing from session', {
+      userId: req.user.id,
+      username: req.user.username,
+    });
+  }
+
   // Filter guilds to only show those where user has MANAGE_GUILD permission
   // MANAGE_GUILD permission bit is 0x00000020 (32)
   const MANAGE_GUILD = 0x00000020;
@@ -71,6 +79,12 @@ router.get('/me', (req, res) => {
     // Check if user has MANAGE_GUILD permission
     return guild.permissions && (BigInt(guild.permissions) & BigInt(MANAGE_GUILD)) === BigInt(MANAGE_GUILD);
   }) : [];
+
+  logger.info('User info requested', {
+    userId: req.user.id,
+    totalGuilds: req.user.guilds?.length || 0,
+    manageableGuilds: manageableGuilds.length,
+  });
 
   res.json({
     id: req.user.id,
