@@ -206,7 +206,7 @@ module.exports = function startWebServer(client) {
       logger.info('Discord OAuth callback received', { userId: profile.id });
 
       // Fetch guilds data from Discord API
-      const guildsResponse = await fetch('https://discord.com/api/users/@me/guilds', {
+      const guildsResponse = await fetch('https://discord.com/api/v10/users/@me/guilds', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },

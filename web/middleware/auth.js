@@ -1,3 +1,5 @@
+const { MANAGE_GUILD } = require('../constants/permissions');
+
 // Middleware to check if user is authenticated
 function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated()) {
@@ -28,7 +30,6 @@ async function ensureServerManager(req, res, next) {
     }
 
     // Check if user has MANAGE_GUILD permission (0x20)
-    const MANAGE_GUILD = 0x00000020;
     const hasPermission = guild.permissions &&
       (BigInt(guild.permissions) & BigInt(MANAGE_GUILD)) === BigInt(MANAGE_GUILD);
 

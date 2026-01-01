@@ -1,6 +1,7 @@
 const express = require('express');
 const passport = require('passport');
 const logger = require('../../utils/logger');
+const { MANAGE_GUILD } = require('../constants/permissions');
 const router = express.Router();
 
 // Login route
@@ -74,7 +75,6 @@ router.get('/me', (req, res) => {
 
   // Filter guilds to only show those where user has MANAGE_GUILD permission
   // MANAGE_GUILD permission bit is 0x00000020 (32)
-  const MANAGE_GUILD = 0x00000020;
   const manageableGuilds = req.user.guilds ? req.user.guilds.filter(guild => {
     // Check if user has MANAGE_GUILD permission
     return guild.permissions && (BigInt(guild.permissions) & BigInt(MANAGE_GUILD)) === BigInt(MANAGE_GUILD);
