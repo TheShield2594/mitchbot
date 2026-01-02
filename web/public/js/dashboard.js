@@ -6,8 +6,12 @@
   'use strict';
 
   // Fetch and display servers
-  async function loadServers() {
+  async function loadServers(showRefreshingMessage = false) {
     try {
+      if (showRefreshingMessage) {
+        showRefreshing();
+      }
+
       console.log('Fetching user data from /auth/me...');
       const response = await fetch('/auth/me');
 
@@ -21,6 +25,7 @@
 
       const user = await response.json();
       console.log('User data received:', user);
+      console.log('Debug info:', user.debugInfo);
 
       // Load user info
       displayUserInfo(user);
@@ -28,7 +33,8 @@
       // Check if user.guilds exists
       if (!user.guilds || !Array.isArray(user.guilds)) {
         console.error('No guilds data found:', user.guilds);
-        showEmptyState();
+        console.error('Debug info:', user.debugInfo);
+        showEmptyState(user.debugInfo);
         hideLoading();
         return;
       }
@@ -41,7 +47,7 @@
       console.log('Manageable guilds:', manageableGuilds.length);
 
       if (manageableGuilds.length === 0) {
-        showEmptyState();
+        showEmptyState(user.debugInfo);
         hideLoading();
         return;
       }
@@ -52,8 +58,92 @@
     } catch (error) {
       console.error('Error loading servers:', error);
       hideLoading();
-      showError();
+      showError(error.message);
     }
+  }
+
+  // Refresh guilds from Discord
+  async function refreshGuilds() {
+    try {
+      showRefreshing();
+      console.log('Refreshing guilds from Discord...');
+
+      const response = await fetch('/auth/refresh-guilds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to refresh guilds:', errorData);
+
+        if (errorData.reason === 'missing_token') {
+          showError('Please log out and log back in to refresh your server list');
+          return;
+        }
+
+        if (errorData.reason === 'timeout') {
+          showError('Discord is taking too long to respond. Please try again in a moment.');
+          return;
+        }
+
+        showError(`Failed to refresh: ${errorData.error}`);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('Guilds refreshed successfully:', data);
+
+      // Reload the dashboard
+      await loadServers(false);
+
+      // Show success message
+      showSuccessMessage(`Successfully refreshed! Found ${data.manageableGuilds} manageable server(s).`);
+    } catch (error) {
+      console.error('Error refreshing guilds:', error);
+      showError('Failed to refresh guilds. Please try again.');
+    }
+  }
+
+  // Show refreshing state
+  function showRefreshing() {
+    const serverList = document.getElementById('server-list');
+    if (!serverList) return;
+
+    serverList.innerHTML = `
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Refreshing servers from Discord...</p>
+      </div>
+    `;
+  }
+
+  // Show success message
+  function showSuccessMessage(message) {
+    const container = document.createElement('div');
+    container.className = 'success-toast';
+    container.textContent = message;
+    container.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: var(--success-bg, #10b981);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 10000;
+      animation: slideInRight 0.3s ease-out;
+    `;
+
+    document.body.appendChild(container);
+
+    setTimeout(() => {
+      container.style.animation = 'slideOutRight 0.3s ease-in';
+      setTimeout(() => container.remove(), 300);
+    }, 3000);
   }
 
   // Display user info
@@ -164,13 +254,72 @@
     if (protectedEl) protectedEl.textContent = protectedCount;
   }
 
-  // Show empty state
-  function showEmptyState() {
+  // Show empty state with diagnostic info
+  function showEmptyState(debugInfo) {
     const serverList = document.getElementById('server-list');
     const emptyState = document.getElementById('empty-state');
 
     if (serverList) serverList.style.display = 'none';
-    if (emptyState) emptyState.style.display = 'block';
+
+    // If we have the empty-state element, use it
+    if (emptyState) {
+      emptyState.style.display = 'block';
+      return;
+    }
+
+    // Otherwise create a detailed empty state
+    if (serverList) {
+      let diagnosticText = '';
+      if (debugInfo) {
+        if (!debugInfo.hasGuildsData) {
+          diagnosticText = `
+            <div class="diagnostic-info">
+              <strong>Issue Detected:</strong> No server data loaded from Discord.<br>
+              This usually happens if:<br>
+              • Discord API timed out during login<br>
+              • Network connection issues during authentication<br>
+              <br>
+              <strong>Solution:</strong> Click the "Refresh Servers" button below or log out and log back in.
+            </div>
+          `;
+        } else if (debugInfo.totalGuilds > 0 && debugInfo.manageableCount === 0) {
+          diagnosticText = `
+            <div class="diagnostic-info">
+              <strong>Issue Detected:</strong> You have ${debugInfo.totalGuilds} server(s) but no "Manage Server" permission.<br>
+              <br>
+              <strong>Solution:</strong> Ask a server administrator to grant you the "Manage Server" permission.
+            </div>
+          `;
+        }
+      }
+
+      serverList.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state__icon">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+          </div>
+          <h3 class="empty-state__title">No Servers Found</h3>
+          <p class="empty-state__description">
+            We couldn't find any servers where you have management permissions.
+          </p>
+          ${diagnosticText}
+          <div style="display: flex; gap: 12px; justify-content: center; margin-top: 20px;">
+            <button class="btn btn-primary" onclick="window.location.reload()">Refresh Page</button>
+            <button class="btn btn-secondary" id="refresh-guilds-btn">Refresh Servers</button>
+          </div>
+        </div>
+      `;
+
+      // Add click handler for refresh button
+      const refreshBtn = document.getElementById('refresh-guilds-btn');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshGuilds);
+      }
+    }
   }
 
   // Hide loading state
@@ -179,10 +328,12 @@
     if (loadingEl) loadingEl.style.display = 'none';
   }
 
-  // Show error
-  function showError() {
+  // Show error with custom message
+  function showError(message) {
     const serverList = document.getElementById('server-list');
     if (!serverList) return;
+
+    const errorMessage = message || 'There was an error loading your servers. Please try refreshing the page.';
 
     serverList.innerHTML = `
       <div class="empty-state">
@@ -195,11 +346,20 @@
         </div>
         <h3 class="empty-state__title">Error Loading Servers</h3>
         <p class="empty-state__description">
-          There was an error loading your servers. Please try refreshing the page.
+          ${escapeHtml(errorMessage)}
         </p>
-        <button class="btn btn-primary" onclick="location.reload()">Refresh Page</button>
+        <div style="display: flex; gap: 12px; justify-content: center; margin-top: 20px;">
+          <button class="btn btn-primary" onclick="location.reload()">Refresh Page</button>
+          <button class="btn btn-secondary" id="refresh-after-error-btn">Refresh Servers</button>
+        </div>
       </div>
     `;
+
+    // Add click handler for refresh button
+    const refreshBtn = document.getElementById('refresh-after-error-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', refreshGuilds);
+    }
   }
 
   // Setup search functionality
@@ -274,7 +434,19 @@
     setupSearch();
     setupFilters();
     updateBotInviteLink();
+    setupRefreshButton();
   }
+
+  // Setup refresh button in header
+  function setupRefreshButton() {
+    const refreshBtn = document.getElementById('refresh-servers-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', refreshGuilds);
+    }
+  }
+
+  // Expose refreshGuilds globally for inline onclick handlers
+  window.refreshGuilds = refreshGuilds;
 
   // Update bot invite link with actual client ID
   async function updateBotInviteLink() {

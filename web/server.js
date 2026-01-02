@@ -202,9 +202,10 @@ module.exports = function startWebServer(client) {
     callbackURL,
     scope: ['identify', 'guilds'],
   }, async (accessToken, refreshToken, profile, done) => {
-    // Read timeout from env var GUILD_FETCH_TIMEOUT_MS, default to 5000ms (5 seconds)
+    // Read timeout from env var GUILD_FETCH_TIMEOUT_MS, default to 10000ms (10 seconds)
+    // Increased from 5s to 10s to reduce timeout issues during login
     const timeoutValue = parseInt(process.env.GUILD_FETCH_TIMEOUT_MS, 10);
-    const GUILD_FETCH_TIMEOUT = !isNaN(timeoutValue) && timeoutValue > 0 ? timeoutValue : 5000;
+    const GUILD_FETCH_TIMEOUT = !isNaN(timeoutValue) && timeoutValue > 0 ? timeoutValue : 10000;
     const controller = new AbortController();
     let timeoutId = null;
 
@@ -243,6 +244,9 @@ module.exports = function startWebServer(client) {
         });
       }
 
+      // Store access token for guild refresh
+      profile.accessToken = accessToken;
+
       return done(null, profile);
     } catch (error) {
       // Clear timeout if it's still set
@@ -265,6 +269,8 @@ module.exports = function startWebServer(client) {
 
       // Continue with auth even if guild fetch fails
       profile.guilds = [];
+      // Store access token for guild refresh even if guild fetch fails
+      profile.accessToken = accessToken;
       return done(null, profile);
     }
   }));
