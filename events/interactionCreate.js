@@ -2,7 +2,7 @@ const { Events } = require('discord.js');
 const { recordCommandUsage } = require('../utils/stats');
 const { updateUserStats } = require('../utils/achievements');
 const logger = require('../utils/logger');
-const { executeCommand } = require('../utils/commandErrors');
+const { handleCommandError } = require('../utils/commandErrors');
 
 function getInteractionContext(interaction) {
   return {
@@ -77,6 +77,10 @@ module.exports = {
       }
     }
 
-    await executeCommand(interaction, command);
+    try {
+      await command.execute(interaction);
+    } catch (error) {
+      await handleCommandError(interaction, error);
+    }
   },
 };
