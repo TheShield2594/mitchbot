@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "deploy": "node deploy/deployCommands.js"
+    "deploy": "node deploy/deployCommands.js",
+    "sync-commands": "node deploy/syncCommands.js"
   },
   "author": "",
   "license": "ISC",
