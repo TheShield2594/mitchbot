@@ -1,4 +1,4 @@
-const NAME_PATTERN = /^[\\w-]{1,32}$/;
+const NAME_PATTERN = /^[\w-]{1,32}$/;
 const DESCRIPTION_MIN = 1;
 const DESCRIPTION_MAX = 100;
 const MAX_OPTIONS = 25;
@@ -10,10 +10,6 @@ const validateName = (errors, path, value) => {
   if (!hasValue(value)) {
     errors.push(`${path} must be a non-empty string.`);
     return;
-  }
-
-  if (value.length < 1 || value.length > 32) {
-    errors.push(`${path} must be between 1 and 32 characters.`);
   }
 
   if (value !== value.toLowerCase()) {
