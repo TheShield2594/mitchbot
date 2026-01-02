@@ -91,6 +91,19 @@ function getDefaultGuildConfig() {
 
     // Tempban tracking
     tempbans: {}, // { userId: { expiresAt: timestamp, caseId: number } }
+
+    // Welcome/Leave messages
+    welcome: {
+      enabled: false,
+      channelId: null,
+      message: 'Welcome to the server, {user}!', // {user} = mention, {username} = name, {server} = server name, {memberCount} = member count
+    },
+
+    leave: {
+      enabled: false,
+      channelId: null,
+      message: '{username} has left the server.',
+    },
   };
 }
 
