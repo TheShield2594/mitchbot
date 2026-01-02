@@ -167,26 +167,41 @@
   // Render server cards with modern design
   function renderServers(guilds) {
     const serverList = document.getElementById('server-list');
-    if (!serverList) return;
+    if (!serverList) {
+      console.error('server-list element not found!');
+      return;
+    }
 
-    serverList.innerHTML = guilds.map(guild => createServerCard(guild)).join('');
+    console.log('Rendering', guilds.length, 'servers');
 
-    // Add click handlers
-    document.querySelectorAll('.server-card').forEach(card => {
-      card.addEventListener('click', function(e) {
-        const button = e.target.closest('.server-card__action');
-        if (button) {
-          // Button clicked - navigate to guild page
-          e.stopPropagation();
-          const guildId = button.getAttribute('data-guild-id');
-          window.location.href = `/guild/${guildId}`;
-        } else {
-          // Card clicked (but not button) - also navigate
-          const guildId = this.getAttribute('data-guild-id');
-          window.location.href = `/guild/${guildId}`;
-        }
+    try {
+      // Make sure server list is visible
+      serverList.style.display = '';
+
+      serverList.innerHTML = guilds.map(guild => createServerCard(guild)).join('');
+
+      // Add click handlers
+      document.querySelectorAll('.server-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+          const button = e.target.closest('.server-card__action');
+          if (button) {
+            // Button clicked - navigate to guild page
+            e.stopPropagation();
+            const guildId = button.getAttribute('data-guild-id');
+            window.location.href = `/guild/${guildId}`;
+          } else {
+            // Card clicked (but not button) - also navigate
+            const guildId = this.getAttribute('data-guild-id');
+            window.location.href = `/guild/${guildId}`;
+          }
+        });
       });
-    });
+
+      console.log('Successfully rendered', guilds.length, 'server cards');
+    } catch (error) {
+      console.error('Error rendering servers:', error);
+      showError(`Failed to render servers: ${error.message}`);
+    }
   }
 
   // Create modern server card HTML
@@ -261,64 +276,65 @@
 
     if (serverList) serverList.style.display = 'none';
 
-    // If we have the empty-state element, use it
-    if (emptyState) {
-      emptyState.style.display = 'block';
-      return;
+    // Build diagnostic text based on debug info
+    let diagnosticText = '';
+    if (debugInfo) {
+      if (!debugInfo.hasGuildsData) {
+        diagnosticText = `
+          <div class="diagnostic-info">
+            <strong>Issue Detected:</strong> No server data loaded from Discord.<br>
+            This usually happens if:<br>
+            • Discord API timed out during login<br>
+            • Network connection issues during authentication<br>
+            <br>
+            <strong>Solution:</strong> Click the "Refresh Servers" button below or log out and log back in.
+          </div>
+        `;
+      } else if (debugInfo.totalGuilds > 0 && debugInfo.manageableCount === 0) {
+        diagnosticText = `
+          <div class="diagnostic-info">
+            <strong>Issue Detected:</strong> You have ${debugInfo.totalGuilds} server(s) but no "Manage Server" permission.<br>
+            <br>
+            <strong>Solution:</strong> Ask a server administrator to grant you the "Manage Server" permission.
+          </div>
+        `;
+      }
     }
 
-    // Otherwise create a detailed empty state
-    if (serverList) {
-      let diagnosticText = '';
-      if (debugInfo) {
-        if (!debugInfo.hasGuildsData) {
-          diagnosticText = `
-            <div class="diagnostic-info">
-              <strong>Issue Detected:</strong> No server data loaded from Discord.<br>
-              This usually happens if:<br>
-              • Discord API timed out during login<br>
-              • Network connection issues during authentication<br>
-              <br>
-              <strong>Solution:</strong> Click the "Refresh Servers" button below or log out and log back in.
-            </div>
-          `;
-        } else if (debugInfo.totalGuilds > 0 && debugInfo.manageableCount === 0) {
-          diagnosticText = `
-            <div class="diagnostic-info">
-              <strong>Issue Detected:</strong> You have ${debugInfo.totalGuilds} server(s) but no "Manage Server" permission.<br>
-              <br>
-              <strong>Solution:</strong> Ask a server administrator to grant you the "Manage Server" permission.
-            </div>
-          `;
-        }
-      }
-
-      serverList.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state__icon">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="16" x2="12" y2="12"/>
-              <line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
-          </div>
-          <h3 class="empty-state__title">No Servers Found</h3>
-          <p class="empty-state__description">
-            We couldn't find any servers where you have management permissions.
-          </p>
-          ${diagnosticText}
-          <div style="display: flex; gap: 12px; justify-content: center; margin-top: 20px;">
-            <button class="btn btn-primary" onclick="window.location.reload()">Refresh Page</button>
-            <button class="btn btn-secondary" id="refresh-guilds-btn">Refresh Servers</button>
-          </div>
+    const emptyStateHTML = `
+      <div class="empty-state">
+        <div class="empty-state__icon">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
         </div>
-      `;
+        <h3 class="empty-state__title">No Servers Found</h3>
+        <p class="empty-state__description">
+          We couldn't find any servers where you have management permissions.
+        </p>
+        ${diagnosticText}
+        <div style="display: flex; gap: 12px; justify-content: center; margin-top: 20px;">
+          <button class="btn btn-primary" onclick="window.location.reload()">Refresh Page</button>
+          <button class="btn btn-secondary" id="refresh-guilds-btn-empty">Refresh Servers</button>
+        </div>
+      </div>
+    `;
 
-      // Add click handler for refresh button
-      const refreshBtn = document.getElementById('refresh-guilds-btn');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', refreshGuilds);
-      }
+    // If we have the empty-state element, populate it
+    if (emptyState) {
+      emptyState.innerHTML = emptyStateHTML;
+      emptyState.style.display = 'block';
+    } else if (serverList) {
+      // Otherwise insert into server list
+      serverList.innerHTML = emptyStateHTML;
+    }
+
+    // Add click handler for refresh button
+    const refreshBtn = document.getElementById('refresh-guilds-btn-empty');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', refreshGuilds);
     }
   }
 
