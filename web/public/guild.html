@@ -293,6 +293,30 @@
           </label>
 
           <div class="form-group">
+            <label class="form-label">Action</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Choose what happens when a user violates the word filter.
+            </p>
+            <select class="form-input" id="wordfilter-action">
+              <option value="delete">Delete message and warn</option>
+              <option value="warn">Warn user only</option>
+              <option value="timeout">Timeout user</option>
+              <option value="kick">Kick user</option>
+              <option value="ban">Ban user</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Warning Threshold</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Number of warnings before escalating to timeout/kick.
+            </p>
+            <input type="number" class="form-input" id="wordfilter-threshold" min="1" max="10" value="3">
+          </div>
+
+          <div class="form-group">
             <label class="form-label">Filtered Words</label>
             <p class="helper-text">
               <span class="helper-text__icon">ℹ️</span>
@@ -343,6 +367,30 @@
           </label>
 
           <div class="form-group">
+            <label class="form-label">Action</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Choose what happens when a user posts an invite link.
+            </p>
+            <select class="form-input" id="invitefilter-action">
+              <option value="delete">Delete message and warn</option>
+              <option value="warn">Warn user only</option>
+              <option value="timeout">Timeout user</option>
+              <option value="kick">Kick user</option>
+              <option value="ban">Ban user</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Warning Threshold</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Number of warnings before escalating to timeout/kick.
+            </p>
+            <input type="number" class="form-input" id="invitefilter-threshold" min="1" max="10" value="3">
+          </div>
+
+          <div class="form-group">
             <label class="form-label">Exceptions</label>
             <label style="display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3);">
               <input type="checkbox" id="allow-own-server">
@@ -383,6 +431,30 @@
             </span>
             <span class="toggle-label">Enable Link Filter</span>
           </label>
+
+          <div class="form-group">
+            <label class="form-label">Action</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Choose what happens when a user posts a blocked link.
+            </p>
+            <select class="form-input" id="linkfilter-action">
+              <option value="delete">Delete message and warn</option>
+              <option value="warn">Warn user only</option>
+              <option value="timeout">Timeout user</option>
+              <option value="kick">Kick user</option>
+              <option value="ban">Ban user</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Warning Threshold</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Number of warnings before escalating to timeout/kick.
+            </p>
+            <input type="number" class="form-input" id="linkfilter-threshold" min="1" max="10" value="3">
+          </div>
 
           <div class="form-group">
             <label class="form-label">Whitelisted Domains</label>
@@ -435,6 +507,113 @@
             </span>
             <span class="toggle-label">Enable Spam Detection</span>
           </label>
+
+          <div class="form-group">
+            <label class="form-label">Action</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Choose what happens when spam is detected.
+            </p>
+            <select class="form-input" id="spam-action">
+              <option value="timeout">Timeout user</option>
+              <option value="delete">Delete messages and warn</option>
+              <option value="warn">Warn user only</option>
+              <option value="kick">Kick user</option>
+              <option value="ban">Ban user</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Timeout Duration (minutes)</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              How long to timeout users for spam violations.
+            </p>
+            <input type="number" class="form-input" id="spam-timeout-duration" min="1" max="1440" value="5">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Message Threshold</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Number of messages in the time window to trigger spam detection.
+            </p>
+            <input type="number" class="form-input" id="spam-message-threshold" min="3" max="20" value="5">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Time Window (seconds)</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Time period to count messages for spam detection.
+            </p>
+            <input type="number" class="form-input" id="spam-time-window" min="1" max="60" value="5">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Duplicate Message Threshold</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Number of identical messages to trigger spam detection.
+            </p>
+            <input type="number" class="form-input" id="spam-duplicate-threshold" min="2" max="10" value="3">
+          </div>
+
+          <div class="mt-6">
+            <button class="btn btn-primary" onclick="saveAutomod()">Save Changes</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-automod-whitelist" class="guild-section">
+        <div class="card card--inactive" id="card-automod-whitelist">
+          <div class="card__header">
+            <div>
+              <h3 class="card__title">
+                <span class="card__icon">✅</span>
+                Automod Whitelist
+              </h3>
+              <p class="card__subtitle">Roles and channels immune to automod</p>
+            </div>
+            <span class="status-badge status-badge--info" id="badge-automod-whitelist">
+              <span class="status-badge__dot"></span>
+              <span>Optional</span>
+            </span>
+          </div>
+
+          <p class="card__description">
+            Configure which roles and channels should be immune to automod. Members with whitelisted roles and messages in whitelisted channels will bypass all automod filters.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label">Whitelisted Roles</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Members with these roles will be immune to automod filters.
+            </p>
+            <div class="tag-list" id="whitelisted-roles-list"></div>
+            <div class="tag-input-group">
+              <select class="form-input" id="whitelist-role-select">
+                <option value="">Select a role...</option>
+              </select>
+              <button class="btn btn-secondary" onclick="addWhitelistedRole()">Add Role</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Whitelisted Channels</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Automod will be disabled in these channels.
+            </p>
+            <div class="tag-list" id="whitelisted-channels-list"></div>
+            <div class="tag-input-group">
+              <select class="form-input" id="whitelist-channel-select">
+                <option value="">Select a channel...</option>
+              </select>
+              <button class="btn btn-secondary" onclick="addWhitelistedChannel()">Add Channel</button>
+            </div>
+          </div>
 
           <div class="mt-6">
             <button class="btn btn-primary" onclick="saveAutomod()">Save Changes</button>
