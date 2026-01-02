@@ -14,8 +14,19 @@ let economyData = {};
 let writeQueue = Promise.resolve();
 let hasLoaded = false;
 
+function getDefaultEconomyConfig() {
+  return {
+    enabled: true,
+    currencyName: "coins",
+    currencySymbol: "💰",
+    dailyReward: 100,
+    dailyCooldownHours: 24,
+  };
+}
+
 function getDefaultGuildEconomy() {
   return {
+    config: getDefaultEconomyConfig(),
     balances: {},
     daily: {},
     transactions: [],
@@ -97,7 +108,27 @@ function getGuildEconomy(guildId) {
     economyData[guildId] = getDefaultGuildEconomy();
   }
 
+  // Ensure config exists for backward compatibility
+  if (!economyData[guildId].config) {
+    economyData[guildId].config = getDefaultEconomyConfig();
+  }
+
   return economyData[guildId];
+}
+
+function getEconomyConfig(guildId) {
+  const guildData = getGuildEconomy(guildId);
+  return guildData.config;
+}
+
+function updateEconomyConfig(guildId, updates) {
+  const guildData = getGuildEconomy(guildId);
+  guildData.config = {
+    ...guildData.config,
+    ...updates,
+  };
+  saveEconomyData();
+  return guildData.config;
 }
 
 function getBalance(guildId, userId) {
@@ -145,7 +176,7 @@ function addBalance(guildId, userId, amount, details = {}) {
   return { balance: updated, transaction };
 }
 
-function getDailyCooldown(lastClaimAt, nowMs) {
+function getDailyCooldown(lastClaimAt, nowMs, cooldownHours = 24) {
   if (!lastClaimAt) {
     return { remainingMs: 0, nextClaimAt: null };
   }
@@ -155,12 +186,13 @@ function getDailyCooldown(lastClaimAt, nowMs) {
     return { remainingMs: 0, nextClaimAt: null };
   }
 
+  const cooldownMs = cooldownHours * 60 * 60 * 1000;
   const elapsed = nowMs - lastClaimMs;
-  if (elapsed >= DAILY_COOLDOWN_MS) {
+  if (elapsed >= cooldownMs) {
     return { remainingMs: 0, nextClaimAt: null };
   }
 
-  const remainingMs = DAILY_COOLDOWN_MS - elapsed;
+  const remainingMs = cooldownMs - elapsed;
   return {
     remainingMs,
     nextClaimAt: new Date(nowMs + remainingMs).toISOString(),
@@ -170,9 +202,14 @@ function getDailyCooldown(lastClaimAt, nowMs) {
 function claimDaily(guildId, userId, now = new Date()) {
   const nowMs = now.getTime();
   const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
   const dailyData = guildData.daily[userId] || {};
 
-  const { remainingMs, nextClaimAt } = getDailyCooldown(dailyData.lastClaimAt, nowMs);
+  const { remainingMs, nextClaimAt } = getDailyCooldown(
+    dailyData.lastClaimAt,
+    nowMs,
+    config.dailyCooldownHours
+  );
   if (remainingMs > 0) {
     return {
       ok: false,
@@ -186,21 +223,22 @@ function claimDaily(guildId, userId, now = new Date()) {
   dailyData.totalClaims = (dailyData.totalClaims || 0) + 1;
   guildData.daily[userId] = dailyData;
 
-  const result = addBalance(guildId, userId, DAILY_REWARD, {
+  const result = addBalance(guildId, userId, config.dailyReward, {
     type: "daily_reward",
     reason: "Daily reward claim",
   });
 
+  const cooldownMs = config.dailyCooldownHours * 60 * 60 * 1000;
   return {
     ok: true,
-    reward: DAILY_REWARD,
+    reward: config.dailyReward,
     balance: result.balance,
-    nextClaimAt: new Date(nowMs + DAILY_COOLDOWN_MS).toISOString(),
+    nextClaimAt: new Date(nowMs + cooldownMs).toISOString(),
   };
 }
 
-function formatCoins(amount) {
-  return `${Number(amount || 0).toLocaleString()} coins`;
+function formatCoins(amount, currencyName = "coins") {
+  return `${Number(amount || 0).toLocaleString()} ${currencyName}`;
 }
 
 module.exports = {
@@ -212,6 +250,8 @@ module.exports = {
   formatCoins,
   getBalance,
   getDailyCooldown,
+  getEconomyConfig,
+  updateEconomyConfig,
   initEconomy,
   loadEconomyData,
   logTransaction,

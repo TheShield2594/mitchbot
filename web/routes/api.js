@@ -3,6 +3,7 @@ const router = express.Router();
 const { ensureServerManager } = require('../middleware/auth');
 const { getGuildConfig, updateGuildConfig, getLogs, getWarnings, clearWarnings } = require('../../utils/moderation');
 const { getBirthdays, addBirthday, removeBirthday } = require('../../utils/birthdays');
+const { getEconomyConfig, updateEconomyConfig } = require('../../utils/economy');
 
 // Get bot client ID for OAuth links
 router.get('/client-id', (req, res) => {
@@ -193,6 +194,54 @@ router.get('/guild/:guildId/info', ensureServerManager, async (req, res) => {
   } catch (error) {
     console.error('Error getting guild info:', error);
     res.status(500).json({ error: 'Failed to get guild info' });
+  }
+});
+
+// Get economy configuration
+router.get('/guild/:guildId/economy/config', ensureServerManager, (req, res) => {
+  try {
+    const config = getEconomyConfig(req.params.guildId);
+    res.json(config);
+  } catch (error) {
+    console.error('Error getting economy config:', error);
+    res.status(500).json({ error: 'Failed to get economy configuration' });
+  }
+});
+
+// Update economy configuration
+router.post('/guild/:guildId/economy/config', ensureServerManager, async (req, res) => {
+  try {
+    const updates = req.body;
+
+    // Validate inputs
+    if (updates.dailyReward !== undefined) {
+      const dailyReward = Number(updates.dailyReward);
+      if (isNaN(dailyReward) || dailyReward < 0 || dailyReward > 1000000) {
+        return res.status(400).json({ error: 'Daily reward must be between 0 and 1,000,000' });
+      }
+      updates.dailyReward = dailyReward;
+    }
+
+    if (updates.dailyCooldownHours !== undefined) {
+      const cooldown = Number(updates.dailyCooldownHours);
+      if (isNaN(cooldown) || cooldown < 1 || cooldown > 168) {
+        return res.status(400).json({ error: 'Daily cooldown must be between 1 and 168 hours' });
+      }
+      updates.dailyCooldownHours = cooldown;
+    }
+
+    if (updates.currencyName !== undefined) {
+      if (typeof updates.currencyName !== 'string' || updates.currencyName.trim().length === 0) {
+        return res.status(400).json({ error: 'Currency name must be a non-empty string' });
+      }
+      updates.currencyName = updates.currencyName.trim();
+    }
+
+    const config = updateEconomyConfig(req.params.guildId, updates);
+    res.json({ success: true, config });
+  } catch (error) {
+    console.error('Error updating economy config:', error);
+    res.status(500).json({ error: 'Failed to update economy configuration' });
   }
 });
 

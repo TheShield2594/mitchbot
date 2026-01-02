@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const { ECONOMY_EMBED_COLOR, formatCoins, getBalance, initEconomy } = require("../../utils/economy");
+const { ECONOMY_EMBED_COLOR, formatCoins, getBalance, getEconomyConfig, initEconomy } = require("../../utils/economy");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -23,11 +23,12 @@ module.exports = {
 
         const target = interaction.options.getUser("user") || interaction.user;
         const balance = getBalance(interaction.guildId, target.id);
+        const config = getEconomyConfig(interaction.guildId);
 
         const embed = new EmbedBuilder()
             .setColor(ECONOMY_EMBED_COLOR)
             .setTitle("Server Balance")
-            .setDescription(`**${target.username}** has **${formatCoins(balance)}**.`)
+            .setDescription(`**${target.username}** has **${formatCoins(balance, config.currencyName)}**.`)
             .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
             .setTimestamp();
 
