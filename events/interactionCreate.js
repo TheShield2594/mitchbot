@@ -2,6 +2,16 @@ const { Events } = require('discord.js');
 const { recordCommandUsage } = require('../utils/stats');
 const { updateUserStats } = require('../utils/achievements');
 const { executeCommand } = require('../utils/commandErrors');
+const logger = require('../utils/logger');
+
+function getInteractionContext(interaction) {
+  return {
+    guildId: interaction.guildId,
+    channelId: interaction.channelId,
+    userId: interaction.user?.id,
+    commandName: interaction.commandName,
+  };
+}
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -10,14 +20,17 @@ module.exports = {
 
     const command = interaction.client.commands.get(interaction.commandName);
     if (!command) {
-      console.error(`Command not found: ${interaction.commandName}`);
+      logger.error('Command not found', getInteractionContext(interaction));
       try {
         await interaction.reply({
           content: `Command \`/${interaction.commandName}\` is not registered. Please contact a server administrator to run \`npm run deploy\` to update slash commands.`,
           ephemeral: true,
         });
       } catch (error) {
-        console.error('Failed to send command-not-found message:', error);
+        logger.error('Failed to send command-not-found message', {
+          ...getInteractionContext(interaction),
+          error,
+        });
       }
       return;
     }
@@ -48,12 +61,18 @@ module.exports = {
                 ephemeral: false,
               });
             } catch (error) {
-              console.warn('Failed to send achievement notification', { error });
+              logger.warn('Failed to send achievement notification', {
+                ...getInteractionContext(interaction),
+                error,
+              });
             }
           }, 1000);
         }
       } catch (error) {
-        console.warn('Failed to record command stats', { error });
+        logger.warn('Failed to record command stats', {
+          ...getInteractionContext(interaction),
+          error,
+        });
       }
     }
 
