@@ -508,6 +508,10 @@ async function loadGuildInfo() {
       };
     }
 
+    // Store roles and channels for later use
+    config.roles = info.roles;
+    config.channels = info.channels;
+
     // Set guild name
     document.getElementById('guild-name').textContent = info.name;
 
@@ -523,6 +527,30 @@ async function loadGuildInfo() {
       }
       logChannelSelect.appendChild(option);
     });
+
+    // Populate whitelist role dropdown
+    const whitelistRoleSelect = document.getElementById('whitelist-role-select');
+    if (whitelistRoleSelect) {
+      whitelistRoleSelect.innerHTML = '<option value="">Select a role...</option>';
+      info.roles.filter(r => r.id !== info.id).forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        whitelistRoleSelect.appendChild(option);
+      });
+    }
+
+    // Populate whitelist channel dropdown
+    const whitelistChannelSelect = document.getElementById('whitelist-channel-select');
+    if (whitelistChannelSelect) {
+      whitelistChannelSelect.innerHTML = '<option value="">Select a channel...</option>';
+      info.channels.filter(c => c.type === 0).forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `#${channel.name}`;
+        whitelistChannelSelect.appendChild(option);
+      });
+    }
 
     // Load automod config
     loadAutomodConfig();
@@ -558,9 +586,28 @@ function loadAutomodConfig() {
   document.getElementById('linkfilter-enabled').checked = config.automod.linkFilter.enabled;
   document.getElementById('spam-enabled').checked = config.automod.spam.enabled;
 
+  // Load action configurations
+  document.getElementById('wordfilter-action').value = config.automod.wordFilter.action || 'delete';
+  document.getElementById('invitefilter-action').value = config.automod.inviteFilter.action || 'delete';
+  document.getElementById('linkfilter-action').value = config.automod.linkFilter.action || 'delete';
+  document.getElementById('spam-action').value = config.automod.spam.action || 'timeout';
+
+  // Load warning thresholds
+  document.getElementById('wordfilter-threshold').value = config.automod.wordFilter.warnThreshold || 3;
+  document.getElementById('invitefilter-threshold').value = config.automod.inviteFilter.warnThreshold || 3;
+  document.getElementById('linkfilter-threshold').value = config.automod.linkFilter.warnThreshold || 3;
+
+  // Load spam detection parameters
+  document.getElementById('spam-timeout-duration').value = (config.automod.spam.timeoutDuration || 300000) / 60000; // Convert ms to minutes
+  document.getElementById('spam-message-threshold').value = config.automod.spam.messageThreshold || 5;
+  document.getElementById('spam-time-window').value = (config.automod.spam.timeWindow || 5000) / 1000; // Convert ms to seconds
+  document.getElementById('spam-duplicate-threshold').value = config.automod.spam.duplicateThreshold || 3;
+
   renderWordList();
   renderWhitelist();
   renderBlacklist();
+  renderWhitelistedRoles();
+  renderWhitelistedChannels();
 
   // Add real-time toggle listeners
   const toggles = [
@@ -728,6 +775,102 @@ function removeBlacklist(domain) {
 }
 
 // ============================================
+// WHITELISTED ROLES FUNCTIONS
+// ============================================
+
+function renderWhitelistedRoles() {
+  const container = document.getElementById('whitelisted-roles-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!config.automod.whitelistedRoles) {
+    config.automod.whitelistedRoles = [];
+  }
+
+  config.automod.whitelistedRoles.forEach(roleId => {
+    const roleName = config.roles?.find(r => r.id === roleId)?.name || `Role ${roleId}`;
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.innerHTML = `
+      <span>${escapeHtml(roleName)}</span>
+      <button class="tag__remove" onclick="removeWhitelistedRole('${roleId}')">×</button>
+    `;
+    container.appendChild(tag);
+  });
+}
+
+function addWhitelistedRole() {
+  const select = document.getElementById('whitelist-role-select');
+  const roleId = select.value;
+
+  if (!roleId) return;
+
+  if (!config.automod.whitelistedRoles) {
+    config.automod.whitelistedRoles = [];
+  }
+
+  if (!config.automod.whitelistedRoles.includes(roleId)) {
+    config.automod.whitelistedRoles.push(roleId);
+    renderWhitelistedRoles();
+    select.value = '';
+  }
+}
+
+function removeWhitelistedRole(roleId) {
+  config.automod.whitelistedRoles = config.automod.whitelistedRoles.filter(id => id !== roleId);
+  renderWhitelistedRoles();
+}
+
+// ============================================
+// WHITELISTED CHANNELS FUNCTIONS
+// ============================================
+
+function renderWhitelistedChannels() {
+  const container = document.getElementById('whitelisted-channels-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!config.automod.whitelistedChannels) {
+    config.automod.whitelistedChannels = [];
+  }
+
+  config.automod.whitelistedChannels.forEach(channelId => {
+    const channelName = config.channels?.find(c => c.id === channelId)?.name || `Channel ${channelId}`;
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.innerHTML = `
+      <span>#${escapeHtml(channelName)}</span>
+      <button class="tag__remove" onclick="removeWhitelistedChannel('${channelId}')">×</button>
+    `;
+    container.appendChild(tag);
+  });
+}
+
+function addWhitelistedChannel() {
+  const select = document.getElementById('whitelist-channel-select');
+  const channelId = select.value;
+
+  if (!channelId) return;
+
+  if (!config.automod.whitelistedChannels) {
+    config.automod.whitelistedChannels = [];
+  }
+
+  if (!config.automod.whitelistedChannels.includes(channelId)) {
+    config.automod.whitelistedChannels.push(channelId);
+    renderWhitelistedChannels();
+    select.value = '';
+  }
+}
+
+function removeWhitelistedChannel(channelId) {
+  config.automod.whitelistedChannels = config.automod.whitelistedChannels.filter(id => id !== channelId);
+  renderWhitelistedChannels();
+}
+
+// ============================================
 // SAVE FUNCTIONS
 // ============================================
 
@@ -738,18 +881,29 @@ async function saveAutomod() {
       wordFilter: {
         enabled: document.getElementById('wordfilter-enabled').checked,
         words: config.automod.wordFilter.words,
+        action: document.getElementById('wordfilter-action').value,
+        warnThreshold: parseInt(document.getElementById('wordfilter-threshold').value),
       },
       inviteFilter: {
         enabled: document.getElementById('invitefilter-enabled').checked,
         allowOwnServer: document.getElementById('allow-own-server').checked,
+        action: document.getElementById('invitefilter-action').value,
+        warnThreshold: parseInt(document.getElementById('invitefilter-threshold').value),
       },
       linkFilter: {
         enabled: document.getElementById('linkfilter-enabled').checked,
         whitelist: config.automod.linkFilter.whitelist,
         blacklist: config.automod.linkFilter.blacklist,
+        action: document.getElementById('linkfilter-action').value,
+        warnThreshold: parseInt(document.getElementById('linkfilter-threshold').value),
       },
       spam: {
         enabled: document.getElementById('spam-enabled').checked,
+        action: document.getElementById('spam-action').value,
+        timeoutDuration: parseInt(document.getElementById('spam-timeout-duration').value) * 60000, // Convert minutes to ms
+        messageThreshold: parseInt(document.getElementById('spam-message-threshold').value),
+        timeWindow: parseInt(document.getElementById('spam-time-window').value) * 1000, // Convert seconds to ms
+        duplicateThreshold: parseInt(document.getElementById('spam-duplicate-threshold').value),
       },
       mentionSpam: {
         enabled: document.getElementById('spam-enabled').checked,
@@ -757,6 +911,8 @@ async function saveAutomod() {
       capsSpam: {
         enabled: document.getElementById('spam-enabled').checked,
       },
+      whitelistedRoles: config.automod.whitelistedRoles || [],
+      whitelistedChannels: config.automod.whitelistedChannels || [],
     };
 
     const response = await fetch(`/api/guild/${guildId}/automod`, {
