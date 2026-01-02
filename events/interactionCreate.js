@@ -2,6 +2,7 @@ const { Events } = require('discord.js');
 const { recordCommandUsage } = require('../utils/stats');
 const { updateUserStats } = require('../utils/achievements');
 const logger = require('../utils/logger');
+const { handleCommandError } = require('../utils/commandErrors');
 
 function getInteractionContext(interaction) {
   return {
@@ -17,9 +18,10 @@ module.exports = {
   async execute(interaction) {
     if (!interaction.isChatInputCommand()) return;
 
+    const interactionContext = getInteractionContext(interaction);
     const command = interaction.client.commands.get(interaction.commandName);
     if (!command) {
-      logger.error('Command not found', getInteractionContext(interaction));
+      logger.error('Command not found', interactionContext);
       try {
         await interaction.reply({
           content: `Command \`/${interaction.commandName}\` is not registered. Please contact a server administrator to run \`npm run deploy\` to update slash commands.`,
@@ -27,7 +29,7 @@ module.exports = {
         });
       } catch (error) {
         logger.error('Failed to send command-not-found message', {
-          ...getInteractionContext(interaction),
+          ...interactionContext,
           error,
         });
       }
@@ -61,7 +63,7 @@ module.exports = {
               });
             } catch (error) {
               logger.warn('Failed to send achievement notification', {
-                ...getInteractionContext(interaction),
+                ...interactionContext,
                 error,
               });
             }
@@ -69,7 +71,7 @@ module.exports = {
         }
       } catch (error) {
         logger.warn('Failed to record command stats', {
-          ...getInteractionContext(interaction),
+          ...interactionContext,
           error,
         });
       }
@@ -78,27 +80,7 @@ module.exports = {
     try {
       await command.execute(interaction);
     } catch (error) {
-      logger.error('Command execution failed', {
-        ...getInteractionContext(interaction),
-        error,
-      });
-      const errorMessage = {
-        content: 'Something broke. Mitch is pretending this didn\'t happen.',
-        ephemeral: true,
-      };
-
-      try {
-        if (interaction.deferred || interaction.replied) {
-          await interaction.editReply(errorMessage);
-        } else {
-          await interaction.reply(errorMessage);
-        }
-      } catch (replyError) {
-        logger.error('Failed to send error message', {
-          ...getInteractionContext(interaction),
-          error: replyError,
-        });
-      }
+      await handleCommandError(interaction, error);
     }
   },
 };
