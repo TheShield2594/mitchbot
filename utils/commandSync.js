@@ -26,7 +26,18 @@ const loadCommandDefinitions = ({ logger = console } = {}) => {
         continue;
       }
 
-      const metadata = command.data.toJSON();
+      let metadata;
+      if (command.data && typeof command.data.toJSON === 'function') {
+        metadata = command.data.toJSON();
+      } else if (command.data && typeof command.data === 'object') {
+        metadata = command.data;
+      } else {
+        errors.push(
+          `Command at ${filePath} has invalid "data" property (must be object or have toJSON method).`
+        );
+        continue;
+      }
+
       const validationErrors = validateCommandMetadata(metadata);
 
       if (validationErrors.length > 0) {

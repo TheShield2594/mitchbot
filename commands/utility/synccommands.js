@@ -10,14 +10,13 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    const token = process.env.CLIENT_TOKEN || interaction.client?.token;
-    const clientId =
-      process.env.CLIENT_ID || interaction.client?.application?.id;
+    const token = process.env.CLIENT_TOKEN;
+    const clientId = process.env.CLIENT_ID;
     const guildId = process.env.COMMAND_GUILD_ID || null;
 
     if (!token || !clientId) {
       await interaction.editReply(
-        'Missing CLIENT_TOKEN or CLIENT_ID. Set them in the environment to sync commands.'
+        'Missing required environment variables. Please set CLIENT_TOKEN and CLIENT_ID in your environment to sync commands.'
       );
       return;
     }
@@ -31,7 +30,7 @@ module.exports = {
       });
       await interaction.editReply('Command registration sync complete.');
     } catch (error) {
-      console.error('Command sync failed.', error);
+      console.error('Command sync failed:', error.message || 'Unknown error');
       await interaction.editReply(
         'Command sync failed. Check logs for details.'
       );
