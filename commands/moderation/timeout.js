@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { addLog, canModerate } = require('../../utils/moderation');
+const { logCommandError } = require('../../utils/commandLogger');
 const logger = require('../../utils/logger');
 
 module.exports = {
@@ -72,7 +73,7 @@ module.exports = {
         logger.warn('Could not DM timed out user', {
           guildId: interaction.guildId,
           channelId: interaction.channelId,
-          userId: interaction.user.id,
+          userId: interaction.user?.id,
           commandName: interaction.commandName,
           targetUserId: target.id,
           error,
@@ -96,11 +97,7 @@ module.exports = {
 
       await interaction.editReply(`Successfully timed out ${target.user.tag} for ${duration} minutes\nReason: ${reason}\nCase #${logEntry.caseId}`);
     } catch (error) {
-      logger.error('Error timing out user', {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        userId: interaction.user.id,
-        commandName: interaction.commandName,
+      logCommandError('Error timing out user', interaction, {
         targetUserId: target.id,
         error,
       });

@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { addLog } = require('../../utils/moderation');
-const logger = require('../../utils/logger');
+const { logCommandError } = require('../../utils/commandLogger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -53,13 +53,7 @@ module.exports = {
 
       await interaction.editReply(`🔓 Channel unlocked.\nReason: ${reason}`);
     } catch (error) {
-      logger.error('Error unlocking channel', {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        userId: interaction.user.id,
-        commandName: interaction.commandName,
-        error,
-      });
+      logCommandError('Error unlocking channel', interaction, { error });
       await interaction.editReply('Failed to unlock the channel. Please check my permissions.');
     }
   },

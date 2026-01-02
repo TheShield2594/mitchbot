@@ -1,7 +1,7 @@
 const { request } = require("undici");
 const { SlashCommandBuilder } = require("discord.js");
 const { checkCooldown, setCooldown } = require("../../utils/cooldowns");
-const logger = require("../../utils/logger");
+const { logCommandError } = require("../../utils/commandLogger");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -37,13 +37,7 @@ module.exports = {
             message.react("🔥");
             setCooldown(interaction.user.id, "insult", 5000);
         } catch (error) {
-            logger.error('Error fetching insult', {
-                guildId: interaction.guildId,
-                channelId: interaction.channelId,
-                userId: interaction.user.id,
-                commandName: interaction.commandName,
-                error,
-            });
+            logCommandError('Error fetching insult', interaction, { error });
             await interaction.editReply("Failed to fetch insult.");
         }
     },

@@ -1,6 +1,6 @@
 const { request } = require('undici');
 const { SlashCommandBuilder } = require('discord.js');
-const logger = require('../../utils/logger');
+const { logCommandError } = require('../../utils/commandLogger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -37,13 +37,7 @@ module.exports = {
 
       await interaction.editReply(jokeText);
     } catch (error) {
-      logger.error('Error fetching joke', {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        userId: interaction.user.id,
-        commandName: interaction.commandName,
-        error,
-      });
+      logCommandError('Error fetching joke', interaction, { error });
       await interaction.editReply('The real joke is this command failing.');
     }
   },

@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const { addLog } = require('../../utils/moderation');
-const logger = require('../../utils/logger');
+const { logCommandError } = require('../../utils/commandLogger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -84,11 +84,7 @@ module.exports = {
 
       await interaction.editReply(`Successfully deleted ${deleted.size} message(s)${target ? ` from ${target.tag}` : ''}.\nCase #${logEntry.caseId}`);
     } catch (error) {
-      logger.error('Error purging messages', {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        userId: interaction.user.id,
-        commandName: interaction.commandName,
+      logCommandError('Error purging messages', interaction, {
         targetUserId: target?.id || null,
         error,
       });

@@ -1,6 +1,6 @@
 const { request } = require('undici');
 const { SlashCommandBuilder } = require('discord.js');
-const logger = require('../../utils/logger');
+const { logCommandError } = require('../../utils/commandLogger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -29,13 +29,7 @@ module.exports = {
 
       await interaction.editReply(`"${data.content}"\n\n— ${data.author}`);
     } catch (error) {
-      logger.error('Error fetching quote', {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        userId: interaction.user.id,
-        commandName: interaction.commandName,
-        error,
-      });
+      logCommandError('Error fetching quote', interaction, { error });
       await interaction.editReply('Couldn\'t get a quote. Move on.');
     }
   },

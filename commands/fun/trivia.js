@@ -1,7 +1,7 @@
 const { request } = require('undici');
 const { SlashCommandBuilder } = require('discord.js');
 const { recordTriviaWin, recordTriviaAttempt, getWinMessage, getTimeoutMessage, POINTS_MULTIPLIER } = require('../../utils/trivia');
-const logger = require('../../utils/logger');
+const { logCommandError } = require('../../utils/commandLogger');
 
 // Decode HTML entities helper - handles numeric and named entities
 function decodeHtml(html) {
@@ -149,13 +149,7 @@ module.exports = {
         }
       });
     } catch (error) {
-      logger.error('Error fetching trivia', {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        userId: interaction.user.id,
-        commandName: interaction.commandName,
-        error,
-      });
+      logCommandError('Error fetching trivia', interaction, { error });
       await interaction.editReply('Trivia broke. Shocking.');
     }
   },

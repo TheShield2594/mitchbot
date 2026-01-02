@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { addWarning, getWarnings, addLog, canModerate } = require('../../utils/moderation');
+const { logCommandError } = require('../../utils/commandLogger');
 const logger = require('../../utils/logger');
 
 module.exports = {
@@ -55,7 +56,7 @@ module.exports = {
         logger.warn('Could not DM warned user', {
           guildId: interaction.guildId,
           channelId: interaction.channelId,
-          userId: interaction.user.id,
+          userId: interaction.user?.id,
           commandName: interaction.commandName,
           targetUserId: target.id,
           error,
@@ -78,11 +79,7 @@ module.exports = {
 
       await interaction.editReply(`Successfully warned ${target.user.tag}\nReason: ${reason}\nTotal warnings: ${warningCount}\nCase #${logEntry.caseId}`);
     } catch (error) {
-      logger.error('Error warning user', {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        userId: interaction.user.id,
-        commandName: interaction.commandName,
+      logCommandError('Error warning user', interaction, {
         targetUserId: target.id,
         error,
       });

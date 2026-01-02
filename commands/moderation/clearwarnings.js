@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { clearWarnings, getWarnings, addLog } = require('../../utils/moderation');
-const logger = require('../../utils/logger');
+const { logCommandError } = require('../../utils/commandLogger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -44,11 +44,7 @@ module.exports = {
       // Clear warnings
       await clearWarnings(interaction.guildId, target.id);
     } catch (error) {
-      logger.error('Error clearing warnings', {
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        userId: interaction.user.id,
-        commandName: interaction.commandName,
+      logCommandError('Error clearing warnings', interaction, {
         targetUserId: target.id,
         error,
       });
