@@ -1,8 +1,8 @@
 const { Events } = require('discord.js');
 const { recordCommandUsage } = require('../utils/stats');
 const { updateUserStats } = require('../utils/achievements');
-const { executeCommand } = require('../utils/commandErrors');
 const logger = require('../utils/logger');
+const { executeCommand } = require('../utils/commandErrors');
 
 function getInteractionContext(interaction) {
   return {
