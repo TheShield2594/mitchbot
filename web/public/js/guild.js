@@ -57,6 +57,13 @@ class FeatureHealthMonitor {
         type: 'channel',
         path: 'logging',
         key: 'channelId'
+      },
+      {
+        id: 'economy',
+        name: 'Economy',
+        type: 'toggle',
+        path: 'economy',
+        key: 'enabled'
       }
     ];
   }
@@ -472,9 +479,10 @@ function initializeHealthToggle() {
 
 async function loadGuildInfo() {
   try {
-    const [infoRes, configRes] = await Promise.all([
+    const [infoRes, configRes, economyRes] = await Promise.all([
       fetch(`/api/guild/${guildId}/info`),
-      fetch(`/api/guild/${guildId}/config`)
+      fetch(`/api/guild/${guildId}/config`),
+      fetch(`/api/guild/${guildId}/economy/config`)
     ]);
 
     if (!infoRes.ok || !configRes.ok) {
@@ -485,6 +493,20 @@ async function loadGuildInfo() {
     const configData = await configRes.json();
 
     config = configData;
+
+    // Add economy config to main config
+    if (economyRes.ok) {
+      config.economy = await economyRes.json();
+    } else {
+      // Default economy config if not available
+      config.economy = {
+        enabled: true,
+        currencyName: 'coins',
+        currencySymbol: '💰',
+        dailyReward: 100,
+        dailyCooldownHours: 24
+      };
+    }
 
     // Set guild name
     document.getElementById('guild-name').textContent = info.name;
@@ -504,6 +526,9 @@ async function loadGuildInfo() {
 
     // Load automod config
     loadAutomodConfig();
+
+    // Load economy config
+    loadEconomyConfig();
 
     // Initialize health monitor
     healthMonitor = new FeatureHealthMonitor(config);
@@ -883,6 +908,96 @@ async function loadBirthdays() {
     console.error('Error loading birthdays:', error);
     document.getElementById('birthdays-container').innerHTML =
       '<p class="text-muted">Failed to load birthdays.</p>';
+  }
+}
+
+// ============================================
+// ECONOMY CONFIGURATION
+// ============================================
+
+function loadEconomyConfig() {
+  if (!config.economy) return;
+
+  document.getElementById('economy-enabled').checked = config.economy.enabled;
+  document.getElementById('currency-name').value = config.economy.currencyName || 'coins';
+  document.getElementById('currency-symbol').value = config.economy.currencySymbol || '💰';
+  document.getElementById('daily-reward').value = config.economy.dailyReward || 100;
+  document.getElementById('daily-cooldown').value = config.economy.dailyCooldownHours || 24;
+
+  updateEconomyStatus();
+}
+
+function updateEconomyStatus() {
+  const enabled = document.getElementById('economy-enabled').checked;
+  const settingsDiv = document.getElementById('economy-settings');
+  const statusBadge = document.getElementById('economy-status-badge');
+
+  if (enabled) {
+    settingsDiv.style.opacity = '1';
+    settingsDiv.style.pointerEvents = 'auto';
+    statusBadge.textContent = 'Active';
+    statusBadge.className = 'badge badge--success';
+  } else {
+    settingsDiv.style.opacity = '0.5';
+    settingsDiv.style.pointerEvents = 'none';
+    statusBadge.textContent = 'Inactive';
+    statusBadge.className = 'badge badge--secondary';
+  }
+
+  // Update config immediately for health monitor
+  if (config.economy) {
+    config.economy.enabled = enabled;
+    if (healthMonitor) {
+      healthMonitor.updateUI();
+    }
+  }
+}
+
+async function saveEconomySettings() {
+  try {
+    const updates = {
+      enabled: document.getElementById('economy-enabled').checked,
+      currencyName: document.getElementById('currency-name').value.trim() || 'coins',
+      currencySymbol: document.getElementById('currency-symbol').value.trim() || '💰',
+      dailyReward: parseInt(document.getElementById('daily-reward').value) || 100,
+      dailyCooldownHours: parseInt(document.getElementById('daily-cooldown').value) || 24,
+    };
+
+    // Validate inputs
+    if (updates.dailyReward < 0 || updates.dailyReward > 1000000) {
+      showToast('Invalid Input', 'Daily reward must be between 0 and 1,000,000', 'error');
+      return;
+    }
+
+    if (updates.dailyCooldownHours < 1 || updates.dailyCooldownHours > 168) {
+      showToast('Invalid Input', 'Daily cooldown must be between 1 and 168 hours', 'error');
+      return;
+    }
+
+    const response = await fetch(`/api/guild/${guildId}/economy/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to save settings');
+    }
+
+    const result = await response.json();
+
+    // Update config
+    config.economy = result.config;
+
+    if (healthMonitor) {
+      healthMonitor.updateUI();
+    }
+
+    showToast('Settings Saved', 'Economy configuration updated successfully', 'success');
+  } catch (error) {
+    console.error('Error saving economy settings:', error);
+    showToast('Save Failed', error.message || 'Could not save economy settings', 'error');
   }
 }
 
