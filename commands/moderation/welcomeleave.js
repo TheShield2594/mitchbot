@@ -39,7 +39,7 @@ module.exports = {
         .addStringOption(option =>
           option
             .setName('message')
-            .setDescription('Welcome message. Use {user} for mention, {username} for name, {server} for server name, {memberCount} for count')
+            .setDescription('Message template. Placeholders: {user}, {username}, {server}, {memberCount}')
             .setRequired(true)
         )
     )
@@ -72,7 +72,7 @@ module.exports = {
         .addStringOption(option =>
           option
             .setName('message')
-            .setDescription('Leave message. Use {user} for mention, {username} for name, {server} for server name, {memberCount} for count')
+            .setDescription('Message template. Placeholders: {user}, {username}, {server}, {memberCount}')
             .setRequired(true)
         )
     )
