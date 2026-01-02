@@ -34,13 +34,11 @@
       }
 
       console.log('Total guilds:', user.guilds.length);
-      console.log('Guild data:', user.guilds);
 
       // Filter manageable guilds - backend already filters, so use all guilds
       const manageableGuilds = user.guilds;
 
       console.log('Manageable guilds:', manageableGuilds.length);
-      console.log('Manageable guild names:', manageableGuilds.map(g => g.name));
 
       if (manageableGuilds.length === 0) {
         showEmptyState();
@@ -282,15 +280,22 @@
   async function updateBotInviteLink() {
     try {
       const response = await fetch('/api/client-id');
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to fetch client ID:', response.status, errorText);
+        return;
+      }
+
       const data = await response.json();
 
       if (data.clientId) {
-        const inviteLink = document.querySelector('a[href*="YOUR_CLIENT_ID"]');
-        if (inviteLink) {
+        const inviteLinks = document.querySelectorAll('a[href*="YOUR_CLIENT_ID"]');
+        inviteLinks.forEach(inviteLink => {
           const currentHref = inviteLink.getAttribute('href');
-          const newHref = currentHref.replace('YOUR_CLIENT_ID', data.clientId);
+          const newHref = currentHref.replace(/YOUR_CLIENT_ID/g, data.clientId);
           inviteLink.setAttribute('href', newHref);
-        }
+        });
       }
     } catch (error) {
       console.error('Error fetching client ID:', error);

@@ -6,7 +6,14 @@ const { getBirthdays, addBirthday, removeBirthday } = require('../../utils/birth
 
 // Get bot client ID for OAuth links
 router.get('/client-id', (req, res) => {
-  res.json({ clientId: process.env.CLIENT_ID });
+  const clientId = process.env.CLIENT_ID;
+
+  if (!clientId || typeof clientId !== 'string' || clientId.trim() === '') {
+    console.error('CLIENT_ID environment variable is not configured');
+    return res.status(500).json({ error: 'CLIENT_ID not configured' });
+  }
+
+  res.json({ clientId });
 });
 
 // Get guild configuration
