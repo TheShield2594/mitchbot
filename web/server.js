@@ -6,6 +6,7 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
+const { fetch } = require('undici');
 const logger = require('../utils/logger');
 const { ensureAuthenticated } = require('./middleware/auth');
 
@@ -200,9 +201,72 @@ module.exports = function startWebServer(client) {
     clientSecret: process.env.DISCORD_CLIENT_SECRET,
     callbackURL,
     scope: ['identify', 'guilds'],
-  }, (accessToken, refreshToken, profile, done) => {
-    logger.info('Discord OAuth callback received', { userId: profile.id });
-    return done(null, profile);
+  }, async (accessToken, refreshToken, profile, done) => {
+    // Read timeout from env var GUILD_FETCH_TIMEOUT_MS, default to 5000ms (5 seconds)
+    const timeoutValue = parseInt(process.env.GUILD_FETCH_TIMEOUT_MS, 10);
+    const GUILD_FETCH_TIMEOUT = !isNaN(timeoutValue) && timeoutValue > 0 ? timeoutValue : 5000;
+    const controller = new AbortController();
+    let timeoutId = null;
+
+    try {
+      logger.info('Discord OAuth callback received', { userId: profile.id });
+
+      // Set timeout for guilds fetch
+      timeoutId = setTimeout(() => controller.abort(), GUILD_FETCH_TIMEOUT);
+
+      // Fetch guilds data from Discord API
+      const guildsResponse = await fetch('https://discord.com/api/v10/users/@me/guilds', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        signal: controller.signal,
+      });
+
+      // Clear timeout on successful fetch
+      clearTimeout(timeoutId);
+      timeoutId = null;
+
+      if (!guildsResponse.ok) {
+        logger.error('Failed to fetch guilds from Discord API', {
+          userId: profile.id,
+          status: guildsResponse.status,
+          statusText: guildsResponse.statusText,
+        });
+        // Continue without guilds data rather than failing auth
+        profile.guilds = [];
+      } else {
+        const guilds = await guildsResponse.json();
+        profile.guilds = guilds;
+        logger.info('Successfully fetched guilds for user', {
+          userId: profile.id,
+          guildCount: guilds.length,
+        });
+      }
+
+      return done(null, profile);
+    } catch (error) {
+      // Clear timeout if it's still set
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+
+      // Check if error is due to timeout
+      if (error.name === 'AbortError') {
+        logger.warn('Discord guilds fetch timed out', {
+          userId: profile.id,
+          timeout: GUILD_FETCH_TIMEOUT,
+        });
+      } else {
+        logger.error('Error in Discord OAuth callback', {
+          userId: profile.id,
+          error: error.message,
+        });
+      }
+
+      // Continue with auth even if guild fetch fails
+      profile.guilds = [];
+      return done(null, profile);
+    }
   }));
 
   app.use(passport.initialize());
