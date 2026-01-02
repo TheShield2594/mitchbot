@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { Collection } = require('discord.js');
 const logger = require('../utils/logger');
+const { validateCommandMetadata } = require('../utils/commandValidation');
 
 function loadCommands(client) {
   const commands = [];
@@ -21,8 +22,19 @@ function loadCommands(client) {
       const command = require(commandPath);
 
       if ('data' in command && 'execute' in command) {
+        const metadata = command.data.toJSON();
+        const validationErrors = validateCommandMetadata(metadata);
+
+        if (validationErrors.length > 0) {
+          logger.warn('Command metadata failed validation', {
+            commandPath,
+            errors: validationErrors,
+          });
+          continue;
+        }
+
         client.commands.set(command.data.name, command);
-        commands.push(command.data.toJSON());
+        commands.push(metadata);
       } else {
         logger.warn('Command missing required data or execute property', {
           commandPath,
