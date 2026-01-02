@@ -572,6 +572,140 @@
         </div>
       </section>
 
+      <section id="section-mention-spam" class="guild-section">
+        <div class="card card--inactive" id="card-mention-spam">
+          <div class="card__header">
+            <div>
+              <h3 class="card__title">
+                <span class="card__icon">@</span>
+                Mention Spam Detection
+              </h3>
+              <p class="card__subtitle">Prevent excessive mentions</p>
+            </div>
+            <span class="status-badge status-badge--inactive" id="badge-mention-spam">
+              <span class="status-badge__dot"></span>
+              <span>Disabled</span>
+            </span>
+          </div>
+
+          <p class="card__description">
+            Automatically detects and takes action against messages with excessive user mentions.
+          </p>
+
+          <label class="toggle-container">
+            <input type="checkbox" class="toggle-input" id="mention-spam-enabled">
+            <span class="toggle-track">
+              <span class="toggle-knob"></span>
+            </span>
+            <span class="toggle-label">Enable Mention Spam Detection</span>
+          </label>
+
+          <div class="form-group">
+            <label class="form-label">Mention Threshold</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Maximum number of mentions allowed per message.
+            </p>
+            <input type="number" class="form-input" id="mention-spam-threshold" min="1" max="20" value="5">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Action</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Choose what happens when mention spam is detected.
+            </p>
+            <select class="form-input" id="mention-spam-action">
+              <option value="delete">Delete message</option>
+              <option value="warn">Warn user</option>
+              <option value="timeout">Timeout user</option>
+              <option value="kick">Kick user</option>
+              <option value="ban">Ban user</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Warning Threshold</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Number of warnings before taking escalated action.
+            </p>
+            <input type="number" class="form-input" id="mention-spam-warn-threshold" min="1" max="10" value="2">
+          </div>
+
+          <div class="mt-6">
+            <button class="btn btn-primary" onclick="saveAutomod()">Save Changes</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-caps-spam" class="guild-section">
+        <div class="card card--inactive" id="card-caps-spam">
+          <div class="card__header">
+            <div>
+              <h3 class="card__title">
+                <span class="card__icon">🔠</span>
+                Caps Spam Detection
+              </h3>
+              <p class="card__subtitle">Prevent excessive capitalization</p>
+            </div>
+            <span class="status-badge status-badge--inactive" id="badge-caps-spam">
+              <span class="status-badge__dot"></span>
+              <span>Disabled</span>
+            </span>
+          </div>
+
+          <p class="card__description">
+            Automatically detects and takes action against messages with excessive capital letters.
+          </p>
+
+          <label class="toggle-container">
+            <input type="checkbox" class="toggle-input" id="caps-spam-enabled">
+            <span class="toggle-track">
+              <span class="toggle-knob"></span>
+            </span>
+            <span class="toggle-label">Enable Caps Spam Detection</span>
+          </label>
+
+          <div class="form-group">
+            <label class="form-label">Caps Percentage (%)</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Percentage of message that must be capitalized to trigger detection.
+            </p>
+            <input type="number" class="form-input" id="caps-spam-percentage" min="10" max="100" value="70">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Minimum Length</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Minimum message length to check for caps spam (shorter messages ignored).
+            </p>
+            <input type="number" class="form-input" id="caps-spam-min-length" min="3" max="50" value="10">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Action</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Choose what happens when caps spam is detected.
+            </p>
+            <select class="form-input" id="caps-spam-action">
+              <option value="delete">Delete message</option>
+              <option value="warn">Warn user</option>
+              <option value="timeout">Timeout user</option>
+              <option value="kick">Kick user</option>
+              <option value="ban">Ban user</option>
+            </select>
+          </div>
+
+          <div class="mt-6">
+            <button class="btn btn-primary" onclick="saveAutomod()">Save Changes</button>
+          </div>
+        </div>
+      </section>
+
       <section id="section-automod-whitelist" class="guild-section">
         <div class="card card--inactive" id="card-automod-whitelist">
           <div class="card__header">

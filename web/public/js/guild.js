@@ -52,6 +52,20 @@ class FeatureHealthMonitor {
         key: 'enabled'
       },
       {
+        id: 'mention-spam',
+        name: 'Mention Spam',
+        type: 'toggle',
+        path: 'automod.mentionSpam',
+        key: 'enabled'
+      },
+      {
+        id: 'caps-spam',
+        name: 'Caps Spam',
+        type: 'toggle',
+        path: 'automod.capsSpam',
+        key: 'enabled'
+      },
+      {
         id: 'logging',
         name: 'Mod Logging',
         type: 'channel',
@@ -603,6 +617,18 @@ function loadAutomodConfig() {
   document.getElementById('spam-time-window').value = (config.automod.spam.timeWindow || 5000) / 1000; // Convert ms to seconds
   document.getElementById('spam-duplicate-threshold').value = config.automod.spam.duplicateThreshold || 3;
 
+  // Load mention spam settings
+  document.getElementById('mention-spam-enabled').checked = config.automod.mentionSpam?.enabled || false;
+  document.getElementById('mention-spam-threshold').value = config.automod.mentionSpam?.threshold || 5;
+  document.getElementById('mention-spam-action').value = config.automod.mentionSpam?.action || 'warn';
+  document.getElementById('mention-spam-warn-threshold').value = config.automod.mentionSpam?.warnThreshold || 2;
+
+  // Load caps spam settings
+  document.getElementById('caps-spam-enabled').checked = config.automod.capsSpam?.enabled || false;
+  document.getElementById('caps-spam-percentage').value = config.automod.capsSpam?.percentage || 70;
+  document.getElementById('caps-spam-min-length').value = config.automod.capsSpam?.minLength || 10;
+  document.getElementById('caps-spam-action').value = config.automod.capsSpam?.action || 'delete';
+
   renderWordList();
   renderWhitelist();
   renderBlacklist();
@@ -615,7 +641,9 @@ function loadAutomodConfig() {
     'wordfilter-enabled',
     'invitefilter-enabled',
     'linkfilter-enabled',
-    'spam-enabled'
+    'spam-enabled',
+    'mention-spam-enabled',
+    'caps-spam-enabled'
   ];
 
   toggles.forEach(id => {
@@ -627,6 +655,8 @@ function loadAutomodConfig() {
         if (id === 'invitefilter-enabled') config.automod.inviteFilter.enabled = element.checked;
         if (id === 'linkfilter-enabled') config.automod.linkFilter.enabled = element.checked;
         if (id === 'spam-enabled') config.automod.spam.enabled = element.checked;
+        if (id === 'mention-spam-enabled') config.automod.mentionSpam.enabled = element.checked;
+        if (id === 'caps-spam-enabled') config.automod.capsSpam.enabled = element.checked;
 
         if (healthMonitor) {
           healthMonitor.updateUI();
@@ -906,10 +936,16 @@ async function saveAutomod() {
         duplicateThreshold: parseInt(document.getElementById('spam-duplicate-threshold').value),
       },
       mentionSpam: {
-        enabled: document.getElementById('spam-enabled').checked,
+        enabled: document.getElementById('mention-spam-enabled').checked,
+        threshold: parseInt(document.getElementById('mention-spam-threshold').value),
+        action: document.getElementById('mention-spam-action').value,
+        warnThreshold: parseInt(document.getElementById('mention-spam-warn-threshold').value),
       },
       capsSpam: {
-        enabled: document.getElementById('spam-enabled').checked,
+        enabled: document.getElementById('caps-spam-enabled').checked,
+        percentage: parseInt(document.getElementById('caps-spam-percentage').value),
+        minLength: parseInt(document.getElementById('caps-spam-min-length').value),
+        action: document.getElementById('caps-spam-action').value,
       },
       whitelistedRoles: config.automod.whitelistedRoles || [],
       whitelistedChannels: config.automod.whitelistedChannels || [],
@@ -931,6 +967,8 @@ async function saveAutomod() {
     config.automod.inviteFilter.enabled = updates.inviteFilter.enabled;
     config.automod.linkFilter.enabled = updates.linkFilter.enabled;
     config.automod.spam.enabled = updates.spam.enabled;
+    config.automod.mentionSpam.enabled = updates.mentionSpam.enabled;
+    config.automod.capsSpam.enabled = updates.capsSpam.enabled;
 
     if (healthMonitor) {
       healthMonitor.updateUI();
