@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { clearWarnings, getWarnings, addLog } = require('../../utils/moderation');
+const { logCommandError } = require('../../utils/commandLogger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -43,7 +44,10 @@ module.exports = {
       // Clear warnings
       await clearWarnings(interaction.guildId, target.id);
     } catch (error) {
-      console.error('Error clearing warnings:', error);
+      logCommandError('Error clearing warnings', interaction, {
+        targetUserId: target.id,
+        error,
+      });
       await interaction.editReply('Failed to clear warnings. The changes may not have been saved.');
       return;
     }

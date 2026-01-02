@@ -25,8 +25,7 @@ client.on('error', (error) => {
 // Start Discord bot
 client.login(process.env.CLIENT_TOKEN).catch((error) => {
   logger.error('Failed to connect to Discord', { error });
-  console.error('❌ Discord bot failed to connect:', error.message);
-  console.log('⚠️  Web dashboard will start without Discord bot functionality');
+  logger.warn('Web dashboard will start without Discord bot functionality');
 });
 
 // Start web server

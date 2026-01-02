@@ -1,5 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { addWarning, getWarnings, addLog, canModerate } = require('../../utils/moderation');
+const { logCommandError } = require('../../utils/commandLogger');
+const logger = require('../../utils/logger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -51,7 +53,14 @@ module.exports = {
         await target.send(`⚠️ You have been warned in **${interaction.guild.name}**\nReason: ${reason}\n\nTotal warnings: ${warningCount}`);
       } catch (error) {
         // User has DMs disabled or blocked the bot
-        console.log('Could not DM warned user');
+        logger.warn('Could not DM warned user', {
+          guildId: interaction.guildId,
+          channelId: interaction.channelId,
+          userId: interaction.user?.id,
+          commandName: interaction.commandName,
+          targetUserId: target.id,
+          error,
+        });
       }
 
       // Log the action
@@ -70,7 +79,10 @@ module.exports = {
 
       await interaction.editReply(`Successfully warned ${target.user.tag}\nReason: ${reason}\nTotal warnings: ${warningCount}\nCase #${logEntry.caseId}`);
     } catch (error) {
-      console.error('Error warning user:', error);
+      logCommandError('Error warning user', interaction, {
+        targetUserId: target.id,
+        error,
+      });
       await interaction.editReply('Failed to warn the user. The warning may not have been saved.');
     }
   },

@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { fetch } = require('undici');
+const logger = require('../utils/logger');
 
 const userCooldown = new Map();
 const replyTracker = new Map();
@@ -8,11 +9,19 @@ const COOLDOWN_MS = 30_000;
 const FOLLOW_UP_WINDOW_MS = 10 * 60 * 1000;
 const MAX_PROMPT_LENGTH = 500;
 
+function getMessageContext(message) {
+  return {
+    guildId: message.guildId,
+    channelId: message.channel?.id,
+    userId: message.author?.id,
+  };
+}
+
 module.exports = {
   name: Events.MessageCreate,
   async execute(message) {
     if (!process.env.GEMINI_API_KEY) {
-      console.error('messageCreate: Missing GEMINI_API_KEY; cannot call Gemini.');
+      logger.warn('messageCreate: Missing GEMINI_API_KEY; cannot call Gemini.', getMessageContext(message));
       return;
     }
 
@@ -109,9 +118,11 @@ User: ${prompt}
       );
 
       if (!response.ok) {
-        console.error(
-          `messageCreate: Gemini request failed with status ${response.status} ${response.statusText}`
-        );
+        logger.error('messageCreate: Gemini request failed', {
+          ...getMessageContext(message),
+          status: response.status,
+          statusText: response.statusText,
+        });
         await message.reply('That failed.');
         return;
       }
@@ -127,7 +138,10 @@ User: ${prompt}
 
       await message.reply(reply.slice(0, 1900));
     } catch (err) {
-      console.error(err);
+      logger.error('messageCreate: Gemini request failed', {
+        ...getMessageContext(message),
+        error: err,
+      });
       await message.reply('That failed.');
     }
   },

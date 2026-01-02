@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const { addLog } = require('../../utils/moderation');
+const { logCommandError } = require('../../utils/commandLogger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -83,7 +84,10 @@ module.exports = {
 
       await interaction.editReply(`Successfully deleted ${deleted.size} message(s)${target ? ` from ${target.tag}` : ''}.\nCase #${logEntry.caseId}`);
     } catch (error) {
-      console.error('Error purging messages:', error);
+      logCommandError('Error purging messages', interaction, {
+        targetUserId: target?.id || null,
+        error,
+      });
       await interaction.editReply('Failed to purge messages. Note: I can only delete messages less than 14 days old.');
     }
   },

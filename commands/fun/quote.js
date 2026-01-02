@@ -1,5 +1,6 @@
 const { request } = require('undici');
 const { SlashCommandBuilder } = require('discord.js');
+const { logCommandError } = require('../../utils/commandLogger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -28,7 +29,7 @@ module.exports = {
 
       await interaction.editReply(`"${data.content}"\n\n— ${data.author}`);
     } catch (error) {
-      console.error('Error fetching quote:', error);
+      logCommandError('Error fetching quote', interaction, { error });
       await interaction.editReply('Couldn\'t get a quote. Move on.');
     }
   },

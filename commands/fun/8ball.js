@@ -1,6 +1,7 @@
 const { request } = require("undici");
 const { SlashCommandBuilder } = require("discord.js");
 const { checkCooldown, setCooldown } = require("../../utils/cooldowns");
+const { logCommandError } = require("../../utils/commandLogger");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -43,7 +44,7 @@ module.exports = {
             );
             setCooldown(interaction.user.id, "8ball", 5000);
         } catch (error) {
-            console.error("Error fetching 8ball:", error);
+            logCommandError("Error fetching 8ball", interaction, { error });
             await interaction.editReply(
                 "The magic 8ball is busy."
             );

@@ -431,7 +431,12 @@ module.exports = {
           }
         }
       } catch (error) {
-        console.error('Error handling automod violation:', error);
+        logger.error('Error handling automod violation', {
+          guildId: message.guildId,
+          channelId: message.channel?.id,
+          userId: message.author?.id,
+          error,
+        });
       }
     }
   },

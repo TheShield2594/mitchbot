@@ -1,6 +1,7 @@
 const { request } = require('undici');
 const { SlashCommandBuilder } = require('discord.js');
 const { checkCooldown, setCooldown } = require('../../utils/cooldowns');
+const { logCommandError } = require('../../utils/commandLogger');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -29,7 +30,7 @@ module.exports = {
                 await interaction.editReply("No meme found.");
             }
         } catch (error) {
-            console.error('Error fetching meme:', error);
+            logCommandError('Error fetching meme', interaction, { error });
             await interaction.editReply("Failed to fetch meme.");
         }
 	},

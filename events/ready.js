@@ -23,7 +23,7 @@ async function checkBirthdays(client) {
   try {
     channel = await client.channels.fetch(CHANNEL_ID);
   } catch (error) {
-    console.error('Failed to fetch birthday channel:', error);
+    logger.error('Failed to fetch birthday channel', { error, channelId: CHANNEL_ID });
     return;
   }
 
@@ -36,7 +36,11 @@ async function checkBirthdays(client) {
           await channel.send(`Happy Birthday, ${user.username}.`);
         }
       } catch (error) {
-        console.error(`Failed to send birthday message for user ${userId}:`, error);
+        logger.error('Failed to send birthday message', {
+          error,
+          userId,
+          channelId: CHANNEL_ID,
+        });
       }
     }
   }
@@ -128,69 +132,69 @@ module.exports = {
   name: Events.ClientReady,
   once: true,
   async execute(client) {
-    console.log(`✅ Logged in as ${client.user.tag}`);
+    logger.info('Logged in', { userTag: client.user.tag, userId: client.user.id });
     schedule.scheduleJob('0 0 * * *', () => checkBirthdays(client));
     try {
       await initReminders();
       await schedulePendingReminders(client);
     } catch (error) {
-      console.error('Failed to initialize reminders', error);
+      logger.error('Failed to initialize reminders', { error });
     }
     try {
       await initModeration();
-      console.log('✅ Moderation system initialized');
+      logger.info('Moderation system initialized');
     } catch (error) {
-      console.error('Failed to initialize moderation', error);
+      logger.error('Failed to initialize moderation', { error });
     }
 
     try {
       await initEconomy();
-      console.log('✅ Economy system initialized');
+      logger.info('Economy system initialized');
     } catch (error) {
-      console.error('Failed to initialize economy', error);
+      logger.error('Failed to initialize economy', { error });
     }
 
     try {
       await initQuests();
-      console.log('✅ Quest streak system initialized');
+      logger.info('Quest streak system initialized');
     } catch (error) {
-      console.error('Failed to initialize quests', error);
+      logger.error('Failed to initialize quests', { error });
     }
 
     try {
       await initTrivia();
-      console.log('✅ Trivia leaderboard system initialized');
+      logger.info('Trivia leaderboard system initialized');
     } catch (error) {
-      console.error('Failed to initialize trivia', error);
+      logger.error('Failed to initialize trivia', { error });
     }
 
     try {
       await initStats();
-      console.log('✅ Server stats tracking initialized');
+      logger.info('Server stats tracking initialized');
     } catch (error) {
-      console.error('Failed to initialize stats', error);
+      logger.error('Failed to initialize stats', { error });
     }
 
     try {
       await initSnark();
-      console.log('✅ Custom snark system initialized');
+      logger.info('Custom snark system initialized');
     } catch (error) {
-      console.error('Failed to initialize snark', error);
+      logger.error('Failed to initialize snark', { error });
     }
 
     try {
       await initAchievements();
-      console.log('✅ Anti-achievements system initialized');
+      logger.info('Anti-achievements system initialized');
     } catch (error) {
-      console.error('Failed to initialize achievements', error);
+      logger.error('Failed to initialize achievements', { error });
     }
 
     // Check for expired tempbans every minute
     schedule.scheduleJob('* * * * *', () => checkExpiredTempbans(client));
-    console.log('✅ Tempban scheduler initialized');
+    logger.info('Tempban scheduler initialized');
 
     // Send weekly recap every Sunday at midnight
     schedule.scheduleJob('0 0 * * 0', () => sendWeeklyRecap(client));
-    console.log('✅ Weekly recap scheduler initialized');
+    logger.info('Weekly recap scheduler initialized');
   },
 };

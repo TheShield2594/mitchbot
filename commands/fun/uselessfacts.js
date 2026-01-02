@@ -1,6 +1,7 @@
 const { request } = require("undici");
 const { SlashCommandBuilder } = require("discord.js");
 const { checkCooldown, setCooldown } = require("../../utils/cooldowns");
+const { logCommandError } = require("../../utils/commandLogger");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -36,7 +37,7 @@ module.exports = {
                 await interaction.editReply("No fact found.");
             }
         } catch (error) {
-            console.error('Error fetching fact:', error);
+            logCommandError('Error fetching fact', interaction, { error });
             await interaction.editReply("Failed to fetch fact.");
         }
     }
