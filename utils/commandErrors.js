@@ -60,11 +60,25 @@ async function handleCommandError(interaction, error, options = {}) {
   const response = formatUserFacingError(error);
 
   try {
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply(response);
-    } else {
-      await interaction.reply(response);
+    if (interaction.deferred && !interaction.replied) {
+      const isEphemeral = Boolean(interaction.ephemeral);
+
+      if (isEphemeral) {
+        await interaction.editReply(response);
+        return;
+      }
+
+      await interaction.editReply({ content: response.content });
+      await interaction.followUp(response);
+      return;
     }
+
+    if (interaction.replied) {
+      await interaction.followUp(response);
+      return;
+    }
+
+    await interaction.reply(response);
   } catch (replyError) {
     logger.error('Failed to send command error response', {
       commandName: interaction.commandName,
