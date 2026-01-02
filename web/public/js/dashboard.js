@@ -34,11 +34,13 @@
       }
 
       console.log('Total guilds:', user.guilds.length);
+      console.log('Guild data:', user.guilds);
 
       // Filter manageable guilds - backend already filters, so use all guilds
       const manageableGuilds = user.guilds;
 
       console.log('Manageable guilds:', manageableGuilds.length);
+      console.log('Manageable guild names:', manageableGuilds.map(g => g.name));
 
       if (manageableGuilds.length === 0) {
         showEmptyState();
@@ -273,6 +275,26 @@
     loadServers();
     setupSearch();
     setupFilters();
+    updateBotInviteLink();
+  }
+
+  // Update bot invite link with actual client ID
+  async function updateBotInviteLink() {
+    try {
+      const response = await fetch('/api/client-id');
+      const data = await response.json();
+
+      if (data.clientId) {
+        const inviteLink = document.querySelector('a[href*="YOUR_CLIENT_ID"]');
+        if (inviteLink) {
+          const currentHref = inviteLink.getAttribute('href');
+          const newHref = currentHref.replace('YOUR_CLIENT_ID', data.clientId);
+          inviteLink.setAttribute('href', newHref);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching client ID:', error);
+    }
   }
 })();
 

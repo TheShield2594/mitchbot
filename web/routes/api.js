@@ -4,6 +4,11 @@ const { ensureServerManager } = require('../middleware/auth');
 const { getGuildConfig, updateGuildConfig, getLogs, getWarnings, clearWarnings } = require('../../utils/moderation');
 const { getBirthdays, addBirthday, removeBirthday } = require('../../utils/birthdays');
 
+// Get bot client ID for OAuth links
+router.get('/client-id', (req, res) => {
+  res.json({ clientId: process.env.CLIENT_ID });
+});
+
 // Get guild configuration
 router.get('/guild/:guildId/config', ensureServerManager, (req, res) => {
   try {
