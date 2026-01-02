@@ -137,6 +137,13 @@
             </svg>
             <span>Birthdays</span>
           </a>
+          <a href="#economy" class="guild-sidebar__link" data-section="economy">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            <span>Economy</span>
+          </a>
         </div>
       </nav>
 
@@ -505,6 +512,70 @@
 
           <div id="birthdays-container">
             <div class="loading">Loading birthday data...</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-economy" class="guild-section">
+        <div class="card">
+          <div class="card__header">
+            <h3 class="card__title">
+              <span class="card__icon">💰</span>
+              Economy System
+              <span class="badge" id="economy-status-badge">Active</span>
+            </h3>
+          </div>
+
+          <p class="card__description">
+            Configure your server's economy system including currency, daily rewards, and more.
+          </p>
+
+          <div class="form-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="economy-enabled" onchange="updateEconomyStatus()">
+              <span class="toggle-switch__slider"></span>
+              <span class="toggle-switch__label">Enable Economy System</span>
+            </label>
+          </div>
+
+          <div id="economy-settings">
+            <div class="form-group">
+              <label class="form-label" for="currency-name">
+                Currency Name
+                <span class="form-hint">What users will earn and spend (e.g., "coins", "credits", "gold")</span>
+              </label>
+              <input type="text" class="form-input" id="currency-name" placeholder="coins" maxlength="50">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="currency-symbol">
+                Currency Symbol
+                <span class="form-hint">Emoji or symbol to represent your currency</span>
+              </label>
+              <input type="text" class="form-input" id="currency-symbol" placeholder="💰" maxlength="10">
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="daily-reward">
+                  Daily Reward Amount
+                  <span class="form-hint">How much currency users receive with /daily</span>
+                </label>
+                <input type="number" class="form-input" id="daily-reward" min="0" max="1000000" placeholder="100">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="daily-cooldown">
+                  Daily Cooldown (hours)
+                  <span class="form-hint">Time between /daily claims (1-168 hours)</span>
+                </label>
+                <input type="number" class="form-input" id="daily-cooldown" min="1" max="168" placeholder="24">
+              </div>
+            </div>
+
+            <div class="mt-6">
+              <button class="btn btn-primary" onclick="saveEconomySettings()">Save Economy Settings</button>
+            </div>
           </div>
         </div>
       </section>

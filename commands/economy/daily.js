@@ -3,6 +3,7 @@ const {
     claimDaily,
     ECONOMY_EMBED_COLOR,
     formatCoins,
+    getEconomyConfig,
     initEconomy,
 } = require("../../utils/economy");
 
@@ -34,6 +35,7 @@ module.exports = {
 
         await initEconomy();
 
+        const config = getEconomyConfig(interaction.guildId);
         const result = claimDaily(interaction.guildId, interaction.user.id, new Date());
 
         if (!result.ok) {
@@ -56,9 +58,9 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(ECONOMY_EMBED_COLOR)
             .setTitle("Daily Reward Claimed")
-            .setDescription(`You received **${formatCoins(result.reward)}**!`)
+            .setDescription(`You received **${formatCoins(result.reward, config.currencyName)}**!`)
             .addFields(
-                { name: "New balance", value: formatCoins(result.balance), inline: true },
+                { name: "New balance", value: formatCoins(result.balance, config.currencyName), inline: true },
                 { name: "Next claim", value: formatRelativeTimestamp(result.nextClaimAt), inline: true }
             )
             .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
