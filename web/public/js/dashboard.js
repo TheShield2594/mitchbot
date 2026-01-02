@@ -273,6 +273,33 @@
     loadServers();
     setupSearch();
     setupFilters();
+    updateBotInviteLink();
+  }
+
+  // Update bot invite link with actual client ID
+  async function updateBotInviteLink() {
+    try {
+      const response = await fetch('/api/client-id');
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to fetch client ID:', response.status, errorText);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.clientId) {
+        const inviteLinks = document.querySelectorAll('a[href*="YOUR_CLIENT_ID"]');
+        inviteLinks.forEach(inviteLink => {
+          const currentHref = inviteLink.getAttribute('href');
+          const newHref = currentHref.replace(/YOUR_CLIENT_ID/g, data.clientId);
+          inviteLink.setAttribute('href', newHref);
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching client ID:', error);
+    }
   }
 })();
 

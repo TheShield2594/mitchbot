@@ -4,6 +4,18 @@ const { ensureServerManager } = require('../middleware/auth');
 const { getGuildConfig, updateGuildConfig, getLogs, getWarnings, clearWarnings } = require('../../utils/moderation');
 const { getBirthdays, addBirthday, removeBirthday } = require('../../utils/birthdays');
 
+// Get bot client ID for OAuth links
+router.get('/client-id', (req, res) => {
+  const clientId = process.env.CLIENT_ID;
+
+  if (!clientId || typeof clientId !== 'string' || clientId.trim() === '') {
+    console.error('CLIENT_ID environment variable is not configured');
+    return res.status(500).json({ error: 'CLIENT_ID not configured' });
+  }
+
+  res.json({ clientId });
+});
+
 // Get guild configuration
 router.get('/guild/:guildId/config', ensureServerManager, (req, res) => {
   try {
