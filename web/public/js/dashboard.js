@@ -151,7 +151,7 @@
     const total = guilds.length;
     const active = guilds.length; // Assume all are active
     const manageable = guilds.length;
-    const protected = 0; // Would need to fetch from API
+    const protectedCount = 0; // Would need to fetch from API
 
     const totalEl = document.getElementById('total-servers');
     const activeEl = document.getElementById('active-servers');
@@ -161,7 +161,7 @@
     if (totalEl) totalEl.textContent = total;
     if (activeEl) activeEl.textContent = active;
     if (manageableEl) manageableEl.textContent = manageable;
-    if (protectedEl) protectedEl.textContent = protected;
+    if (protectedEl) protectedEl.textContent = protectedCount;
   }
 
   // Show empty state
