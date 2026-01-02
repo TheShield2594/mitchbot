@@ -1,6 +1,7 @@
 const { Events } = require('discord.js');
 const { fetch } = require('undici');
 const logger = require('../utils/logger');
+const { awardMessageXP, getRolesForLevel } = require('../utils/xp');
 
 const userCooldown = new Map();
 const replyTracker = new Map();
@@ -32,6 +33,74 @@ module.exports = {
 
     // Ignore DMs
     if (!message.guild) return;
+
+    // Award XP for messages (before AI response logic)
+    try {
+      const member = message.member;
+      const userRoles = member ? Array.from(member.roles.cache.keys()) : [];
+
+      const xpResult = awardMessageXP(
+        message.guildId,
+        message.author.id,
+        message.author.username,
+        message.channelId,
+        userRoles
+      );
+
+      // Handle level-up
+      if (xpResult && xpResult.leveledUp) {
+        const rolesForLevel = getRolesForLevel(message.guildId, xpResult.newLevel);
+
+        // Award level roles
+        if (rolesForLevel.length > 0 && member) {
+          for (const roleId of rolesForLevel) {
+            try {
+              const role = message.guild.roles.cache.get(roleId);
+              if (role && !member.roles.cache.has(roleId)) {
+                await member.roles.add(role);
+              }
+            } catch (err) {
+              logger.error('messageCreate: Failed to award level role', {
+                ...getMessageContext(message),
+                roleId,
+                error: err,
+              });
+            }
+          }
+        }
+
+        // Send level-up message
+        const { getGuildConfig } = require('../utils/xp');
+        const config = getGuildConfig(message.guildId);
+
+        if (config.announceLevelUp) {
+          const levelUpMessage = config.levelUpMessage
+            .replace('{user}', `<@${message.author.id}>`)
+            .replace('{level}', xpResult.newLevel)
+            .replace('{xp}', xpResult.totalXp);
+
+          const channelToUse = config.levelUpChannel
+            ? message.guild.channels.cache.get(config.levelUpChannel)
+            : message.channel;
+
+          if (channelToUse) {
+            try {
+              await channelToUse.send(levelUpMessage);
+            } catch (err) {
+              logger.error('messageCreate: Failed to send level-up message', {
+                ...getMessageContext(message),
+                error: err,
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      logger.error('messageCreate: XP award failed', {
+        ...getMessageContext(message),
+        error: err,
+      });
+    }
 
     let shouldRespond = false;
     let prompt = '';
