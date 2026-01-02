@@ -1,6 +1,7 @@
 const { request } = require("undici");
 const { SlashCommandBuilder } = require("discord.js");
 const { checkCooldown, setCooldown } = require("../../utils/cooldowns");
+const logger = require("../../utils/logger");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -35,7 +36,13 @@ module.exports = {
             await interaction.editReply("```" + cow + "```");
             setCooldown(interaction.user.id, "moo", 5000);
         } catch (error) {
-            console.error("Error fetching cowspeak:", error);
+            logger.error("Error fetching cowspeak", {
+                guildId: interaction.guildId,
+                channelId: interaction.channelId,
+                userId: interaction.user.id,
+                commandName: interaction.commandName,
+                error,
+            });
             await interaction.editReply("Failed to fetch cowspeak.");
         }
     },

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { addLog, canModerate } = require('../../utils/moderation');
+const logger = require('../../utils/logger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -68,7 +69,14 @@ module.exports = {
         await target.send(`You have been timed out in **${interaction.guild.name}** for ${duration} minutes\nReason: ${reason}`);
       } catch (error) {
         // User has DMs disabled or blocked the bot
-        console.log('Could not DM timed out user');
+        logger.warn('Could not DM timed out user', {
+          guildId: interaction.guildId,
+          channelId: interaction.channelId,
+          userId: interaction.user.id,
+          commandName: interaction.commandName,
+          targetUserId: target.id,
+          error,
+        });
       }
 
       // Timeout the user
@@ -88,7 +96,14 @@ module.exports = {
 
       await interaction.editReply(`Successfully timed out ${target.user.tag} for ${duration} minutes\nReason: ${reason}\nCase #${logEntry.caseId}`);
     } catch (error) {
-      console.error('Error timing out user:', error);
+      logger.error('Error timing out user', {
+        guildId: interaction.guildId,
+        channelId: interaction.channelId,
+        userId: interaction.user.id,
+        commandName: interaction.commandName,
+        targetUserId: target.id,
+        error,
+      });
       await interaction.editReply('Failed to timeout the user. Please check my permissions.');
     }
   },

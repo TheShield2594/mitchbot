@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const { addLog } = require('../../utils/moderation');
+const logger = require('../../utils/logger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -74,7 +75,13 @@ module.exports = {
         await interaction.editReply(`Slowmode set to ${seconds} second(s) for this channel.\nReason: ${reason}`);
       }
     } catch (error) {
-      console.error('Error setting slowmode:', error);
+      logger.error('Error setting slowmode', {
+        guildId: interaction.guildId,
+        channelId: interaction.channelId,
+        userId: interaction.user.id,
+        commandName: interaction.commandName,
+        error,
+      });
       await interaction.editReply('Failed to set slowmode. Please check my permissions.');
     }
   },

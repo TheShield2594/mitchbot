@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Collection } = require('discord.js');
+const logger = require('../utils/logger');
 
 function loadCommands(client) {
   const commands = [];
@@ -23,9 +24,9 @@ function loadCommands(client) {
         client.commands.set(command.data.name, command);
         commands.push(command.data.toJSON());
       } else {
-        console.warn(
-          `[WARNING] The command at ${commandPath} is missing a required "data" or "execute" property.`
-        );
+        logger.warn('Command missing required data or execute property', {
+          commandPath,
+        });
       }
     }
   }

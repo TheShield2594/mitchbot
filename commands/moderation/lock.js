@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { addLog } = require('../../utils/moderation');
+const logger = require('../../utils/logger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -52,7 +53,13 @@ module.exports = {
 
       await interaction.editReply(`🔒 Channel locked.\nReason: ${reason}`);
     } catch (error) {
-      console.error('Error locking channel:', error);
+      logger.error('Error locking channel', {
+        guildId: interaction.guildId,
+        channelId: interaction.channelId,
+        userId: interaction.user.id,
+        commandName: interaction.commandName,
+        error,
+      });
       await interaction.editReply('Failed to lock the channel. Please check my permissions.');
     }
   },
