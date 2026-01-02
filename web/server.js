@@ -202,7 +202,9 @@ module.exports = function startWebServer(client) {
     callbackURL,
     scope: ['identify', 'guilds'],
   }, async (accessToken, refreshToken, profile, done) => {
-    const GUILD_FETCH_TIMEOUT = 5000; // 5 seconds
+    // Read timeout from env var GUILD_FETCH_TIMEOUT_MS, default to 5000ms (5 seconds)
+    const timeoutValue = parseInt(process.env.GUILD_FETCH_TIMEOUT_MS, 10);
+    const GUILD_FETCH_TIMEOUT = !isNaN(timeoutValue) && timeoutValue > 0 ? timeoutValue : 5000;
     const controller = new AbortController();
     let timeoutId = null;
 
