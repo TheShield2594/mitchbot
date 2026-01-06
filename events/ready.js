@@ -2,7 +2,7 @@ const { Events } = require('discord.js');
 const schedule = require('node-schedule');
 const { getBirthdays } = require('../utils/birthdays');
 const { initReminders, schedulePendingReminders } = require('../utils/reminders');
-const { initModeration, getAllTempbans, removeTempban, addLog, getGuildConfig } = require('../utils/moderation');
+const { initModeration, getAllTempbans, removeTempban, addLog, getGuildConfig, addBirthdayRole, removeBirthdayRole, getAllExpiredBirthdayRoles } = require('../utils/moderation');
 const { initEconomy } = require('../utils/economy');
 const { initQuests } = require('../utils/quests');
 const { initTrivia } = require('../utils/trivia');
@@ -12,8 +12,11 @@ const { initAchievements } = require('../utils/achievements');
 const { initXP } = require('../utils/xp');
 const logger = require('../utils/logger');
 
-// Track active birthday roles for removal after 24 hours
+// Track active birthday roles for removal after 24 hours (in-memory cache, backed by persistent storage)
 const activeBirthdayRoles = new Map(); // key: `${guildId}-${userId}`, value: { guildId, userId, roleId, expiresAt }
+
+// Track announced birthdays to prevent duplicates on same day
+const announcedBirthdays = new Map(); // key: `${guildId}-${userId}-${today}`, value: timestamp
 
 async function checkBirthdays(client) {
   const now = new Date();
@@ -51,6 +54,12 @@ async function checkBirthdays(client) {
     for (const [userId, birthday] of Object.entries(birthdays)) {
       if (birthday === today) {
         try {
+          // Check if we already announced this birthday today
+          const announceKey = `${guild.id}-${userId}-${today}`;
+          if (announcedBirthdays.has(announceKey)) {
+            continue; // Skip, already announced
+          }
+
           // Fetch the user
           const user = await client.users.fetch(userId);
           if (!user) continue;
@@ -72,6 +81,10 @@ async function checkBirthdays(client) {
             .replace(/{user}/g, user.username);
 
           await channel.send(message);
+
+          // Mark this birthday as announced for today
+          announcedBirthdays.set(announceKey, Date.now());
+
           logger.info('Birthday message sent', {
             guildId: guild.id,
             userId,
@@ -83,26 +96,34 @@ async function checkBirthdays(client) {
             try {
               const role = guild.roles.cache.get(config.birthday.roleId);
               if (role) {
-                // Check if member already has the role
-                if (!member.roles.cache.has(config.birthday.roleId)) {
+                const memberHasRole = member.roles.cache.has(config.birthday.roleId);
+
+                // Add role if member doesn't have it
+                if (!memberHasRole) {
                   await member.roles.add(config.birthday.roleId, 'Birthday role');
-
-                  // Schedule role removal after 24 hours
-                  const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-                  const key = `${guild.id}-${userId}`;
-                  activeBirthdayRoles.set(key, {
-                    guildId: guild.id,
-                    userId,
-                    roleId: config.birthday.roleId,
-                    expiresAt
-                  });
-
-                  logger.info('Birthday role assigned', {
-                    guildId: guild.id,
-                    userId,
-                    roleId: config.birthday.roleId
-                  });
                 }
+
+                // Schedule role removal after 24 hours (regardless of whether we just added it)
+                const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+                const key = `${guild.id}-${userId}`;
+
+                // Store in memory cache
+                activeBirthdayRoles.set(key, {
+                  guildId: guild.id,
+                  userId,
+                  roleId: config.birthday.roleId,
+                  expiresAt
+                });
+
+                // Persist to config
+                addBirthdayRole(guild.id, userId, config.birthday.roleId, expiresAt);
+
+                logger.info('Birthday role tracked for removal', {
+                  guildId: guild.id,
+                  userId,
+                  roleId: config.birthday.roleId,
+                  alreadyHadRole: memberHasRole
+                });
               }
             } catch (error) {
               logger.error('Failed to assign birthday role', {
@@ -124,29 +145,37 @@ async function checkBirthdays(client) {
       }
     }
   }
+
+  // Clean up old announcement entries (remove entries older than today)
+  const cutoffTime = Date.now() - 25 * 60 * 60 * 1000; // 25 hours ago
+  for (const [key, timestamp] of announcedBirthdays.entries()) {
+    if (timestamp < cutoffTime) {
+      announcedBirthdays.delete(key);
+    }
+  }
 }
 
 async function checkExpiredBirthdayRoles(client) {
-  const now = Date.now();
-  const expiredEntries = [];
+  // Get expired birthday roles from persistent storage
+  const expiredRoles = getAllExpiredBirthdayRoles();
 
-  for (const [key, entry] of activeBirthdayRoles.entries()) {
-    if (entry.expiresAt <= now) {
-      expiredEntries.push({ key, ...entry });
-    }
-  }
-
-  for (const entry of expiredEntries) {
+  for (const entry of expiredRoles) {
     try {
       const guild = await client.guilds.fetch(entry.guildId);
       if (!guild) {
-        activeBirthdayRoles.delete(entry.key);
+        // Guild not found, clean up
+        removeBirthdayRole(entry.guildId, entry.userId);
+        const key = `${entry.guildId}-${entry.userId}`;
+        activeBirthdayRoles.delete(key);
         continue;
       }
 
       const member = await guild.members.fetch(entry.userId);
       if (!member) {
-        activeBirthdayRoles.delete(entry.key);
+        // Member not found, clean up
+        removeBirthdayRole(entry.guildId, entry.userId);
+        const key = `${entry.guildId}-${entry.userId}`;
+        activeBirthdayRoles.delete(key);
         continue;
       }
 
@@ -160,7 +189,10 @@ async function checkExpiredBirthdayRoles(client) {
         });
       }
 
-      activeBirthdayRoles.delete(entry.key);
+      // Clean up from both persistent storage and memory
+      removeBirthdayRole(entry.guildId, entry.userId);
+      const key = `${entry.guildId}-${entry.userId}`;
+      activeBirthdayRoles.delete(key);
     } catch (error) {
       logger.error('Failed to remove expired birthday role', {
         error,
@@ -169,7 +201,9 @@ async function checkExpiredBirthdayRoles(client) {
         roleId: entry.roleId
       });
       // Remove from tracking even if removal failed
-      activeBirthdayRoles.delete(entry.key);
+      removeBirthdayRole(entry.guildId, entry.userId);
+      const key = `${entry.guildId}-${entry.userId}`;
+      activeBirthdayRoles.delete(key);
     }
   }
 }

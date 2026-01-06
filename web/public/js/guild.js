@@ -580,8 +580,8 @@ async function loadGuildInfo() {
     // Load logs
     loadLogs();
 
-    // Load birthdays
-    loadBirthdays();
+    // Initialize birthday UI now that config is loaded
+    initializeBirthdayUI();
   } catch (error) {
     console.error('Error loading guild info:', error);
     showToast('Error', 'Failed to load guild information', 'error');
@@ -1081,8 +1081,8 @@ async function loadBirthdayConfig() {
       throw new Error('Failed to load config');
     }
 
-    const config = await response.json();
-    const birthdayConfig = config.birthday || {
+    const fetchedConfig = await response.json();
+    const birthdayConfig = fetchedConfig.birthday || {
       enabled: false,
       channelId: null,
       roleId: null,
@@ -1111,7 +1111,7 @@ async function loadBirthdayConfig() {
 
   } catch (error) {
     console.error('Error loading birthday config:', error);
-    showNotification('Failed to load birthday configuration', 'error');
+    showToast('Error', 'Failed to load birthday configuration', 'error');
   }
 }
 
@@ -1141,10 +1141,10 @@ async function saveBirthdayConfig() {
       throw new Error('Failed to save config');
     }
 
-    showNotification('Birthday configuration saved successfully!', 'success');
+    showToast('Success', 'Birthday configuration saved successfully!', 'success');
   } catch (error) {
     console.error('Error saving birthday config:', error);
-    showNotification('Failed to save birthday configuration', 'error');
+    showToast('Error', 'Failed to save birthday configuration', 'error');
   }
 }
 
@@ -1195,20 +1195,24 @@ async function addBirthday() {
     const date = dateInput.value.trim();
 
     if (!userId || !date) {
-      showNotification('Please enter both User ID and Birthday', 'error');
+      showToast('Error', 'Please enter both User ID and Birthday', 'error');
       return;
     }
 
     // Validate date format
     const dateRegex = /^\d{2}-\d{2}$/;
     if (!dateRegex.test(date)) {
-      showNotification('Invalid date format. Use MM-DD (e.g., 01-15)', 'error');
+      showToast('Error', 'Invalid date format. Use MM-DD (e.g., 01-15)', 'error');
       return;
     }
 
+    // Proper date validation - check if date is actually valid
     const [month, day] = date.split('-').map(Number);
-    if (month < 1 || month > 12 || day < 1 || day > 31) {
-      showNotification('Invalid date. Month must be 01-12, day must be 01-31', 'error');
+
+    // Use a leap year to allow Feb 29
+    const testDate = new Date(2024, month - 1, day);
+    if (testDate.getMonth() !== month - 1 || testDate.getDate() !== day) {
+      showToast('Error', 'Invalid date. Please enter a valid calendar date', 'error');
       return;
     }
 
@@ -1224,13 +1228,13 @@ async function addBirthday() {
       throw new Error('Failed to add birthday');
     }
 
-    showNotification('Birthday added successfully!', 'success');
+    showToast('Success', 'Birthday added successfully!', 'success');
     userIdInput.value = '';
     dateInput.value = '';
     loadBirthdays();
   } catch (error) {
     console.error('Error adding birthday:', error);
-    showNotification('Failed to add birthday', 'error');
+    showToast('Error', 'Failed to add birthday', 'error');
   }
 }
 
@@ -1248,73 +1252,51 @@ async function deleteBirthday(userId) {
       throw new Error('Failed to delete birthday');
     }
 
-    showNotification('Birthday deleted successfully!', 'success');
+    showToast('Success', 'Birthday deleted successfully!', 'success');
     loadBirthdays();
   } catch (error) {
     console.error('Error deleting birthday:', error);
-    showNotification('Failed to delete birthday', 'error');
+    showToast('Error', 'Failed to delete birthday', 'error');
   }
 }
 
-async function populateBirthdayChannels() {
-  try {
-    const channelSelect = document.getElementById('birthday-channel');
-    const response = await fetch(`/api/guild/${guildId}/info`);
+function populateBirthdayChannels() {
+  const channelSelect = document.getElementById('birthday-channel');
 
-    if (!response.ok) {
-      throw new Error('Failed to load guild info');
-    }
+  // Clear existing options except the first one
+  channelSelect.innerHTML = '<option value="">Select a channel...</option>';
 
-    const guild = await response.json();
-
-    // Clear existing options except the first one
-    channelSelect.innerHTML = '<option value="">Select a channel...</option>';
-
-    // Add text channels
-    if (guild.channels && Array.isArray(guild.channels)) {
-      guild.channels
-        .filter(ch => ch.type === 'GUILD_TEXT' || ch.type === 0)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .forEach(channel => {
-          const option = document.createElement('option');
-          option.value = channel.id;
-          option.textContent = `# ${channel.name}`;
-          channelSelect.appendChild(option);
-        });
-    }
-  } catch (error) {
-    console.error('Error populating channels:', error);
+  // Add text channels from cached config
+  if (config && config.channels && Array.isArray(config.channels)) {
+    config.channels
+      .filter(ch => ch.type === 'GUILD_TEXT' || ch.type === 0)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `# ${channel.name}`;
+        channelSelect.appendChild(option);
+      });
   }
 }
 
-async function populateBirthdayRoles() {
-  try {
-    const roleSelect = document.getElementById('birthday-role');
-    const response = await fetch(`/api/guild/${guildId}/info`);
+function populateBirthdayRoles() {
+  const roleSelect = document.getElementById('birthday-role');
 
-    if (!response.ok) {
-      throw new Error('Failed to load guild info');
-    }
+  // Clear existing options except the first one
+  roleSelect.innerHTML = '<option value="">No role</option>';
 
-    const guild = await response.json();
-
-    // Clear existing options except the first one
-    roleSelect.innerHTML = '<option value="">No role</option>';
-
-    // Add roles
-    if (guild.roles && Array.isArray(guild.roles)) {
-      guild.roles
-        .filter(role => role.name !== '@everyone')
-        .sort((a, b) => b.position - a.position)
-        .forEach(role => {
-          const option = document.createElement('option');
-          option.value = role.id;
-          option.textContent = role.name;
-          roleSelect.appendChild(option);
-        });
-    }
-  } catch (error) {
-    console.error('Error populating roles:', error);
+  // Add roles from cached config
+  if (config && config.roles && Array.isArray(config.roles)) {
+    config.roles
+      .filter(role => role.name !== '@everyone')
+      .sort((a, b) => b.position - a.position)
+      .forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        roleSelect.appendChild(option);
+      });
   }
 }
 
@@ -1450,5 +1432,4 @@ document.addEventListener('DOMContentLoaded', () => {
   loadGuildInfo();
   initializeDisclosures();
   initializeHealthToggle();
-  initializeBirthdayUI();
 });
