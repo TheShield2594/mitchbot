@@ -91,6 +91,14 @@ function getDefaultGuildConfig() {
 
     // Tempban tracking
     tempbans: {}, // { userId: { expiresAt: timestamp, caseId: number } }
+
+    // Birthday settings
+    birthday: {
+      enabled: false,
+      channelId: null, // Channel for birthday announcements
+      roleId: null, // Role to assign on birthdays
+      customMessage: 'Happy Birthday, {mention}! 🎉', // Custom birthday message ({mention}, {username}, {user} available)
+    },
   };
 }
 
@@ -202,6 +210,9 @@ async function updateGuildConfig(guildId, updates) {
   }
   if (updates.logging) {
     config.logging = { ...config.logging, ...updates.logging };
+  }
+  if (updates.birthday) {
+    config.birthday = { ...config.birthday, ...updates.birthday };
   }
 
   moderationData[guildId] = config;

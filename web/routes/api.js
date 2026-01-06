@@ -168,6 +168,27 @@ router.delete('/guild/:guildId/birthdays/:userId', ensureServerManager, (req, re
   }
 });
 
+// Update birthday configuration
+router.patch('/guild/:guildId/config/birthday', ensureServerManager, async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    const { enabled, channelId, roleId, customMessage } = req.body;
+
+    // Build update object with only provided fields
+    const updates = {};
+    if (enabled !== undefined) updates.enabled = enabled;
+    if (channelId !== undefined) updates.channelId = channelId;
+    if (roleId !== undefined) updates.roleId = roleId;
+    if (customMessage !== undefined) updates.customMessage = customMessage;
+
+    const config = await updateGuildConfig(guildId, { birthday: updates });
+    res.json({ success: true, birthday: config.birthday });
+  } catch (error) {
+    console.error('Error updating birthday config:', error);
+    res.status(500).json({ error: 'Failed to update birthday configuration' });
+  }
+});
+
 // Get guild info from bot
 router.get('/guild/:guildId/info', ensureServerManager, async (req, res) => {
   try {
