@@ -9,6 +9,7 @@ const { initTrivia } = require('../utils/trivia');
 const { initStats, getWeeklyRecap, generateRecapMessage } = require('../utils/stats');
 const { initSnark } = require('../utils/snark');
 const { initAchievements } = require('../utils/achievements');
+const { initXP } = require('../utils/xp');
 const logger = require('../utils/logger');
 
 // Track active birthday roles for removal after 24 hours
@@ -314,6 +315,13 @@ module.exports = {
       logger.info('Anti-achievements system initialized');
     } catch (error) {
       logger.error('Failed to initialize achievements', { error });
+    }
+
+    try {
+      await initXP();
+      logger.info('XP/Leveling system initialized');
+    } catch (error) {
+      logger.error('Failed to initialize XP system', { error });
     }
 
     // Check for expired tempbans every minute

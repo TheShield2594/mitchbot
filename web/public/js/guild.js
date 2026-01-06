@@ -52,11 +52,32 @@ class FeatureHealthMonitor {
         key: 'enabled'
       },
       {
+        id: 'mention-spam',
+        name: 'Mention Spam',
+        type: 'toggle',
+        path: 'automod.mentionSpam',
+        key: 'enabled'
+      },
+      {
+        id: 'caps-spam',
+        name: 'Caps Spam',
+        type: 'toggle',
+        path: 'automod.capsSpam',
+        key: 'enabled'
+      },
+      {
         id: 'logging',
         name: 'Mod Logging',
         type: 'channel',
         path: 'logging',
         key: 'channelId'
+      },
+      {
+        id: 'economy',
+        name: 'Economy',
+        type: 'toggle',
+        path: 'economy',
+        key: 'enabled'
       }
     ];
   }
@@ -472,9 +493,10 @@ function initializeHealthToggle() {
 
 async function loadGuildInfo() {
   try {
-    const [infoRes, configRes] = await Promise.all([
+    const [infoRes, configRes, economyRes] = await Promise.all([
       fetch(`/api/guild/${guildId}/info`),
-      fetch(`/api/guild/${guildId}/config`)
+      fetch(`/api/guild/${guildId}/config`),
+      fetch(`/api/guild/${guildId}/economy/config`)
     ]);
 
     if (!infoRes.ok || !configRes.ok) {
@@ -485,6 +507,24 @@ async function loadGuildInfo() {
     const configData = await configRes.json();
 
     config = configData;
+
+    // Add economy config to main config
+    if (economyRes.ok) {
+      config.economy = await economyRes.json();
+    } else {
+      // Default economy config if not available
+      config.economy = {
+        enabled: true,
+        currencyName: 'coins',
+        currencySymbol: '💰',
+        dailyReward: 100,
+        dailyCooldownHours: 24
+      };
+    }
+
+    // Store roles and channels for later use
+    config.roles = info.roles;
+    config.channels = info.channels;
 
     // Set guild name
     document.getElementById('guild-name').textContent = info.name;
@@ -502,8 +542,35 @@ async function loadGuildInfo() {
       logChannelSelect.appendChild(option);
     });
 
+    // Populate whitelist role dropdown
+    const whitelistRoleSelect = document.getElementById('whitelist-role-select');
+    if (whitelistRoleSelect) {
+      whitelistRoleSelect.innerHTML = '<option value="">Select a role...</option>';
+      info.roles.filter(r => r.id !== info.id).forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        whitelistRoleSelect.appendChild(option);
+      });
+    }
+
+    // Populate whitelist channel dropdown
+    const whitelistChannelSelect = document.getElementById('whitelist-channel-select');
+    if (whitelistChannelSelect) {
+      whitelistChannelSelect.innerHTML = '<option value="">Select a channel...</option>';
+      info.channels.filter(c => c.type === 0).forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `#${channel.name}`;
+        whitelistChannelSelect.appendChild(option);
+      });
+    }
+
     // Load automod config
     loadAutomodConfig();
+
+    // Load economy config
+    loadEconomyConfig();
 
     // Initialize health monitor
     healthMonitor = new FeatureHealthMonitor(config);
@@ -533,9 +600,40 @@ function loadAutomodConfig() {
   document.getElementById('linkfilter-enabled').checked = config.automod.linkFilter.enabled;
   document.getElementById('spam-enabled').checked = config.automod.spam.enabled;
 
+  // Load action configurations
+  document.getElementById('wordfilter-action').value = config.automod.wordFilter.action || 'delete';
+  document.getElementById('invitefilter-action').value = config.automod.inviteFilter.action || 'delete';
+  document.getElementById('linkfilter-action').value = config.automod.linkFilter.action || 'delete';
+  document.getElementById('spam-action').value = config.automod.spam.action || 'timeout';
+
+  // Load warning thresholds
+  document.getElementById('wordfilter-threshold').value = config.automod.wordFilter.warnThreshold || 3;
+  document.getElementById('invitefilter-threshold').value = config.automod.inviteFilter.warnThreshold || 3;
+  document.getElementById('linkfilter-threshold').value = config.automod.linkFilter.warnThreshold || 3;
+
+  // Load spam detection parameters
+  document.getElementById('spam-timeout-duration').value = (config.automod.spam.timeoutDuration || 300000) / 60000; // Convert ms to minutes
+  document.getElementById('spam-message-threshold').value = config.automod.spam.messageThreshold || 5;
+  document.getElementById('spam-time-window').value = (config.automod.spam.timeWindow || 5000) / 1000; // Convert ms to seconds
+  document.getElementById('spam-duplicate-threshold').value = config.automod.spam.duplicateThreshold || 3;
+
+  // Load mention spam settings
+  document.getElementById('mention-spam-enabled').checked = config.automod.mentionSpam?.enabled || false;
+  document.getElementById('mention-spam-threshold').value = config.automod.mentionSpam?.threshold || 5;
+  document.getElementById('mention-spam-action').value = config.automod.mentionSpam?.action || 'warn';
+  document.getElementById('mention-spam-warn-threshold').value = config.automod.mentionSpam?.warnThreshold || 2;
+
+  // Load caps spam settings
+  document.getElementById('caps-spam-enabled').checked = config.automod.capsSpam?.enabled || false;
+  document.getElementById('caps-spam-percentage').value = config.automod.capsSpam?.percentage || 70;
+  document.getElementById('caps-spam-min-length').value = config.automod.capsSpam?.minLength || 10;
+  document.getElementById('caps-spam-action').value = config.automod.capsSpam?.action || 'delete';
+
   renderWordList();
   renderWhitelist();
   renderBlacklist();
+  renderWhitelistedRoles();
+  renderWhitelistedChannels();
 
   // Add real-time toggle listeners
   const toggles = [
@@ -543,7 +641,9 @@ function loadAutomodConfig() {
     'wordfilter-enabled',
     'invitefilter-enabled',
     'linkfilter-enabled',
-    'spam-enabled'
+    'spam-enabled',
+    'mention-spam-enabled',
+    'caps-spam-enabled'
   ];
 
   toggles.forEach(id => {
@@ -555,6 +655,8 @@ function loadAutomodConfig() {
         if (id === 'invitefilter-enabled') config.automod.inviteFilter.enabled = element.checked;
         if (id === 'linkfilter-enabled') config.automod.linkFilter.enabled = element.checked;
         if (id === 'spam-enabled') config.automod.spam.enabled = element.checked;
+        if (id === 'mention-spam-enabled') config.automod.mentionSpam.enabled = element.checked;
+        if (id === 'caps-spam-enabled') config.automod.capsSpam.enabled = element.checked;
 
         if (healthMonitor) {
           healthMonitor.updateUI();
@@ -703,6 +805,102 @@ function removeBlacklist(domain) {
 }
 
 // ============================================
+// WHITELISTED ROLES FUNCTIONS
+// ============================================
+
+function renderWhitelistedRoles() {
+  const container = document.getElementById('whitelisted-roles-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!config.automod.whitelistedRoles) {
+    config.automod.whitelistedRoles = [];
+  }
+
+  config.automod.whitelistedRoles.forEach(roleId => {
+    const roleName = config.roles?.find(r => r.id === roleId)?.name || `Role ${roleId}`;
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.innerHTML = `
+      <span>${escapeHtml(roleName)}</span>
+      <button class="tag__remove" onclick="removeWhitelistedRole('${roleId}')">×</button>
+    `;
+    container.appendChild(tag);
+  });
+}
+
+function addWhitelistedRole() {
+  const select = document.getElementById('whitelist-role-select');
+  const roleId = select.value;
+
+  if (!roleId) return;
+
+  if (!config.automod.whitelistedRoles) {
+    config.automod.whitelistedRoles = [];
+  }
+
+  if (!config.automod.whitelistedRoles.includes(roleId)) {
+    config.automod.whitelistedRoles.push(roleId);
+    renderWhitelistedRoles();
+    select.value = '';
+  }
+}
+
+function removeWhitelistedRole(roleId) {
+  config.automod.whitelistedRoles = config.automod.whitelistedRoles.filter(id => id !== roleId);
+  renderWhitelistedRoles();
+}
+
+// ============================================
+// WHITELISTED CHANNELS FUNCTIONS
+// ============================================
+
+function renderWhitelistedChannels() {
+  const container = document.getElementById('whitelisted-channels-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!config.automod.whitelistedChannels) {
+    config.automod.whitelistedChannels = [];
+  }
+
+  config.automod.whitelistedChannels.forEach(channelId => {
+    const channelName = config.channels?.find(c => c.id === channelId)?.name || `Channel ${channelId}`;
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.innerHTML = `
+      <span>#${escapeHtml(channelName)}</span>
+      <button class="tag__remove" onclick="removeWhitelistedChannel('${channelId}')">×</button>
+    `;
+    container.appendChild(tag);
+  });
+}
+
+function addWhitelistedChannel() {
+  const select = document.getElementById('whitelist-channel-select');
+  const channelId = select.value;
+
+  if (!channelId) return;
+
+  if (!config.automod.whitelistedChannels) {
+    config.automod.whitelistedChannels = [];
+  }
+
+  if (!config.automod.whitelistedChannels.includes(channelId)) {
+    config.automod.whitelistedChannels.push(channelId);
+    renderWhitelistedChannels();
+    select.value = '';
+  }
+}
+
+function removeWhitelistedChannel(channelId) {
+  config.automod.whitelistedChannels = config.automod.whitelistedChannels.filter(id => id !== channelId);
+  renderWhitelistedChannels();
+}
+
+// ============================================
 // SAVE FUNCTIONS
 // ============================================
 
@@ -713,25 +911,44 @@ async function saveAutomod() {
       wordFilter: {
         enabled: document.getElementById('wordfilter-enabled').checked,
         words: config.automod.wordFilter.words,
+        action: document.getElementById('wordfilter-action').value,
+        warnThreshold: parseInt(document.getElementById('wordfilter-threshold').value),
       },
       inviteFilter: {
         enabled: document.getElementById('invitefilter-enabled').checked,
         allowOwnServer: document.getElementById('allow-own-server').checked,
+        action: document.getElementById('invitefilter-action').value,
+        warnThreshold: parseInt(document.getElementById('invitefilter-threshold').value),
       },
       linkFilter: {
         enabled: document.getElementById('linkfilter-enabled').checked,
         whitelist: config.automod.linkFilter.whitelist,
         blacklist: config.automod.linkFilter.blacklist,
+        action: document.getElementById('linkfilter-action').value,
+        warnThreshold: parseInt(document.getElementById('linkfilter-threshold').value),
       },
       spam: {
         enabled: document.getElementById('spam-enabled').checked,
+        action: document.getElementById('spam-action').value,
+        timeoutDuration: parseInt(document.getElementById('spam-timeout-duration').value) * 60000, // Convert minutes to ms
+        messageThreshold: parseInt(document.getElementById('spam-message-threshold').value),
+        timeWindow: parseInt(document.getElementById('spam-time-window').value) * 1000, // Convert seconds to ms
+        duplicateThreshold: parseInt(document.getElementById('spam-duplicate-threshold').value),
       },
       mentionSpam: {
-        enabled: document.getElementById('spam-enabled').checked,
+        enabled: document.getElementById('mention-spam-enabled').checked,
+        threshold: parseInt(document.getElementById('mention-spam-threshold').value),
+        action: document.getElementById('mention-spam-action').value,
+        warnThreshold: parseInt(document.getElementById('mention-spam-warn-threshold').value),
       },
       capsSpam: {
-        enabled: document.getElementById('spam-enabled').checked,
+        enabled: document.getElementById('caps-spam-enabled').checked,
+        percentage: parseInt(document.getElementById('caps-spam-percentage').value),
+        minLength: parseInt(document.getElementById('caps-spam-min-length').value),
+        action: document.getElementById('caps-spam-action').value,
       },
+      whitelistedRoles: config.automod.whitelistedRoles || [],
+      whitelistedChannels: config.automod.whitelistedChannels || [],
     };
 
     const response = await fetch(`/api/guild/${guildId}/automod`, {
@@ -750,6 +967,8 @@ async function saveAutomod() {
     config.automod.inviteFilter.enabled = updates.inviteFilter.enabled;
     config.automod.linkFilter.enabled = updates.linkFilter.enabled;
     config.automod.spam.enabled = updates.spam.enabled;
+    config.automod.mentionSpam.enabled = updates.mentionSpam.enabled;
+    config.automod.capsSpam.enabled = updates.capsSpam.enabled;
 
     if (healthMonitor) {
       healthMonitor.updateUI();
@@ -1121,6 +1340,96 @@ function initializeBirthdayUI() {
   populateBirthdayRoles();
   loadBirthdayConfig();
   loadBirthdays();
+}
+
+// ============================================
+// ECONOMY CONFIGURATION
+// ============================================
+
+function loadEconomyConfig() {
+  if (!config.economy) return;
+
+  document.getElementById('economy-enabled').checked = config.economy.enabled;
+  document.getElementById('currency-name').value = config.economy.currencyName || 'coins';
+  document.getElementById('currency-symbol').value = config.economy.currencySymbol || '💰';
+  document.getElementById('daily-reward').value = config.economy.dailyReward || 100;
+  document.getElementById('daily-cooldown').value = config.economy.dailyCooldownHours || 24;
+
+  updateEconomyStatus();
+}
+
+function updateEconomyStatus() {
+  const enabled = document.getElementById('economy-enabled').checked;
+  const settingsDiv = document.getElementById('economy-settings');
+  const statusBadge = document.getElementById('economy-status-badge');
+
+  if (enabled) {
+    settingsDiv.style.opacity = '1';
+    settingsDiv.style.pointerEvents = 'auto';
+    statusBadge.textContent = 'Active';
+    statusBadge.className = 'badge badge--success';
+  } else {
+    settingsDiv.style.opacity = '0.5';
+    settingsDiv.style.pointerEvents = 'none';
+    statusBadge.textContent = 'Inactive';
+    statusBadge.className = 'badge badge--secondary';
+  }
+
+  // Update config immediately for health monitor
+  if (config.economy) {
+    config.economy.enabled = enabled;
+    if (healthMonitor) {
+      healthMonitor.updateUI();
+    }
+  }
+}
+
+async function saveEconomySettings() {
+  try {
+    const updates = {
+      enabled: document.getElementById('economy-enabled').checked,
+      currencyName: document.getElementById('currency-name').value.trim() || 'coins',
+      currencySymbol: document.getElementById('currency-symbol').value.trim() || '💰',
+      dailyReward: parseInt(document.getElementById('daily-reward').value) || 100,
+      dailyCooldownHours: parseInt(document.getElementById('daily-cooldown').value) || 24,
+    };
+
+    // Validate inputs
+    if (updates.dailyReward < 0 || updates.dailyReward > 1000000) {
+      showToast('Invalid Input', 'Daily reward must be between 0 and 1,000,000', 'error');
+      return;
+    }
+
+    if (updates.dailyCooldownHours < 1 || updates.dailyCooldownHours > 168) {
+      showToast('Invalid Input', 'Daily cooldown must be between 1 and 168 hours', 'error');
+      return;
+    }
+
+    const response = await fetch(`/api/guild/${guildId}/economy/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to save settings');
+    }
+
+    const result = await response.json();
+
+    // Update config
+    config.economy = result.config;
+
+    if (healthMonitor) {
+      healthMonitor.updateUI();
+    }
+
+    showToast('Settings Saved', 'Economy configuration updated successfully', 'success');
+  } catch (error) {
+    console.error('Error saving economy settings:', error);
+    showToast('Save Failed', error.message || 'Could not save economy settings', 'error');
+  }
 }
 
 // ============================================

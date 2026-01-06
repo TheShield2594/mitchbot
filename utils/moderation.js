@@ -99,6 +99,19 @@ function getDefaultGuildConfig() {
       roleId: null, // Role to assign on birthdays
       customMessage: 'Happy Birthday, {mention}! 🎉', // Custom birthday message ({mention}, {username}, {user} available)
     },
+
+    // Welcome/Leave messages
+    welcome: {
+      enabled: false,
+      channelId: null,
+      message: 'Welcome to the server, {user}!', // {user} = mention, {username} = name, {server} = server name, {memberCount} = member count
+    },
+
+    leave: {
+      enabled: false,
+      channelId: null,
+      message: '{username} has left the server.',
+    },
   };
 }
 
@@ -213,6 +226,12 @@ async function updateGuildConfig(guildId, updates) {
   }
   if (updates.birthday) {
     config.birthday = { ...config.birthday, ...updates.birthday };
+  }
+  if (updates.welcome) {
+    config.welcome = { ...config.welcome, ...updates.welcome };
+  }
+  if (updates.leave) {
+    config.leave = { ...config.leave, ...updates.leave };
   }
 
   moderationData[guildId] = config;
