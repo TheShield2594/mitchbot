@@ -1166,7 +1166,9 @@ async function loadBirthdays() {
       return;
     }
 
-    container.innerHTML = '<ul style="list-style: none; padding: 0; margin: 0;">';
+    // Create UL element properly
+    const ul = document.createElement('ul');
+    ul.style.cssText = 'list-style: none; padding: 0; margin: 0;';
 
     for (const [userId, date] of Object.entries(birthdays)) {
       const listItem = document.createElement('li');
@@ -1177,8 +1179,12 @@ async function loadBirthdays() {
         <button class="btn btn--danger btn--sm" data-delete-birthday="${userId}">Delete</button>
       `;
 
-      container.querySelector('ul').appendChild(listItem);
+      ul.appendChild(listItem);
     }
+
+    // Clear container and append the complete list
+    container.innerHTML = '';
+    container.appendChild(ul);
   } catch (error) {
     console.error('Error loading birthdays:', error);
     document.getElementById('birthdays-container').innerHTML =
