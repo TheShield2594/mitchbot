@@ -169,6 +169,46 @@ router.delete('/guild/:guildId/birthdays/:userId', ensureServerManager, (req, re
   }
 });
 
+// Update birthday configuration
+router.patch('/guild/:guildId/config/birthday', ensureServerManager, async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    const { enabled, channelId, roleId, customMessage } = req.body;
+
+    // Validate snowflake IDs if provided
+    const snowflakeRegex = /^\d{17,19}$/;
+    if (channelId !== undefined && channelId !== null && channelId !== '' && !snowflakeRegex.test(channelId)) {
+      return res.status(400).json({ error: 'Invalid channel ID format' });
+    }
+    if (roleId !== undefined && roleId !== null && roleId !== '' && !snowflakeRegex.test(roleId)) {
+      return res.status(400).json({ error: 'Invalid role ID format' });
+    }
+
+    // Validate custom message length
+    if (customMessage !== undefined && customMessage !== null) {
+      if (typeof customMessage !== 'string') {
+        return res.status(400).json({ error: 'Custom message must be a string' });
+      }
+      if (customMessage.length > 2000) {
+        return res.status(400).json({ error: 'Custom message must be 2000 characters or less' });
+      }
+    }
+
+    // Build update object with only provided fields
+    const updates = {};
+    if (enabled !== undefined) updates.enabled = enabled;
+    if (channelId !== undefined) updates.channelId = channelId;
+    if (roleId !== undefined) updates.roleId = roleId;
+    if (customMessage !== undefined) updates.customMessage = customMessage;
+
+    const config = await updateGuildConfig(guildId, { birthday: updates });
+    res.json({ success: true, birthday: config.birthday });
+  } catch (error) {
+    console.error('Error updating birthday config:', error);
+    res.status(500).json({ error: 'Failed to update birthday configuration' });
+  }
+});
+
 // Get guild info from bot
 router.get('/guild/:guildId/info', ensureServerManager, async (req, res) => {
   try {
