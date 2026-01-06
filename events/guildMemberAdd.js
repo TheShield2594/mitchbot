@@ -197,6 +197,49 @@ module.exports = {
         }
       }
 
+      // Anti-dehoist for new members
+      if (config.antiDehoist && config.antiDehoist.enabled) {
+        const displayName = member.user.username;
+        const hoistRegex = /^[^a-zA-Z0-9]/;
+
+        if (hoistRegex.test(displayName)) {
+          // Check if bot can manage nicknames
+          if (member.guild.members.me.permissions.has(PermissionFlagsBits.ManageNicknames) && member.manageable) {
+            try {
+              const prefix = config.antiDehoist.prefix || 'Dehoisted';
+              const cleaned = displayName.replace(/^[^a-zA-Z0-9]+/, '');
+              const dehoistedName = cleaned.length >= 2 ? cleaned : `${prefix} ${cleaned || ''}`.trim() || prefix;
+
+              await member.setNickname(dehoistedName, 'Anti-dehoist: Username contains hoisting characters');
+
+              logger.info('Dehoisted new member', {
+                guildId: member.guild.id,
+                userId: member.id,
+                userTag: member.user.tag,
+                oldName: displayName,
+                newName: dehoistedName,
+              });
+
+              addLog(member.guild.id, {
+                actionType: 'dehoist',
+                action: 'New Member Dehoisted',
+                targetUserId: member.id,
+                targetTag: member.user.tag,
+                moderatorId: member.client.user.id,
+                moderatorTag: member.client.user.username,
+                reason: `Anti-dehoist: Changed "${displayName}" to "${dehoistedName}"`,
+              });
+            } catch (error) {
+              logger.error('Failed to dehoist new member', {
+                guildId: member.guild.id,
+                userId: member.id,
+                error,
+              });
+            }
+          }
+        }
+      }
+
       // Welcome message (existing functionality)
       if (config.welcome && config.welcome.enabled && config.welcome.channelId) {
         const channel = member.guild.channels.cache.get(config.welcome.channelId);

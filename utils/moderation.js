@@ -66,6 +66,22 @@ function getDefaultGuildConfig() {
         action: 'delete',
       },
 
+      // Attachment spam
+      attachmentSpam: {
+        enabled: false,
+        threshold: 5, // Number of attachments
+        timeWindow: 10000, // Time window in ms (10 seconds)
+        action: 'warn',
+        warnThreshold: 2,
+      },
+
+      // Emoji spam
+      emojiSpam: {
+        enabled: false,
+        threshold: 10, // Max emojis per message
+        action: 'delete',
+      },
+
       // Whitelisted roles (immune to automod)
       whitelistedRoles: [],
 
@@ -125,6 +141,12 @@ function getDefaultGuildConfig() {
         channelId: null, // Channel where users verify
         message: 'Welcome! Please verify by reacting to this message.', // Verification message
       },
+    },
+
+    // Anti-dehoist (auto-rename users with hoisting characters)
+    antiDehoist: {
+      enabled: false,
+      prefix: 'Dehoisted', // Prefix to add to dehoisted names
     },
 
     // Welcome/Leave messages
@@ -256,6 +278,12 @@ async function updateGuildConfig(guildId, updates) {
       config.antiRaid = getDefaultGuildConfig().antiRaid;
     }
     config.antiRaid = { ...config.antiRaid, ...updates.antiRaid };
+  }
+  if (updates.antiDehoist) {
+    if (!config.antiDehoist) {
+      config.antiDehoist = getDefaultGuildConfig().antiDehoist;
+    }
+    config.antiDehoist = { ...config.antiDehoist, ...updates.antiDehoist };
   }
 
   // Handle simple field updates
@@ -428,6 +456,41 @@ function trackUserMessage(guildId, userId, messageId, content) {
 function getUserRecentMessages(guildId, userId) {
   const key = `${guildId}-${userId}`;
   return userMessageTracking.get(key) || [];
+}
+
+// Attachment spam tracking (in-memory, doesn't persist)
+const userAttachmentTracking = new Map();
+
+function trackUserAttachment(guildId, userId, attachmentCount) {
+  const key = `${guildId}-${userId}`;
+
+  if (!userAttachmentTracking.has(key)) {
+    userAttachmentTracking.set(key, []);
+  }
+
+  const attachments = userAttachmentTracking.get(key);
+  attachments.push({
+    count: attachmentCount,
+    timestamp: Date.now(),
+  });
+
+  // Keep only attachments from last 60 seconds
+  const cutoff = Date.now() - 60000;
+  const filtered = attachments.filter(att => att.timestamp > cutoff);
+  userAttachmentTracking.set(key, filtered);
+
+  return filtered;
+}
+
+function getUserRecentAttachments(guildId, userId, timeWindow = 10000) {
+  const key = `${guildId}-${userId}`;
+  if (!userAttachmentTracking.has(key)) {
+    return [];
+  }
+
+  const attachments = userAttachmentTracking.get(key);
+  const cutoff = Date.now() - timeWindow;
+  return attachments.filter(att => att.timestamp > cutoff);
 }
 
 // Check if user/channel is whitelisted
@@ -611,6 +674,8 @@ module.exports = {
   getCasesByUser,
   trackUserMessage,
   getUserRecentMessages,
+  trackUserAttachment,
+  getUserRecentAttachments,
   isWhitelisted,
   getDefaultGuildConfig,
   addTempban,
