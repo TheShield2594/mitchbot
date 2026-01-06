@@ -95,6 +95,38 @@ function getDefaultGuildConfig() {
     // Mute role
     muteRole: null, // Role ID for permanent mutes
 
+    // Anti-raid settings
+    antiRaid: {
+      // Account age filter
+      accountAge: {
+        enabled: false,
+        minAgeDays: 7, // Minimum account age in days
+        action: 'kick', // 'kick' or 'ban'
+      },
+
+      // Join spam detection
+      joinSpam: {
+        enabled: false,
+        threshold: 5, // Number of joins
+        timeWindow: 10000, // Time window in ms (10 seconds)
+        action: 'kick', // 'kick' or 'ban' for detected raid accounts
+      },
+
+      // Emergency lockdown
+      lockdown: {
+        active: false,
+        lockedChannels: [], // Array of channel IDs that were locked
+      },
+
+      // Verification system
+      verification: {
+        enabled: false,
+        roleId: null, // Role to give after verification
+        channelId: null, // Channel where users verify
+        message: 'Welcome! Please verify by reacting to this message.', // Verification message
+      },
+    },
+
     // Welcome/Leave messages
     welcome: {
       enabled: false,
@@ -218,6 +250,12 @@ async function updateGuildConfig(guildId, updates) {
   }
   if (updates.logging) {
     config.logging = { ...config.logging, ...updates.logging };
+  }
+  if (updates.antiRaid) {
+    if (!config.antiRaid) {
+      config.antiRaid = getDefaultGuildConfig().antiRaid;
+    }
+    config.antiRaid = { ...config.antiRaid, ...updates.antiRaid };
   }
 
   // Handle simple field updates
@@ -494,6 +532,38 @@ function getAllTempbans() {
   return allExpired;
 }
 
+// Join spam tracking (in-memory, doesn't persist)
+const guildJoinTracking = new Map();
+
+function trackMemberJoin(guildId, userId) {
+  if (!guildJoinTracking.has(guildId)) {
+    guildJoinTracking.set(guildId, []);
+  }
+
+  const joins = guildJoinTracking.get(guildId);
+  joins.push({
+    userId,
+    timestamp: Date.now(),
+  });
+
+  // Keep only joins from last 60 seconds
+  const cutoff = Date.now() - 60000;
+  const filtered = joins.filter(join => join.timestamp > cutoff);
+  guildJoinTracking.set(guildId, filtered);
+
+  return filtered;
+}
+
+function getRecentJoins(guildId, timeWindow = 10000) {
+  if (!guildJoinTracking.has(guildId)) {
+    return [];
+  }
+
+  const joins = guildJoinTracking.get(guildId);
+  const cutoff = Date.now() - timeWindow;
+  return joins.filter(join => join.timestamp > cutoff);
+}
+
 // Safety check helpers
 function canModerate(guild, moderator, target) {
   // Can't moderate yourself
@@ -547,5 +617,7 @@ module.exports = {
   removeTempban,
   getExpiredTempbans,
   getAllTempbans,
+  trackMemberJoin,
+  getRecentJoins,
   canModerate,
 };
