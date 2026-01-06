@@ -403,7 +403,7 @@
               card.style.display = hasBot ? '' : 'none';
               break;
             case 'available':
-              card.style.display = !hasBot ? '' : 'none';
+              card.style.display = hasBot ? '' : 'none';
               break;
           }
         });
