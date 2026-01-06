@@ -92,6 +92,9 @@ function getDefaultGuildConfig() {
     // Tempban tracking
     tempbans: {}, // { userId: { expiresAt: timestamp, caseId: number } }
 
+    // Mute role
+    muteRole: null, // Role ID for permanent mutes
+
     // Welcome/Leave messages
     welcome: {
       enabled: false,
@@ -215,6 +218,11 @@ async function updateGuildConfig(guildId, updates) {
   }
   if (updates.logging) {
     config.logging = { ...config.logging, ...updates.logging };
+  }
+
+  // Handle simple field updates
+  if (updates.muteRole !== undefined) {
+    config.muteRole = updates.muteRole;
   }
 
   moderationData[guildId] = config;
