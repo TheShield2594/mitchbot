@@ -1174,7 +1174,7 @@ async function loadBirthdays() {
 
       listItem.innerHTML = `
         <span>User ${escapeHtml(userId)}: ${escapeHtml(date)}</span>
-        <button class="btn btn--danger btn--sm" onclick="deleteBirthday('${escapeHtml(userId)}')">Delete</button>
+        <button class="btn btn--danger btn--sm" data-delete-birthday="${userId}">Delete</button>
       `;
 
       container.querySelector('ul').appendChild(listItem);
@@ -1316,6 +1316,16 @@ function initializeBirthdayUI() {
   // Add birthday button
   const addBirthdayBtn = document.getElementById('add-birthday-btn');
   addBirthdayBtn.addEventListener('click', addBirthday);
+
+  // Delegated event listener for delete buttons
+  const birthdaysContainer = document.getElementById('birthdays-container');
+  birthdaysContainer.addEventListener('click', (event) => {
+    const deleteBtn = event.target.closest('[data-delete-birthday]');
+    if (deleteBtn) {
+      const userId = deleteBtn.dataset.deleteBirthday;
+      deleteBirthday(userId);
+    }
+  });
 
   // Load data
   populateBirthdayChannels();
