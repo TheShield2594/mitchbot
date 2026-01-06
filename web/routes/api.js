@@ -185,8 +185,13 @@ router.patch('/guild/:guildId/config/birthday', ensureServerManager, async (req,
     }
 
     // Validate custom message length
-    if (customMessage !== undefined && customMessage.length > 2000) {
-      return res.status(400).json({ error: 'Custom message must be 2000 characters or less' });
+    if (customMessage !== undefined && customMessage !== null) {
+      if (typeof customMessage !== 'string') {
+        return res.status(400).json({ error: 'Custom message must be a string' });
+      }
+      if (customMessage.length > 2000) {
+        return res.status(400).json({ error: 'Custom message must be 2000 characters or less' });
+      }
     }
 
     // Build update object with only provided fields

@@ -582,6 +582,20 @@ function getAllExpiredBirthdayRoles() {
   return allExpired;
 }
 
+function getAllBirthdayRoles() {
+  const allRoles = [];
+
+  for (const [guildId, guildData] of Object.entries(moderationData)) {
+    if (guildData.birthdayRoles) {
+      for (const [userId, birthdayRole] of Object.entries(guildData.birthdayRoles)) {
+        allRoles.push({ userId, guildId, ...birthdayRole });
+      }
+    }
+  }
+
+  return allRoles;
+}
+
 // Safety check helpers
 function canModerate(guild, moderator, target) {
   // Can't moderate yourself
@@ -639,5 +653,6 @@ module.exports = {
   removeBirthdayRole,
   getExpiredBirthdayRoles,
   getAllExpiredBirthdayRoles,
+  getAllBirthdayRoles,
   canModerate,
 };

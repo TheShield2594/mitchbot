@@ -2,7 +2,7 @@ const { Events } = require('discord.js');
 const schedule = require('node-schedule');
 const { getBirthdays } = require('../utils/birthdays');
 const { initReminders, schedulePendingReminders } = require('../utils/reminders');
-const { initModeration, getAllTempbans, removeTempban, addLog, getGuildConfig, addBirthdayRole, removeBirthdayRole, getAllExpiredBirthdayRoles } = require('../utils/moderation');
+const { initModeration, getAllTempbans, removeTempban, addLog, getGuildConfig, addBirthdayRole, removeBirthdayRole, getAllBirthdayRoles } = require('../utils/moderation');
 const { initEconomy } = require('../utils/economy');
 const { initQuests } = require('../utils/quests');
 const { initTrivia } = require('../utils/trivia');
@@ -156,17 +156,23 @@ async function checkBirthdays(client) {
 }
 
 async function checkExpiredBirthdayRoles(client) {
-  // Get expired birthday roles from persistent storage
-  const expiredRoles = getAllExpiredBirthdayRoles();
+  const now = Date.now();
+  const expiredEntries = [];
 
-  for (const entry of expiredRoles) {
+  // Check in-memory cache for expired roles
+  for (const [key, entry] of activeBirthdayRoles.entries()) {
+    if (entry.expiresAt <= now) {
+      expiredEntries.push({ key, ...entry });
+    }
+  }
+
+  for (const entry of expiredEntries) {
     try {
       const guild = await client.guilds.fetch(entry.guildId);
       if (!guild) {
         // Guild not found, clean up
         removeBirthdayRole(entry.guildId, entry.userId);
-        const key = `${entry.guildId}-${entry.userId}`;
-        activeBirthdayRoles.delete(key);
+        activeBirthdayRoles.delete(entry.key);
         continue;
       }
 
@@ -174,8 +180,7 @@ async function checkExpiredBirthdayRoles(client) {
       if (!member) {
         // Member not found, clean up
         removeBirthdayRole(entry.guildId, entry.userId);
-        const key = `${entry.guildId}-${entry.userId}`;
-        activeBirthdayRoles.delete(key);
+        activeBirthdayRoles.delete(entry.key);
         continue;
       }
 
@@ -191,8 +196,7 @@ async function checkExpiredBirthdayRoles(client) {
 
       // Clean up from both persistent storage and memory
       removeBirthdayRole(entry.guildId, entry.userId);
-      const key = `${entry.guildId}-${entry.userId}`;
-      activeBirthdayRoles.delete(key);
+      activeBirthdayRoles.delete(entry.key);
     } catch (error) {
       logger.error('Failed to remove expired birthday role', {
         error,
@@ -202,8 +206,7 @@ async function checkExpiredBirthdayRoles(client) {
       });
       // Remove from tracking even if removal failed
       removeBirthdayRole(entry.guildId, entry.userId);
-      const key = `${entry.guildId}-${entry.userId}`;
-      activeBirthdayRoles.delete(key);
+      activeBirthdayRoles.delete(entry.key);
     }
   }
 }
@@ -305,6 +308,19 @@ module.exports = {
     try {
       await initModeration();
       logger.info('Moderation system initialized');
+
+      // Load all birthday roles into in-memory cache from persistent storage
+      const allBirthdayRoles = getAllBirthdayRoles();
+      for (const role of allBirthdayRoles) {
+        const key = `${role.guildId}-${role.userId}`;
+        activeBirthdayRoles.set(key, {
+          guildId: role.guildId,
+          userId: role.userId,
+          roleId: role.roleId,
+          expiresAt: role.expiresAt
+        });
+      }
+      logger.info('Birthday roles cache initialized', { count: activeBirthdayRoles.size });
     } catch (error) {
       logger.error('Failed to initialize moderation', { error });
     }

@@ -1122,7 +1122,7 @@ async function saveBirthdayConfig() {
     const roleSelect = document.getElementById('birthday-role');
     const messageTextarea = document.getElementById('birthday-message');
 
-    const config = {
+    const birthdayConfig = {
       enabled: enabledCheckbox.checked,
       channelId: channelSelect.value || null,
       roleId: roleSelect.value || null,
@@ -1134,7 +1134,7 @@ async function saveBirthdayConfig() {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(config),
+      body: JSON.stringify(birthdayConfig),
     });
 
     if (!response.ok) {
