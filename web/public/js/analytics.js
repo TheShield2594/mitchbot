@@ -676,7 +676,7 @@ function updateTopUsersLeaderboard(topUsers) {
           <div class="leaderboard-name">${escapedDisplayName}</div>
           <div class="leaderboard-detail">Last active: ${lastActive}</div>
         </div>
-        <div class="leaderboard-value">${user.commandCount}</div>
+        <div class="leaderboard-value">${(user.commandCount ?? 0).toLocaleString()}</div>
       </div>
     `;
   }).join('');
@@ -710,7 +710,7 @@ function updateTopViolatorsLeaderboard(topViolators) {
           <div class="leaderboard-name">${escapedDisplayName}</div>
           <div class="leaderboard-detail">AutoMod violations</div>
         </div>
-        <div class="leaderboard-value">${violator.count}</div>
+        <div class="leaderboard-value">${(violator.count ?? 0).toLocaleString()}</div>
       </div>
     `;
   }).join('');
