@@ -1839,3 +1839,104 @@ a:hover {
   gap: var(--space-2);
   white-space: nowrap;
 }
+
+/* ============================================ */
+/* XP LEADERBOARD */
+/* ============================================ */
+
+.leaderboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+}
+
+.leaderboard-item:hover {
+  background: var(--surface-3);
+  transform: translateX(4px);
+}
+
+.leaderboard-item__rank {
+  font-size: 1.25rem;
+  font-weight: 700;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.leaderboard-item__name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.leaderboard-item__stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: 0.875rem;
+}
+
+.leaderboard-item__level {
+  font-weight: 600;
+  color: var(--primary);
+  padding: var(--space-1) var(--space-3);
+  background: var(--primary-alpha);
+  border-radius: var(--radius-md);
+}
+
+.leaderboard-item__xp {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================ */
+/* ROLE ITEMS (for level rewards) */
+/* ============================================ */
+
+.role-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.role-item:hover {
+  background: var(--surface-3);
+  border-color: var(--primary-alpha);
+}
+
+.role-item__content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.role-item__label {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 80px;
+}
+
+.role-item__arrow {
+  color: var(--text-tertiary);
+  font-size: 1.25rem;
+}
+
+.role-item__role {
+  color: var(--text-secondary);
+  font-weight: 500;
+}

@@ -526,6 +526,10 @@ async function loadGuildInfo() {
     config.roles = info.roles;
     config.channels = info.channels;
 
+    // Store for XP system
+    guildRoles = info.roles;
+    guildChannels = info.channels;
+
     // Set guild name
     document.getElementById('guild-name').textContent = info.name;
 
@@ -571,6 +575,21 @@ async function loadGuildInfo() {
 
     // Load economy config
     loadEconomyConfig();
+
+    // Populate level role dropdown
+    const levelRoleSelect = document.getElementById('level-role-role');
+    if (levelRoleSelect) {
+      levelRoleSelect.innerHTML = '<option value="">Select a role...</option>';
+      info.roles.filter(r => r.id !== info.id).forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        levelRoleSelect.appendChild(option);
+      });
+    }
+
+    // Load XP config
+    loadXPConfig();
 
     // Initialize health monitor
     healthMonitor = new FeatureHealthMonitor(config);
@@ -1192,6 +1211,260 @@ async function saveEconomySettings() {
   } catch (error) {
     console.error('Error saving economy settings:', error);
     showToast('Save Failed', error.message || 'Could not save economy settings', 'error');
+  }
+}
+
+// ============================================
+// XP SYSTEM
+// ============================================
+
+let xpConfig = null;
+let guildRoles = [];
+let guildChannels = [];
+
+async function loadXPConfig() {
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/config`);
+    if (!response.ok) throw new Error('Failed to load XP config');
+
+    xpConfig = await response.json();
+
+    // Populate form fields
+    document.getElementById('xp-enabled').checked = xpConfig.enabled || false;
+    document.getElementById('xp-min').value = xpConfig.minXpPerMessage || 10;
+    document.getElementById('xp-max').value = xpConfig.maxXpPerMessage || 20;
+    document.getElementById('xp-cooldown').value = xpConfig.cooldown || 60;
+    document.getElementById('xp-announce-levelup').checked = xpConfig.announceLevelUp || false;
+    document.getElementById('xp-levelup-message').value = xpConfig.levelUpMessage || '🎉 {user} just reached **Level {level}**! Keep it up!';
+
+    // Populate level-up channel dropdown
+    const channelSelect = document.getElementById('xp-levelup-channel');
+    channelSelect.innerHTML = '<option value="">Same channel as message</option>';
+    guildChannels.filter(c => c.type === 0).forEach(channel => {
+      const option = document.createElement('option');
+      option.value = channel.id;
+      option.textContent = `# ${channel.name}`;
+      if (xpConfig.levelUpChannel === channel.id) {
+        option.selected = true;
+      }
+      channelSelect.appendChild(option);
+    });
+
+    // Update status badge
+    updateXPStatus();
+
+    // Load level roles
+    loadLevelRoles();
+
+    // Load leaderboard
+    loadXPLeaderboard();
+
+  } catch (error) {
+    console.error('Error loading XP config:', error);
+    showToast('Load Failed', 'Could not load XP configuration', 'error');
+  }
+}
+
+function updateXPStatus() {
+  const enabled = document.getElementById('xp-enabled').checked;
+  const badge = document.getElementById('xp-status-badge');
+  const settings = document.getElementById('xp-settings');
+
+  if (enabled) {
+    badge.textContent = 'Active';
+    badge.className = 'badge badge--success';
+    settings.style.display = 'block';
+  } else {
+    badge.textContent = 'Disabled';
+    badge.className = 'badge badge--muted';
+    settings.style.display = 'none';
+  }
+}
+
+async function saveXPSettings() {
+  try {
+    const updates = {
+      enabled: document.getElementById('xp-enabled').checked,
+      minXpPerMessage: parseInt(document.getElementById('xp-min').value) || 10,
+      maxXpPerMessage: parseInt(document.getElementById('xp-max').value) || 20,
+      cooldown: parseInt(document.getElementById('xp-cooldown').value) || 60,
+      announceLevelUp: document.getElementById('xp-announce-levelup').checked,
+      levelUpChannel: document.getElementById('xp-levelup-channel').value || null,
+      levelUpMessage: document.getElementById('xp-levelup-message').value.trim() || '🎉 {user} just reached **Level {level}**! Keep it up!',
+    };
+
+    // Validate inputs
+    if (updates.minXpPerMessage < 1 || updates.minXpPerMessage > 100) {
+      showToast('Invalid Input', 'Min XP must be between 1 and 100', 'error');
+      return;
+    }
+
+    if (updates.maxXpPerMessage < 1 || updates.maxXpPerMessage > 100) {
+      showToast('Invalid Input', 'Max XP must be between 1 and 100', 'error');
+      return;
+    }
+
+    if (updates.minXpPerMessage > updates.maxXpPerMessage) {
+      showToast('Invalid Input', 'Min XP cannot be greater than Max XP', 'error');
+      return;
+    }
+
+    if (updates.cooldown < 0 || updates.cooldown > 3600) {
+      showToast('Invalid Input', 'Cooldown must be between 0 and 3600 seconds', 'error');
+      return;
+    }
+
+    const response = await fetch(`/api/guild/${guildId}/xp/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to save settings');
+    }
+
+    const result = await response.json();
+    xpConfig = result.config;
+
+    showToast('Settings Saved', 'XP configuration updated successfully', 'success');
+  } catch (error) {
+    console.error('Error saving XP settings:', error);
+    showToast('Save Failed', error.message || 'Could not save XP settings', 'error');
+  }
+}
+
+function loadLevelRoles() {
+  const container = document.getElementById('level-roles-list');
+
+  if (!xpConfig || !xpConfig.levelRoles || xpConfig.levelRoles.length === 0) {
+    container.innerHTML = '<div class="form-hint">No level rewards configured yet</div>';
+    return;
+  }
+
+  // Sort by level
+  const sortedRoles = [...xpConfig.levelRoles].sort((a, b) => a.level - b.level);
+
+  container.innerHTML = sortedRoles.map(reward => {
+    const role = guildRoles.find(r => r.id === reward.roleId);
+    const roleName = role ? role.name : 'Unknown Role';
+
+    return `
+      <div class="role-item">
+        <div class="role-item__content">
+          <span class="role-item__label">Level ${reward.level}</span>
+          <span class="role-item__arrow">→</span>
+          <span class="role-item__role">${escapeHtml(roleName)}</span>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="removeLevelRoleReward(${reward.level})">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function addLevelRole() {
+  const level = parseInt(document.getElementById('level-role-level').value);
+  const roleId = document.getElementById('level-role-role').value;
+
+  if (!level || level < 1 || level > 1000) {
+    showToast('Invalid Input', 'Please enter a valid level (1-1000)', 'error');
+    return;
+  }
+
+  if (!roleId) {
+    showToast('Invalid Input', 'Please select a role', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/level-roles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level, roleId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to add level role');
+    }
+
+    // Reload config and list
+    await loadXPConfig();
+
+    // Clear inputs
+    document.getElementById('level-role-level').value = '';
+    document.getElementById('level-role-role').value = '';
+
+    showToast('Reward Added', `Level ${level} role reward added successfully`, 'success');
+  } catch (error) {
+    console.error('Error adding level role:', error);
+    showToast('Add Failed', error.message || 'Could not add level role', 'error');
+  }
+}
+
+async function removeLevelRoleReward(level) {
+  if (!confirm(`Remove level ${level} role reward?`)) return;
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/level-roles/${level}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to remove level role');
+    }
+
+    // Reload config and list
+    await loadXPConfig();
+
+    showToast('Reward Removed', `Level ${level} role reward removed`, 'success');
+  } catch (error) {
+    console.error('Error removing level role:', error);
+    showToast('Remove Failed', error.message || 'Could not remove level role', 'error');
+  }
+}
+
+async function loadXPLeaderboard() {
+  const container = document.getElementById('xp-leaderboard');
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/leaderboard?limit=10`);
+    if (!response.ok) throw new Error('Failed to load leaderboard');
+
+    const leaderboard = await response.json();
+
+    if (leaderboard.length === 0) {
+      container.innerHTML = '<div class="form-hint">No one has earned XP yet. Start chatting!</div>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="leaderboard">
+        ${leaderboard.map((entry, index) => {
+          const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+          return `
+            <div class="leaderboard-item">
+              <span class="leaderboard-item__rank">${medal}</span>
+              <span class="leaderboard-item__name">${escapeHtml(entry.username)}</span>
+              <span class="leaderboard-item__stats">
+                <span class="leaderboard-item__level">Level ${entry.level}</span>
+                <span class="leaderboard-item__xp">${entry.totalXp.toLocaleString()} XP</span>
+              </span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  } catch (error) {
+    console.error('Error loading leaderboard:', error);
+    container.innerHTML = '<div class="form-hint text-error">Failed to load leaderboard</div>';
   }
 }
 
