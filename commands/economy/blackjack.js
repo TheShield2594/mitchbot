@@ -103,18 +103,18 @@ function createGameEmbed(game, config, guildName, gameOver = false) {
     return embed;
 }
 
-module.exports = {
-    data: new SlashCommandBuilder()
-        .setName("blackjack")
-        .setDescription("Play blackjack against the dealer")
-        .addIntegerOption(option =>
-            option
-                .setName("amount")
-                .setDescription("Amount to bet")
-                .setRequired(true)
-                .setMinValue(1)
-        ),
-    async execute(interaction) {
+const data = new SlashCommandBuilder()
+    .setName("blackjack")
+    .setDescription("Play blackjack against the dealer")
+    .addIntegerOption(option =>
+        option
+            .setName("amount")
+            .setDescription("Amount to bet")
+            .setRequired(true)
+            .setMinValue(1)
+    );
+
+async function execute(interaction) {
         const betAmount = interaction.options.getInteger("amount");
 
         // Validate betAmount
@@ -270,14 +270,25 @@ module.exports = {
                 ephemeral: true,
             });
         }
-    },
-};
+}
 
 // Handle button interactions (this needs to be registered in interactionCreate event)
 async function handleBlackjackButton(interaction) {
     if (!interaction.customId.startsWith("blackjack_")) return false;
 
-    const [, action, gameId] = interaction.customId.split("_");
+    // Parse customId with regex to allow underscores in gameId
+    const match = interaction.customId.match(/^blackjack_(hit|stand)_(.+)$/);
+
+    if (!match) {
+        logger.error("Invalid blackjack customId format", {
+            customId: interaction.customId,
+            userId: interaction.user.id,
+        });
+        return false;
+    }
+
+    const action = match[1];
+    const gameId = match[2];
 
     if (!activeGames.has(gameId)) {
         await interaction.update({
@@ -426,4 +437,9 @@ async function handleBlackjackButton(interaction) {
     return true;
 }
 
-module.exports.handleBlackjackButton = handleBlackjackButton;
+// Consolidated exports
+module.exports = {
+    data,
+    execute,
+    handleBlackjackButton,
+};
