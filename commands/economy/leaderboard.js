@@ -48,16 +48,17 @@ module.exports = {
                 }
 
                 // Build leaderboard text
+                const medals = ['🥇', '🥈', '🥉'];
                 const leaderboardText = xpLeaderboard
                     .map((entry, index) => {
-                        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `**${index + 1}.**`;
+                        const medal = medals[index] ?? `**${index + 1}.**`;
                         return `${medal} <@${entry.userId}> - **Level ${entry.level}** (${entry.totalXp.toLocaleString()} XP)`;
                     })
                     .join('\n');
 
                 const embed = new EmbedBuilder()
                     .setColor(0xffd700)
-                    .setTitle(`${interaction.guild?.name ?? 'Unknown Server'} - XP Leaderboard`)
+                    .setTitle(`${interaction.guild?.name ?? interaction.guildId} - XP Leaderboard`)
                     .setDescription(leaderboardText)
                     .setFooter({ text: `Showing top ${xpLeaderboard.length} users` })
                     .setTimestamp();
