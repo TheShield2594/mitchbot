@@ -12,6 +12,7 @@
   /* Brand Colors - Discord Inspired */
   --brand-primary: #5865F2;
   --brand-primary-hover: #4752C4;
+  --brand-primary-alpha: rgba(88, 101, 242, 0.1);
   --brand-secondary: #EB459E;
   --brand-accent: #00D9FF;
 
@@ -55,6 +56,7 @@
 :root[data-theme="light"] {
   --brand-primary: #5865F2;
   --brand-primary-hover: #4752C4;
+  --brand-primary-alpha: rgba(88, 101, 242, 0.1);
   --brand-secondary: #EB459E;
   --brand-accent: #00D9FF;
 
@@ -1764,4 +1766,179 @@ a:hover {
   .guild-content {
     padding: var(--space-8) var(--space-4);
   }
+}
+
+/* ============================================
+   DIAGNOSTIC INFO & TOAST MESSAGES
+   ============================================ */
+.diagnostic-info {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin: var(--space-6) 0;
+  color: var(--warning-text);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.diagnostic-info strong {
+  color: var(--warning-border);
+  font-weight: var(--font-semibold);
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16);
+  color: var(--text-secondary);
+}
+
+.loading-state p {
+  margin-top: var(--space-4);
+  font-size: var(--text-base);
+}
+
+/* Toast animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.success-toast {
+  animation: slideInRight 0.3s ease-out;
+}
+
+/* Refresh button spacing */
+.dashboard-header__actions {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.dashboard-header__actions .btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+/* ============================================ */
+/* XP LEADERBOARD */
+/* ============================================ */
+
+.leaderboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+}
+
+.leaderboard-item:hover {
+  background: var(--bg-tertiary);
+  transform: translateX(4px);
+}
+
+.leaderboard-item__rank {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.leaderboard-item__name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.leaderboard-item__stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.leaderboard-item__level {
+  font-weight: 600;
+  color: var(--brand-primary);
+  padding: var(--space-1) var(--space-3);
+  background: var(--brand-primary-alpha);
+  border-radius: var(--radius-md);
+}
+
+.leaderboard-item__xp {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================ */
+/* ROLE ITEMS (for level rewards) */
+/* ============================================ */
+
+.role-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.role-item:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--brand-primary-alpha);
+}
+
+.role-item__content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.role-item__label {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 80px;
+}
+
+.role-item__arrow {
+  color: var(--text-tertiary);
+  font-size: var(--text-lg);
+}
+
+.role-item__role {
+  color: var(--text-secondary);
+  font-weight: 500;
 }

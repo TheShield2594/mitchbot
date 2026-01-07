@@ -51,7 +51,8 @@ function validateEnvironment(port, isProduction) {
 
 // Configure session store
 function getSessionStore() {
-  if (process.env.NODE_ENV === 'production' && process.env.REDIS_URL) {
+  // Use Redis if REDIS_URL is available (works in both dev and production)
+  if (process.env.REDIS_URL) {
     try {
       const RedisStore = require('connect-redis').default;
       const { createClient } = require('redis');
@@ -74,7 +75,7 @@ function getSessionStore() {
       });
 
       redisClient.on('connect', () => {
-        logger.info('Redis client connected');
+        logger.info('Redis client connected successfully');
       });
 
       redisClient.connect().catch((err) => {
@@ -82,6 +83,7 @@ function getSessionStore() {
         throw err;
       });
 
+      logger.info('Using Redis session store', { redisUrl: process.env.REDIS_URL.replace(/:[^:@]*@/, ':***@') });
       return new RedisStore({ client: redisClient });
     } catch (error) {
       logger.error('Failed to initialize Redis store', { error });
@@ -89,10 +91,11 @@ function getSessionStore() {
     }
   }
 
-  // Development: use default memory store
-  if (process.env.NODE_ENV !== 'production') {
-    logger.warn('Using in-memory session store (not suitable for production)');
-  }
+  // Fallback: use default memory store
+  logger.warn('Using in-memory session store (not suitable for production)', {
+    environment: process.env.NODE_ENV,
+    redisAvailable: false,
+  });
 
   return undefined; // Use default memory store
 }
@@ -202,9 +205,10 @@ module.exports = function startWebServer(client) {
     callbackURL,
     scope: ['identify', 'guilds'],
   }, async (accessToken, refreshToken, profile, done) => {
-    // Read timeout from env var GUILD_FETCH_TIMEOUT_MS, default to 5000ms (5 seconds)
+    // Read timeout from env var GUILD_FETCH_TIMEOUT_MS, default to 10000ms (10 seconds)
+    // Increased from 5s to 10s to reduce timeout issues during login
     const timeoutValue = parseInt(process.env.GUILD_FETCH_TIMEOUT_MS, 10);
-    const GUILD_FETCH_TIMEOUT = !isNaN(timeoutValue) && timeoutValue > 0 ? timeoutValue : 5000;
+    const GUILD_FETCH_TIMEOUT = !isNaN(timeoutValue) && timeoutValue > 0 ? timeoutValue : 10000;
     const controller = new AbortController();
     let timeoutId = null;
 
@@ -243,6 +247,9 @@ module.exports = function startWebServer(client) {
         });
       }
 
+      // Store access token for guild refresh
+      profile.accessToken = accessToken;
+
       return done(null, profile);
     } catch (error) {
       // Clear timeout if it's still set
@@ -265,6 +272,8 @@ module.exports = function startWebServer(client) {
 
       // Continue with auth even if guild fetch fails
       profile.guilds = [];
+      // Store access token for guild refresh even if guild fetch fails
+      profile.accessToken = accessToken;
       return done(null, profile);
     }
   }));

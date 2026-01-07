@@ -91,6 +91,30 @@ function getDefaultGuildConfig() {
 
     // Tempban tracking
     tempbans: {}, // { userId: { expiresAt: timestamp, caseId: number } }
+
+    // Birthday settings
+    birthday: {
+      enabled: false,
+      channelId: null, // Channel for birthday announcements
+      roleId: null, // Role to assign on birthdays
+      customMessage: 'Happy Birthday, {mention}! 🎉', // Custom birthday message ({mention}, {username}, {user} available)
+    },
+
+    // Birthday role tracking (persisted for restart survival)
+    birthdayRoles: {}, // { userId: { guildId, userId, roleId, expiresAt } }
+
+    // Welcome/Leave messages
+    welcome: {
+      enabled: false,
+      channelId: null,
+      message: 'Welcome to the server, {user}!', // {user} = mention, {username} = name, {server} = server name, {memberCount} = member count
+    },
+
+    leave: {
+      enabled: false,
+      channelId: null,
+      message: '{username} has left the server.',
+    },
   };
 }
 
@@ -202,6 +226,15 @@ async function updateGuildConfig(guildId, updates) {
   }
   if (updates.logging) {
     config.logging = { ...config.logging, ...updates.logging };
+  }
+  if (updates.birthday) {
+    config.birthday = { ...config.birthday, ...updates.birthday };
+  }
+  if (updates.welcome) {
+    config.welcome = { ...config.welcome, ...updates.welcome };
+  }
+  if (updates.leave) {
+    config.leave = { ...config.leave, ...updates.leave };
   }
 
   moderationData[guildId] = config;
@@ -473,6 +506,96 @@ function getAllTempbans() {
   return allExpired;
 }
 
+// Birthday role management
+function addBirthdayRole(guildId, userId, roleId, expiresAt) {
+  const config = getGuildConfig(guildId);
+
+  if (!config.birthdayRoles) {
+    config.birthdayRoles = {};
+  }
+
+  config.birthdayRoles[userId] = {
+    guildId,
+    userId,
+    roleId,
+    expiresAt,
+  };
+
+  // Save in background, don't block
+  saveModerationData().catch(err => {
+    console.error('Failed to save birthday role', { guildId, userId, error: err });
+  });
+}
+
+function removeBirthdayRole(guildId, userId) {
+  const config = getGuildConfig(guildId);
+
+  if (!config.birthdayRoles) {
+    return false;
+  }
+
+  if (config.birthdayRoles[userId]) {
+    delete config.birthdayRoles[userId];
+    // Save in background, don't block
+    saveModerationData().catch(err => {
+      console.error('Failed to save birthday role removal', { guildId, userId, error: err });
+    });
+    return true;
+  }
+
+  return false;
+}
+
+function getExpiredBirthdayRoles(guildId) {
+  const config = getGuildConfig(guildId);
+
+  if (!config.birthdayRoles) {
+    return [];
+  }
+
+  const now = Date.now();
+  const expired = [];
+
+  for (const [userId, birthdayRole] of Object.entries(config.birthdayRoles)) {
+    if (birthdayRole.expiresAt <= now) {
+      expired.push({ userId, ...birthdayRole });
+    }
+  }
+
+  return expired;
+}
+
+function getAllExpiredBirthdayRoles() {
+  const allExpired = [];
+
+  for (const [guildId, guildData] of Object.entries(moderationData)) {
+    if (guildData.birthdayRoles) {
+      const now = Date.now();
+      for (const [userId, birthdayRole] of Object.entries(guildData.birthdayRoles)) {
+        if (birthdayRole.expiresAt <= now) {
+          allExpired.push({ userId, guildId, ...birthdayRole });
+        }
+      }
+    }
+  }
+
+  return allExpired;
+}
+
+function getAllBirthdayRoles() {
+  const allRoles = [];
+
+  for (const [guildId, guildData] of Object.entries(moderationData)) {
+    if (guildData.birthdayRoles) {
+      for (const [userId, birthdayRole] of Object.entries(guildData.birthdayRoles)) {
+        allRoles.push({ userId, guildId, ...birthdayRole });
+      }
+    }
+  }
+
+  return allRoles;
+}
+
 // Safety check helpers
 function canModerate(guild, moderator, target) {
   // Can't moderate yourself
@@ -526,5 +649,10 @@ module.exports = {
   removeTempban,
   getExpiredTempbans,
   getAllTempbans,
+  addBirthdayRole,
+  removeBirthdayRole,
+  getExpiredBirthdayRoles,
+  getAllExpiredBirthdayRoles,
+  getAllBirthdayRoles,
   canModerate,
 };
