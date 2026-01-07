@@ -66,6 +66,22 @@ function getDefaultGuildConfig() {
         action: 'delete',
       },
 
+      // Attachment spam
+      attachmentSpam: {
+        enabled: false,
+        threshold: 5, // Number of attachments
+        timeWindow: 10000, // Time window in ms (10 seconds)
+        action: 'warn',
+        warnThreshold: 2,
+      },
+
+      // Emoji spam
+      emojiSpam: {
+        enabled: false,
+        threshold: 10, // Max emojis per message
+        action: 'delete',
+      },
+
       // Whitelisted roles (immune to automod)
       whitelistedRoles: [],
 
@@ -91,6 +107,47 @@ function getDefaultGuildConfig() {
 
     // Tempban tracking
     tempbans: {}, // { userId: { expiresAt: timestamp, caseId: number } }
+
+    // Mute role
+    muteRole: null, // Role ID for permanent mutes
+
+    // Anti-raid settings
+    antiRaid: {
+      // Account age filter
+      accountAge: {
+        enabled: false,
+        minAgeDays: 7, // Minimum account age in days
+        action: 'kick', // 'kick' or 'ban'
+      },
+
+      // Join spam detection
+      joinSpam: {
+        enabled: false,
+        threshold: 5, // Number of joins
+        timeWindow: 10000, // Time window in ms (10 seconds)
+        action: 'kick', // 'kick' or 'ban' for detected raid accounts
+      },
+
+      // Emergency lockdown
+      lockdown: {
+        active: false,
+        lockedChannels: [], // Array of channel IDs that were locked
+      },
+
+      // Verification system
+      verification: {
+        enabled: false,
+        roleId: null, // Role to give after verification
+        channelId: null, // Channel where users verify
+        message: 'Welcome! Please verify by reacting to this message.', // Verification message
+      },
+    },
+
+    // Anti-dehoist (auto-rename users with hoisting characters)
+    antiDehoist: {
+      enabled: false,
+      prefix: 'Dehoisted', // Prefix to add to dehoisted names
+    },
 
     // Birthday settings
     birthday: {
@@ -197,6 +254,47 @@ async function initModeration() {
 }
 
 // Get or create guild config
+// Deep merge utility - recursively merges nested objects
+function deepMerge(target, source) {
+  // Handle null/undefined
+  if (source === null || source === undefined) {
+    return target;
+  }
+
+  // If source is not a plain object, replace target
+  if (typeof source !== 'object' || Array.isArray(source)) {
+    return source;
+  }
+
+  // Create result starting with target
+  const result = { ...target };
+
+  // Merge each property from source
+  for (const key in source) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      const sourceValue = source[key];
+      const targetValue = result[key];
+
+      // If both are plain objects, recursively merge
+      if (
+        typeof sourceValue === 'object' &&
+        !Array.isArray(sourceValue) &&
+        sourceValue !== null &&
+        typeof targetValue === 'object' &&
+        !Array.isArray(targetValue) &&
+        targetValue !== null
+      ) {
+        result[key] = deepMerge(targetValue, sourceValue);
+      } else {
+        // Otherwise, replace with source value
+        result[key] = sourceValue;
+      }
+    }
+  }
+
+  return result;
+}
+
 function getGuildConfig(guildId) {
   if (!moderationData[guildId]) {
     moderationData[guildId] = getDefaultGuildConfig();
@@ -220,27 +318,13 @@ function getGuildConfig(guildId) {
 async function updateGuildConfig(guildId, updates) {
   const config = getGuildConfig(guildId);
 
-  // Deep merge updates
-  if (updates.automod) {
-    config.automod = { ...config.automod, ...updates.automod };
-  }
-  if (updates.logging) {
-    config.logging = { ...config.logging, ...updates.logging };
-  }
-  if (updates.birthday) {
-    config.birthday = { ...config.birthday, ...updates.birthday };
-  }
-  if (updates.welcome) {
-    config.welcome = { ...config.welcome, ...updates.welcome };
-  }
-  if (updates.leave) {
-    config.leave = { ...config.leave, ...updates.leave };
-  }
+  // Use deep merge to properly handle nested config updates
+  const updatedConfig = deepMerge(config, updates);
 
-  moderationData[guildId] = config;
+  moderationData[guildId] = updatedConfig;
   await saveModerationData();
 
-  return config;
+  return updatedConfig;
 }
 
 // Warning system
@@ -404,6 +488,41 @@ function getUserRecentMessages(guildId, userId) {
   return userMessageTracking.get(key) || [];
 }
 
+// Attachment spam tracking (in-memory, doesn't persist)
+const userAttachmentTracking = new Map();
+
+function trackUserAttachment(guildId, userId, attachmentCount) {
+  const key = `${guildId}-${userId}`;
+
+  if (!userAttachmentTracking.has(key)) {
+    userAttachmentTracking.set(key, []);
+  }
+
+  const attachments = userAttachmentTracking.get(key);
+  attachments.push({
+    count: attachmentCount,
+    timestamp: Date.now(),
+  });
+
+  // Keep only attachments from last 60 seconds
+  const cutoff = Date.now() - 60000;
+  const filtered = attachments.filter(att => att.timestamp > cutoff);
+  userAttachmentTracking.set(key, filtered);
+
+  return filtered;
+}
+
+function getUserRecentAttachments(guildId, userId, timeWindow = 10000) {
+  const key = `${guildId}-${userId}`;
+  if (!userAttachmentTracking.has(key)) {
+    return [];
+  }
+
+  const attachments = userAttachmentTracking.get(key);
+  const cutoff = Date.now() - timeWindow;
+  return attachments.filter(att => att.timestamp > cutoff);
+}
+
 // Check if user/channel is whitelisted
 function isWhitelisted(guildId, member, channelId) {
   const config = getGuildConfig(guildId);
@@ -506,6 +625,83 @@ function getAllTempbans() {
   return allExpired;
 }
 
+// Join spam tracking (in-memory, doesn't persist)
+const guildJoinTracking = new Map();
+
+function trackMemberJoin(guildId, userId) {
+  if (!guildJoinTracking.has(guildId)) {
+    guildJoinTracking.set(guildId, []);
+  }
+
+  const joins = guildJoinTracking.get(guildId);
+  joins.push({
+    userId,
+    timestamp: Date.now(),
+  });
+
+  // Keep only joins from last 60 seconds
+  const cutoff = Date.now() - 60000;
+  const filtered = joins.filter(join => join.timestamp > cutoff);
+  guildJoinTracking.set(guildId, filtered);
+
+  return filtered;
+}
+
+function getRecentJoins(guildId, timeWindow = 10000) {
+  if (!guildJoinTracking.has(guildId)) {
+    return [];
+  }
+
+  const joins = guildJoinTracking.get(guildId);
+  const cutoff = Date.now() - timeWindow;
+  return joins.filter(join => join.timestamp > cutoff);
+}
+
+// Verification message tracking (in-memory, doesn't persist)
+const verificationMessageTracking = new Map();
+
+function trackVerificationMessage(guildId, userId, messageId) {
+  const key = `${guildId}-${userId}`;
+  verificationMessageTracking.set(key, {
+    messageId,
+    timestamp: Date.now(),
+  });
+}
+
+function getVerificationMessage(guildId, userId) {
+  const key = `${guildId}-${userId}`;
+  return verificationMessageTracking.get(key);
+}
+
+function clearVerificationMessage(guildId, userId) {
+  const key = `${guildId}-${userId}`;
+  verificationMessageTracking.delete(key);
+}
+
+// Anti-dehoist utilities
+const HOIST_CHARS = /^[^a-zA-Z0-9]/;
+
+function shouldDehoist(displayName) {
+  return HOIST_CHARS.test(displayName);
+}
+
+function generateDehoistedName(originalName, prefix = 'Dehoisted') {
+  // Remove leading special characters
+  const cleaned = originalName.replace(/^[^a-zA-Z0-9]+/, '');
+
+  // If nothing left after cleaning, use the prefix
+  if (!cleaned) {
+    return prefix;
+  }
+
+  // If the cleaned name is too short, add prefix
+  if (cleaned.length < 2) {
+    return `${prefix} ${cleaned}`;
+  }
+
+  return cleaned;
+}
+
 // Birthday role management
 function addBirthdayRole(guildId, userId, roleId, expiresAt) {
   const config = getGuildConfig(guildId);
@@ -596,6 +792,24 @@ function getAllBirthdayRoles() {
   return allRoles;
 }
 
+// Anti-raid config defaults helper
+function ensureAntiRaidConfigDefaults(config) {
+  if (!config.antiRaid) {
+    config.antiRaid = {
+      accountAge: { enabled: false },
+      joinSpam: { enabled: false },
+      lockdown: { active: false, lockedChannels: [] },
+      verification: { enabled: false },
+    };
+  }
+
+  if (!config.antiRaid.lockdown) {
+    config.antiRaid.lockdown = { active: false, lockedChannels: [] };
+  }
+
+  return config;
+}
+
 // Safety check helpers
 function canModerate(guild, moderator, target) {
   // Can't moderate yourself
@@ -643,16 +857,26 @@ module.exports = {
   getCasesByUser,
   trackUserMessage,
   getUserRecentMessages,
+  trackUserAttachment,
+  getUserRecentAttachments,
   isWhitelisted,
   getDefaultGuildConfig,
   addTempban,
   removeTempban,
   getExpiredTempbans,
   getAllTempbans,
+  trackMemberJoin,
+  getRecentJoins,
+  trackVerificationMessage,
+  getVerificationMessage,
+  clearVerificationMessage,
+  shouldDehoist,
+  generateDehoistedName,
   addBirthdayRole,
   removeBirthdayRole,
   getExpiredBirthdayRoles,
   getAllExpiredBirthdayRoles,
   getAllBirthdayRoles,
+  ensureAntiRaidConfigDefaults,
   canModerate,
 };

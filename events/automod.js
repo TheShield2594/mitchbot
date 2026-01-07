@@ -4,6 +4,8 @@ const {
   isWhitelisted,
   trackUserMessage,
   getUserRecentMessages,
+  trackUserAttachment,
+  getUserRecentAttachments,
   addWarning,
   getWarnings,
   addLog,
@@ -28,6 +30,11 @@ module.exports = {
 
     // Track message for spam detection
     trackUserMessage(message.guildId, message.author.id, message.id, message.content);
+
+    // Track attachments if present
+    if (message.attachments.size > 0) {
+      trackUserAttachment(message.guildId, message.author.id, message.attachments.size);
+    }
 
     let violated = false;
     let violationType = '';
@@ -158,7 +165,36 @@ module.exports = {
       }
     }
 
-    // 6. Message Spam
+    // 6. Attachment Spam
+    if (!violated && config.automod.attachmentSpam && config.automod.attachmentSpam.enabled) {
+      const threshold = config.automod.attachmentSpam.threshold || 5;
+      const timeWindow = config.automod.attachmentSpam.timeWindow || 10000;
+      const recentAttachments = getUserRecentAttachments(message.guildId, message.author.id, timeWindow);
+
+      const totalAttachments = recentAttachments.reduce((sum, att) => sum + att.count, 0);
+
+      if (totalAttachments > threshold) {
+        violated = true;
+        violationType = 'Attachment Spam';
+        action = config.automod.attachmentSpam.action;
+      }
+    }
+
+    // 7. Emoji Spam
+    if (!violated && config.automod.emojiSpam && config.automod.emojiSpam.enabled) {
+      // Match both Unicode emojis and Discord custom emojis
+      const emojiRegex = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|<a?:\w+:\d+>)/gu;
+      const emojis = message.content.match(emojiRegex);
+      const emojiCount = emojis ? emojis.length : 0;
+
+      if (emojiCount > config.automod.emojiSpam.threshold) {
+        violated = true;
+        violationType = 'Emoji Spam';
+        action = config.automod.emojiSpam.action;
+      }
+    }
+
+    // 8. Message Spam
     if (!violated && config.automod.spam.enabled) {
       const recentMessages = getUserRecentMessages(message.guildId, message.author.id);
       const timeWindow = config.automod.spam.timeWindow;
@@ -262,6 +298,8 @@ module.exports = {
             warnThreshold = config.automod.linkFilter.warnThreshold;
           } else if (violationType.includes('Mention')) {
             warnThreshold = config.automod.mentionSpam.warnThreshold;
+          } else if (violationType.includes('Attachment')) {
+            warnThreshold = config.automod.attachmentSpam?.warnThreshold || 2;
           }
 
           // Escalate if threshold reached
