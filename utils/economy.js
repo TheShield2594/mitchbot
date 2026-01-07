@@ -33,6 +33,12 @@ function getDefaultEconomyConfig() {
     crimeFailChance: 0.4, // 40% chance to fail and lose money
     crimePenaltyMin: 50,
     crimePenaltyMax: 150,
+    robSuccessChance: 0.5, // 50% base success rate
+    robCooldownMinutes: 180, // 3 hours
+    robPercentageMin: 5, // Minimum % of target's balance to steal
+    robPercentageMax: 15, // Maximum % of target's balance to steal
+    robMinimumBalance: 100, // Target must have at least this much to be robbed
+    robPenaltyPercentage: 10, // % of your balance lost on failed rob
     startingBalance: 100,
   };
 }
@@ -45,6 +51,7 @@ function getDefaultGuildEconomy() {
     work: {},
     beg: {},
     crime: {},
+    rob: {}, // { userId: { lastRobAt: ISO string, totalRobs: number, successfulRobs: number, failedRobs: number, targets: { targetId: ISO string } } }
     transactions: [],
     shop: [],
     inventory: {},
@@ -435,6 +442,136 @@ function claimCrime(guildId, userId, now = new Date()) {
   }
 }
 
+function attemptRob(guildId, userId, targetId, now = new Date()) {
+  const nowMs = now.getTime();
+  const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+  const robData = guildData.rob[userId] || { targets: {} };
+
+  // Can't rob yourself
+  if (userId === targetId) {
+    return { ok: false, error: "cant_rob_self" };
+  }
+
+  // Check global cooldown
+  const cooldownMs = (config.robCooldownMinutes || 180) * 60 * 1000;
+  if (robData.lastRobAt) {
+    const lastRobMs = new Date(robData.lastRobAt).getTime();
+    const elapsed = nowMs - lastRobMs;
+
+    if (elapsed < cooldownMs) {
+      const remainingMs = cooldownMs - elapsed;
+      return {
+        ok: false,
+        error: "cooldown",
+        remainingMs,
+        nextRobAt: new Date(nowMs + remainingMs).toISOString(),
+      };
+    }
+  }
+
+  // Check target-specific cooldown (can't rob same person within 24 hours)
+  const targetCooldownMs = 24 * 60 * 60 * 1000;
+  if (robData.targets && robData.targets[targetId]) {
+    const lastTargetRobMs = new Date(robData.targets[targetId]).getTime();
+    const targetElapsed = nowMs - lastTargetRobMs;
+
+    if (targetElapsed < targetCooldownMs) {
+      return {
+        ok: false,
+        error: "target_cooldown",
+        targetId,
+      };
+    }
+  }
+
+  const userBalance = getBalance(guildId, userId);
+  const targetBalance = getBalance(guildId, targetId);
+
+  // Check if target has minimum balance
+  const minimumBalance = config.robMinimumBalance || 100;
+  if (targetBalance < minimumBalance) {
+    return {
+      ok: false,
+      error: "target_too_poor",
+      minimumBalance,
+    };
+  }
+
+  // Check if user has enough balance to pay penalty on failure
+  const penaltyPercentage = config.robPenaltyPercentage || 10;
+  const potentialPenalty = Math.floor(userBalance * (penaltyPercentage / 100));
+  if (userBalance < 50) {
+    return {
+      ok: false,
+      error: "insufficient_funds",
+    };
+  }
+
+  // Update rob data
+  robData.lastRobAt = new Date(nowMs).toISOString();
+  robData.totalRobs = (robData.totalRobs || 0) + 1;
+  if (!robData.targets) robData.targets = {};
+  robData.targets[targetId] = new Date(nowMs).toISOString();
+  guildData.rob[userId] = robData;
+
+  // Calculate success chance
+  const baseChance = config.robSuccessChance || 0.5;
+  const success = Math.random() < baseChance;
+
+  if (success) {
+    // Rob succeeded - steal percentage of target's balance
+    const percentageMin = config.robPercentageMin || 5;
+    const percentageMax = config.robPercentageMax || 15;
+    const percentage = Math.random() * (percentageMax - percentageMin) + percentageMin;
+    const stolenAmount = Math.floor(targetBalance * (percentage / 100));
+
+    robData.successfulRobs = (robData.successfulRobs || 0) + 1;
+
+    // Transfer money from target to robber
+    addBalance(guildId, targetId, -stolenAmount, {
+      type: "robbed",
+      reason: `Robbed by user ${userId}`,
+      robberId: userId,
+    });
+
+    addBalance(guildId, userId, stolenAmount, {
+      type: "rob_success",
+      reason: `Robbed user ${targetId}`,
+      victimId: targetId,
+      stolen: stolenAmount,
+    });
+
+    return {
+      ok: true,
+      success: true,
+      stolenAmount,
+      balance: getBalance(guildId, userId),
+      targetBalance: getBalance(guildId, targetId),
+      nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  } else {
+    // Rob failed - lose money as penalty
+    const penalty = potentialPenalty;
+    robData.failedRobs = (robData.failedRobs || 0) + 1;
+
+    addBalance(guildId, userId, -penalty, {
+      type: "rob_failure",
+      reason: `Failed rob attempt on user ${targetId}`,
+      targetId,
+      penalty,
+    });
+
+    return {
+      ok: true,
+      success: false,
+      penalty,
+      balance: getBalance(guildId, userId),
+      nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  }
+}
+
 // Shop item management
 function addShopItem(guildId, itemData) {
   const guildData = getGuildEconomy(guildId);
@@ -632,6 +769,7 @@ module.exports = {
   claimWork,
   claimBeg,
   claimCrime,
+  attemptRob,
   formatCoins,
   getBalance,
   setBalance,
