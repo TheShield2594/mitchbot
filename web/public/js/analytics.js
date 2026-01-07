@@ -664,7 +664,7 @@ function updateTopUsersLeaderboard(topUsers) {
     const escapedUsername = escapeHtml(user.username || 'Unknown User');
     const safeAvatar = sanitizeUrl(user.avatar);
     const lastActive = user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'Never';
-    const firstLetter = escapedUsername.charAt(0).toUpperCase();
+    const firstLetter = (escapedUsername || '?').charAt(0).toUpperCase();
 
     return `
       <div class="leaderboard-item">
