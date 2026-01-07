@@ -3,7 +3,14 @@ const router = express.Router();
 const { ensureServerManager } = require('../middleware/auth');
 const { getGuildConfig, updateGuildConfig, getLogs, getWarnings, clearWarnings } = require('../../utils/moderation');
 const { getBirthdays, addBirthday, removeBirthday } = require('../../utils/birthdays');
-const { getEconomyConfig, updateEconomyConfig } = require('../../utils/economy');
+const {
+  getEconomyConfig,
+  updateEconomyConfig,
+  getShopItems,
+  addShopItem,
+  updateShopItem,
+  deleteShopItem,
+} = require('../../utils/economy');
 const {
   getGuildConfig: getXPGuildConfig,
   updateGuildConfig: updateXPGuildConfig,
@@ -628,13 +635,6 @@ router.delete('/guild/:guildId/xp/reset', ensureServerManager, async (req, res) 
 // ECONOMY SHOP ROUTES
 // ============================================
 
-const {
-  getShopItems,
-  addShopItem,
-  updateShopItem,
-  deleteShopItem,
-} = require('../../utils/economy');
-
 // Get all shop items
 router.get('/guild/:guildId/economy/shop', ensureServerManager, async (req, res) => {
   try {
@@ -653,6 +653,14 @@ router.post('/guild/:guildId/economy/shop', ensureServerManager, async (req, res
 
     if (!name || price === undefined) {
       return res.status(400).json({ error: 'name and price are required' });
+    }
+
+    if (name.length > 100) {
+      return res.status(400).json({ error: 'name must be 100 characters or less' });
+    }
+
+    if (description && description.length > 500) {
+      return res.status(400).json({ error: 'description must be 500 characters or less' });
     }
 
     const priceNum = Number(price);
@@ -691,8 +699,19 @@ router.put('/guild/:guildId/economy/shop/:itemId', ensureServerManager, async (r
     const { name, description, price, type, roleId, stock } = req.body;
     const updates = {};
 
-    if (name !== undefined) updates.name = name.trim();
-    if (description !== undefined) updates.description = description.trim();
+    if (name !== undefined) {
+      if (name.length > 100) {
+        return res.status(400).json({ error: 'name must be 100 characters or less' });
+      }
+      updates.name = name.trim();
+    }
+
+    if (description !== undefined) {
+      if (description.length > 500) {
+        return res.status(400).json({ error: 'description must be 500 characters or less' });
+      }
+      updates.description = description.trim();
+    }
     if (price !== undefined) {
       const priceNum = Number(price);
       if (isNaN(priceNum) || priceNum < 0) {

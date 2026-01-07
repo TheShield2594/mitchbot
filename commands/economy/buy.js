@@ -101,10 +101,43 @@ module.exports = {
         // If it's a role item, try to assign the role
         if (result.item.type === "role" && result.item.roleId) {
             try {
+                // Check if bot has permission to manage roles
+                const botMember = await interaction.guild.members.fetchMe();
+                if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
+                    embed.addFields({
+                        name: "Role Assignment Failed",
+                        value: "The item was purchased but I don't have permission to manage roles. Please contact an administrator.",
+                        inline: false,
+                    });
+                    await interaction.reply({ embeds: [embed] });
+                    return;
+                }
+
                 const member = await interaction.guild.members.fetch(interaction.user.id);
                 const role = await interaction.guild.roles.fetch(result.item.roleId);
 
-                if (role && member) {
+                if (!role) {
+                    embed.addFields({
+                        name: "Role Assignment Failed",
+                        value: "The item was purchased but the role no longer exists. Please contact an administrator.",
+                        inline: false,
+                    });
+                    await interaction.reply({ embeds: [embed] });
+                    return;
+                }
+
+                // Check role hierarchy
+                if (botMember.roles.highest.position <= role.position) {
+                    embed.addFields({
+                        name: "Role Assignment Failed",
+                        value: "The item was purchased but the role is too high in the hierarchy for me to assign. Please contact an administrator.",
+                        inline: false,
+                    });
+                    await interaction.reply({ embeds: [embed] });
+                    return;
+                }
+
+                if (member) {
                     await member.roles.add(role);
                     embed.addFields({
                         name: "Role Assigned",

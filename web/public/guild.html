@@ -1112,6 +1112,40 @@
         </div>
       </div>
 
+      <!-- Edit Shop Item Modal -->
+      <div id="edit-shop-item-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 class="modal-title">Edit Shop Item</h3>
+            <button class="modal-close" onclick="closeEditShopItemModal()">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <input type="hidden" id="edit-shop-item-id">
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-shop-item-price">Price</label>
+                <input type="number" class="form-input" id="edit-shop-item-price" min="0" placeholder="100" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="edit-shop-item-stock">
+                  Stock
+                  <span class="form-hint">-1 for unlimited</span>
+                </label>
+                <input type="number" class="form-input" id="edit-shop-item-stock" min="-1" placeholder="-1">
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeEditShopItemModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="updateShopItem()">Update Item</button>
+          </div>
+        </div>
+      </div>
+
       <!-- XP & Levels Section -->
       <section id="section-xp" class="guild-section">
         <div class="card">

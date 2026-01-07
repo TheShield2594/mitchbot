@@ -1859,6 +1859,11 @@ async function saveShopItem() {
       return;
     }
 
+    if (isNaN(stock) || (stock !== -1 && stock < 0)) {
+      showToast('Invalid Input', 'Stock must be -1 (unlimited) or a non-negative number', 'error');
+      return;
+    }
+
     if (type === 'role' && !roleId) {
       showToast('Invalid Input', 'Please select a role', 'error');
       return;
@@ -1884,34 +1889,60 @@ async function saveShopItem() {
   }
 }
 
-async function editShopItem(itemId) {
+function editShopItem(itemId) {
   const item = shopItems.find(i => i.id === itemId);
   if (!item) return;
 
-  // For simplicity, we'll prompt for new values. In a real app, you'd use a modal like add
-  const newPrice = prompt(`Edit price for "${item.name}":`, item.price);
-  if (newPrice === null) return;
+  // Populate the edit modal with current values
+  document.getElementById('edit-shop-item-id').value = itemId;
+  document.getElementById('edit-shop-item-price').value = item.price;
+  document.getElementById('edit-shop-item-stock').value = item.stock;
 
-  const newStock = prompt(`Edit stock for "${item.name}" (-1 for unlimited):`, item.stock);
-  if (newStock === null) return;
+  // Show the modal
+  document.getElementById('edit-shop-item-modal').style.display = 'flex';
+}
 
+function closeEditShopItemModal() {
+  document.getElementById('edit-shop-item-modal').style.display = 'none';
+  // Clear the form
+  document.getElementById('edit-shop-item-id').value = '';
+  document.getElementById('edit-shop-item-price').value = '';
+  document.getElementById('edit-shop-item-stock').value = '';
+}
+
+async function updateShopItem() {
   try {
+    const itemId = document.getElementById('edit-shop-item-id').value;
+    const price = parseInt(document.getElementById('edit-shop-item-price').value);
+    const stock = parseInt(document.getElementById('edit-shop-item-stock').value);
+
+    if (isNaN(price)) {
+      showToast('Invalid Input', 'Price is required', 'error');
+      return;
+    }
+
+    if (isNaN(stock) || (stock !== -1 && stock < 0)) {
+      showToast('Invalid Input', 'Stock must be -1 (unlimited) or a non-negative number', 'error');
+      return;
+    }
+
     const response = await fetch(`/api/guild/${guildId}/economy/shop/${itemId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        price: parseInt(newPrice),
-        stock: parseInt(newStock),
-      }),
+      body: JSON.stringify({ price, stock }),
     });
 
-    if (!response.ok) throw new Error('Failed to update shop item');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update shop item');
+    }
 
-    showToast('Success', 'Shop item updated!', 'success');
+    showToast('Success', 'Shop item updated successfully!', 'success');
+    closeEditShopItemModal();
     loadShopItems();
   } catch (error) {
     console.error('Error updating shop item:', error);
-    showToast('Error', 'Failed to update shop item', 'error');
+    showToast('Error', error.message || 'Failed to update shop item', 'error');
   }
 }
 

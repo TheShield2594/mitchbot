@@ -59,7 +59,6 @@ module.exports = {
                     count: 0,
                     description: item.description,
                     type: item.type,
-                    firstPurchased: item.purchasedAt,
                 };
             }
             itemCounts[item.name].count++;

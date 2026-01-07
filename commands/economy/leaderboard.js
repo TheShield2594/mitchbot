@@ -6,6 +6,7 @@ const {
     getEconomyConfig,
     initEconomy,
 } = require("../../utils/economy");
+const { getLeaderboard: getXPLeaderboard, initXP } = require("../../utils/xp");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -33,13 +34,46 @@ module.exports = {
 
         const type = interaction.options.getString("type") || "economy";
 
-        // If XP leaderboard is requested, defer to existing XP leaderboard logic
+        // If XP leaderboard is requested, use XP leaderboard logic
         if (type === "xp") {
-            await interaction.reply({
-                content: "Please use the `/levels leaderboard` command for XP rankings.",
-                ephemeral: true,
-            });
-            return;
+            try {
+                await initXP();
+
+                const xpLeaderboard = getXPLeaderboard(interaction.guildId, 10);
+
+                if (xpLeaderboard.length === 0) {
+                    await interaction.reply({
+                        content: "No one has earned XP yet. Start chatting to gain XP!",
+                        ephemeral: true,
+                    });
+                    return;
+                }
+
+                // Build leaderboard text
+                const leaderboardText = xpLeaderboard
+                    .map((entry, index) => {
+                        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `**${index + 1}.**`;
+                        return `${medal} <@${entry.userId}> - **Level ${entry.level}** (${entry.totalXp.toLocaleString()} XP)`;
+                    })
+                    .join('\n');
+
+                const embed = new EmbedBuilder()
+                    .setColor(0xffd700)
+                    .setTitle(`${interaction.guild.name} - XP Leaderboard`)
+                    .setDescription(leaderboardText)
+                    .setFooter({ text: `Showing top ${xpLeaderboard.length} users` })
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [embed] });
+                return;
+            } catch (error) {
+                console.error("Error loading XP leaderboard:", error);
+                await interaction.reply({
+                    content: "Please use the `/leaderboard` command for XP rankings.",
+                    ephemeral: true,
+                });
+                return;
+            }
         }
 
         const config = getEconomyConfig(interaction.guildId);
