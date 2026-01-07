@@ -12,6 +12,7 @@
   /* Brand Colors - Discord Inspired */
   --brand-primary: #5865F2;
   --brand-primary-hover: #4752C4;
+  --brand-primary-alpha: rgba(88, 101, 242, 0.1);
   --brand-secondary: #EB459E;
   --brand-accent: #00D9FF;
 
@@ -55,6 +56,7 @@
 :root[data-theme="light"] {
   --brand-primary: #5865F2;
   --brand-primary-hover: #4752C4;
+  --brand-primary-alpha: rgba(88, 101, 242, 0.1);
   --brand-secondary: #EB459E;
   --brand-accent: #00D9FF;
 
@@ -1838,4 +1840,184 @@ a:hover {
   align-items: center;
   gap: var(--space-2);
   white-space: nowrap;
+}
+
+/* ============================================ */
+/* XP LEADERBOARD */
+/* ============================================ */
+
+.leaderboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+}
+
+.leaderboard-item:hover {
+  background: var(--bg-tertiary);
+  transform: translateX(4px);
+}
+
+.leaderboard-item__rank {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.leaderboard-item__name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.leaderboard-item__stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.leaderboard-item__level {
+  font-weight: 600;
+  color: var(--brand-primary);
+  padding: var(--space-1) var(--space-3);
+  background: var(--brand-primary-alpha);
+  border-radius: var(--radius-md);
+}
+
+.leaderboard-item__xp {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================ */
+/* ROLE ITEMS (for level rewards) */
+/* ============================================ */
+
+.role-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.role-item:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--brand-primary-alpha);
+}
+
+.role-item__content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.role-item__label {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 80px;
+}
+
+.role-item__arrow {
+  color: var(--text-tertiary);
+  font-size: var(--text-lg);
+}
+
+.role-item__role {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ============================================
+   MODAL STYLES
+   ============================================ */
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background-color: var(--bg-primary);
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  line-height: 1;
+  padding: 0;
+  width: 2rem;
+  height: 2rem;
+}
+
+.modal-close:hover {
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-danger {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #c0392b;
 }

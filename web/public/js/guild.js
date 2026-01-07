@@ -572,6 +572,21 @@ async function loadGuildInfo() {
     // Load economy config
     loadEconomyConfig();
 
+    // Populate level role dropdown
+    const levelRoleSelect = document.getElementById('level-role-role');
+    if (levelRoleSelect) {
+      levelRoleSelect.innerHTML = '<option value="">Select a role...</option>';
+      info.roles.filter(r => r.id !== info.id).forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        levelRoleSelect.appendChild(option);
+      });
+    }
+
+    // Load XP config
+    loadXPConfig();
+
     // Initialize health monitor
     healthMonitor = new FeatureHealthMonitor(config);
     healthMonitor.updateUI();
@@ -1352,6 +1367,10 @@ function loadEconomyConfig() {
   document.getElementById('currency-symbol').value = config.economy.currencySymbol || '💰';
   document.getElementById('daily-reward').value = config.economy.dailyReward || 100;
   document.getElementById('daily-cooldown').value = config.economy.dailyCooldownHours || 24;
+  document.getElementById('work-reward-min').value = config.economy.workRewardMin || 50;
+  document.getElementById('work-reward-max').value = config.economy.workRewardMax || 150;
+  document.getElementById('work-cooldown').value = config.economy.workCooldownMinutes || 60;
+  document.getElementById('starting-balance').value = config.economy.startingBalance || 100;
 
   updateEconomyStatus();
 }
@@ -1390,6 +1409,10 @@ async function saveEconomySettings() {
       currencySymbol: document.getElementById('currency-symbol').value.trim() || '💰',
       dailyReward: parseInt(document.getElementById('daily-reward').value) || 100,
       dailyCooldownHours: parseInt(document.getElementById('daily-cooldown').value) || 24,
+      workRewardMin: parseInt(document.getElementById('work-reward-min').value) || 50,
+      workRewardMax: parseInt(document.getElementById('work-reward-max').value) || 150,
+      workCooldownMinutes: parseInt(document.getElementById('work-cooldown').value) || 60,
+      startingBalance: parseInt(document.getElementById('starting-balance').value) || 100,
     };
 
     // Validate inputs
@@ -1400,6 +1423,31 @@ async function saveEconomySettings() {
 
     if (updates.dailyCooldownHours < 1 || updates.dailyCooldownHours > 168) {
       showToast('Invalid Input', 'Daily cooldown must be between 1 and 168 hours', 'error');
+      return;
+    }
+
+    if (updates.workRewardMin < 1 || updates.workRewardMin > 10000) {
+      showToast('Invalid Input', 'Work reward min must be between 1 and 10,000', 'error');
+      return;
+    }
+
+    if (updates.workRewardMax < 1 || updates.workRewardMax > 10000) {
+      showToast('Invalid Input', 'Work reward max must be between 1 and 10,000', 'error');
+      return;
+    }
+
+    if (updates.workRewardMin > updates.workRewardMax) {
+      showToast('Invalid Input', 'Work reward min cannot exceed max', 'error');
+      return;
+    }
+
+    if (updates.workCooldownMinutes < 1 || updates.workCooldownMinutes > 1440) {
+      showToast('Invalid Input', 'Work cooldown must be between 1 and 1440 minutes', 'error');
+      return;
+    }
+
+    if (updates.startingBalance < 0 || updates.startingBalance > 100000) {
+      showToast('Invalid Input', 'Starting balance must be between 0 and 100,000', 'error');
       return;
     }
 
@@ -1431,6 +1479,274 @@ async function saveEconomySettings() {
 }
 
 // ============================================
+// XP SYSTEM
+// ============================================
+
+let xpConfig = null;
+
+async function loadXPConfig() {
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/config`);
+    if (!response.ok) throw new Error('Failed to load XP config');
+
+    xpConfig = await response.json();
+
+    // Populate form fields
+    document.getElementById('xp-enabled').checked = xpConfig.enabled || false;
+    document.getElementById('xp-min').value = xpConfig.minXpPerMessage || 10;
+    document.getElementById('xp-max').value = xpConfig.maxXpPerMessage || 20;
+    document.getElementById('xp-cooldown').value = xpConfig.cooldown || 60;
+    document.getElementById('xp-announce-levelup').checked = xpConfig.announceLevelUp || false;
+    document.getElementById('xp-levelup-message').value = xpConfig.levelUpMessage || '🎉 {user} just reached **Level {level}**! Keep it up!';
+
+    // Populate level-up channel dropdown
+    const channelSelect = document.getElementById('xp-levelup-channel');
+    if (channelSelect) {
+      channelSelect.innerHTML = '<option value="">Same channel as message</option>';
+      const channels = (config && Array.isArray(config.channels)) ? config.channels : [];
+      channels.filter(c => c.type === 0).forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `# ${channel.name}`;
+        if (xpConfig.levelUpChannel === channel.id) {
+          option.selected = true;
+        }
+        channelSelect.appendChild(option);
+      });
+    }
+
+    // Update status badge
+    updateXPStatus();
+
+    // Load level roles
+    loadLevelRoles();
+
+    // Load leaderboard
+    loadXPLeaderboard();
+
+  } catch (error) {
+    console.error('Error loading XP config:', error);
+    showToast('Load Failed', 'Could not load XP configuration', 'error');
+  }
+}
+
+function updateXPStatus() {
+  const enabled = document.getElementById('xp-enabled').checked;
+  const badge = document.getElementById('xp-status-badge');
+  const settings = document.getElementById('xp-settings');
+
+  if (enabled) {
+    badge.textContent = 'Active';
+    badge.className = 'badge badge--success';
+    settings.style.display = 'block';
+  } else {
+    badge.textContent = 'Disabled';
+    badge.className = 'badge badge--muted';
+    settings.style.display = 'none';
+  }
+}
+
+async function saveXPSettings() {
+  try {
+    const updates = {
+      enabled: document.getElementById('xp-enabled').checked,
+      minXpPerMessage: parseInt(document.getElementById('xp-min').value) || 10,
+      maxXpPerMessage: parseInt(document.getElementById('xp-max').value) || 20,
+      cooldown: parseInt(document.getElementById('xp-cooldown').value) || 60,
+      announceLevelUp: document.getElementById('xp-announce-levelup').checked,
+      levelUpChannel: document.getElementById('xp-levelup-channel').value || null,
+      levelUpMessage: document.getElementById('xp-levelup-message').value.trim() || '🎉 {user} just reached **Level {level}**! Keep it up!',
+    };
+
+    // Validate inputs
+    if (updates.minXpPerMessage < 1 || updates.minXpPerMessage > 100) {
+      showToast('Invalid Input', 'Min XP must be between 1 and 100', 'error');
+      return;
+    }
+
+    if (updates.maxXpPerMessage < 1 || updates.maxXpPerMessage > 100) {
+      showToast('Invalid Input', 'Max XP must be between 1 and 100', 'error');
+      return;
+    }
+
+    if (updates.minXpPerMessage > updates.maxXpPerMessage) {
+      showToast('Invalid Input', 'Min XP cannot be greater than Max XP', 'error');
+      return;
+    }
+
+    if (updates.cooldown < 0 || updates.cooldown > 3600) {
+      showToast('Invalid Input', 'Cooldown must be between 0 and 3600 seconds', 'error');
+      return;
+    }
+
+    const response = await fetch(`/api/guild/${guildId}/xp/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to save settings');
+    }
+
+    const result = await response.json();
+    xpConfig = result.config;
+
+    showToast('Settings Saved', 'XP configuration updated successfully', 'success');
+  } catch (error) {
+    console.error('Error saving XP settings:', error);
+    showToast('Save Failed', error.message || 'Could not save XP settings', 'error');
+  }
+}
+
+function loadLevelRoles() {
+  const container = document.getElementById('level-roles-list');
+
+  if (!xpConfig || !xpConfig.levelRoles || xpConfig.levelRoles.length === 0) {
+    container.innerHTML = '<div class="form-hint">No level rewards configured yet</div>';
+    return;
+  }
+
+  // Sort by level
+  const sortedRoles = [...xpConfig.levelRoles].sort((a, b) => a.level - b.level);
+  const rolesList = (config && Array.isArray(config.roles)) ? config.roles : [];
+
+  container.innerHTML = sortedRoles.map(reward => {
+    const role = rolesList.find(r => r.id === reward.roleId);
+    const roleName = role ? role.name : 'Unknown Role';
+
+    return `
+      <div class="role-item">
+        <div class="role-item__content">
+          <span class="role-item__label">Level ${reward.level}</span>
+          <span class="role-item__arrow">→</span>
+          <span class="role-item__role">${escapeHtml(roleName)}</span>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="removeLevelRoleReward(${reward.level})">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function addLevelRole() {
+  const level = parseInt(document.getElementById('level-role-level').value);
+  const roleId = document.getElementById('level-role-role').value;
+
+  if (!level || level < 1 || level > 1000) {
+    showToast('Invalid Input', 'Please enter a valid level (1-1000)', 'error');
+    return;
+  }
+
+  if (!roleId) {
+    showToast('Invalid Input', 'Please select a role', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/level-roles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level, roleId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to add level role');
+    }
+
+    // Fetch only the updated XP config
+    const configResponse = await fetch(`/api/guild/${guildId}/xp/config`);
+    if (configResponse.ok) {
+      xpConfig = await configResponse.json();
+    }
+
+    // Refresh only the level roles UI
+    loadLevelRoles();
+
+    // Clear inputs
+    document.getElementById('level-role-level').value = '';
+    document.getElementById('level-role-role').value = '';
+
+    showToast('Reward Added', `Level ${level} role reward added successfully`, 'success');
+  } catch (error) {
+    console.error('Error adding level role:', error);
+    showToast('Add Failed', error.message || 'Could not add level role', 'error');
+  }
+}
+
+async function removeLevelRoleReward(level) {
+  if (!confirm(`Remove level ${level} role reward?`)) return;
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/level-roles/${level}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to remove level role');
+    }
+
+    // Fetch only the updated XP config
+    const configResponse = await fetch(`/api/guild/${guildId}/xp/config`);
+    if (configResponse.ok) {
+      xpConfig = await configResponse.json();
+    }
+
+    // Refresh only the level roles UI
+    loadLevelRoles();
+
+    showToast('Reward Removed', `Level ${level} role reward removed`, 'success');
+  } catch (error) {
+    console.error('Error removing level role:', error);
+    showToast('Remove Failed', error.message || 'Could not remove level role', 'error');
+  }
+}
+
+async function loadXPLeaderboard() {
+  const container = document.getElementById('xp-leaderboard');
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/leaderboard?limit=10`);
+    if (!response.ok) throw new Error('Failed to load leaderboard');
+
+    const leaderboard = await response.json();
+
+    if (leaderboard.length === 0) {
+      container.innerHTML = '<div class="form-hint">No one has earned XP yet. Start chatting!</div>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="leaderboard">
+        ${leaderboard.map((entry, index) => {
+          const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+          return `
+            <div class="leaderboard-item">
+              <span class="leaderboard-item__rank">${medal}</span>
+              <span class="leaderboard-item__name">${escapeHtml(entry.username)}</span>
+              <span class="leaderboard-item__stats">
+                <span class="leaderboard-item__level">Level ${entry.level}</span>
+                <span class="leaderboard-item__xp">${entry.totalXp.toLocaleString()} XP</span>
+              </span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  } catch (error) {
+    console.error('Error loading leaderboard:', error);
+    container.innerHTML = '<div class="form-hint text-error">Failed to load leaderboard</div>';
+  }
+}
+
+// ============================================
 // UTILITY FUNCTIONS
 // ============================================
 
@@ -1441,6 +1757,227 @@ function escapeHtml(text) {
 }
 
 // ============================================
+// ECONOMY SHOP MANAGEMENT
+// ============================================
+
+let shopItems = [];
+
+async function loadShopItems() {
+  try {
+    const response = await fetch(`/api/guild/${guildId}/economy/shop`);
+    if (!response.ok) throw new Error('Failed to load shop items');
+
+    const data = await response.json();
+    shopItems = data.items || [];
+    renderShopItems();
+  } catch (error) {
+    console.error('Error loading shop items:', error);
+    document.getElementById('shop-items-list').innerHTML = '<p class="text-red-500">Failed to load shop items.</p>';
+  }
+}
+
+function renderShopItems() {
+  const container = document.getElementById('shop-items-list');
+
+  if (shopItems.length === 0) {
+    container.innerHTML = '<p class="text-gray-500">No shop items yet. Click "Add Shop Item" to create one.</p>';
+    return;
+  }
+
+  const itemsHTML = shopItems.map(item => {
+    const typeEmoji = item.type === 'role' ? '🎭' : '📦';
+    const stockText = item.stock === -1 ? '∞' : item.stock;
+    const stockClass = item.stock === 0 ? 'text-red-500' : '';
+
+    return `
+      <div class="card mb-3">
+        <div class="flex justify-between items-start">
+          <div class="flex-1">
+            <h4 class="font-semibold text-lg">${typeEmoji} ${escapeHtml(item.name)}</h4>
+            <p class="text-gray-600 text-sm mb-2">${escapeHtml(item.description || 'No description')}</p>
+            <div class="flex gap-4 text-sm">
+              <span><strong>Price:</strong> ${item.price}</span>
+              <span class="${stockClass}"><strong>Stock:</strong> ${stockText}</span>
+              <span><strong>Type:</strong> ${item.type}</span>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-sm btn-secondary" onclick="editShopItem('${item.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteShopItem('${item.id}')">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = itemsHTML;
+}
+
+function openAddShopItemModal() {
+  document.getElementById('add-shop-item-modal').style.display = 'flex';
+  document.getElementById('shop-item-name').value = '';
+  document.getElementById('shop-item-description').value = '';
+  document.getElementById('shop-item-price').value = '';
+  document.getElementById('shop-item-stock').value = '-1';
+  document.getElementById('shop-item-type').value = 'item';
+  toggleRoleSelect();
+  loadRolesForShop();
+}
+
+function closeAddShopItemModal() {
+  document.getElementById('add-shop-item-modal').style.display = 'none';
+}
+
+function toggleRoleSelect() {
+  const type = document.getElementById('shop-item-type').value;
+  const roleGroup = document.getElementById('shop-item-role-group');
+  roleGroup.style.display = type === 'role' ? 'block' : 'none';
+}
+
+async function loadRolesForShop() {
+  const roleSelect = document.getElementById('shop-item-role');
+  if (!config.roles) return;
+
+  roleSelect.innerHTML = '<option value="">Select a role...</option>' +
+    config.roles
+      .filter(r => !r.managed && r.name !== '@everyone')
+      .map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`)
+      .join('');
+}
+
+async function saveShopItem() {
+  try {
+    const name = document.getElementById('shop-item-name').value.trim();
+    const description = document.getElementById('shop-item-description').value.trim();
+    const price = parseInt(document.getElementById('shop-item-price').value);
+    const stock = parseInt(document.getElementById('shop-item-stock').value);
+    const type = document.getElementById('shop-item-type').value;
+    const roleId = type === 'role' ? document.getElementById('shop-item-role').value : null;
+
+    if (!name || isNaN(price)) {
+      showToast('Invalid Input', 'Name and price are required', 'error');
+      return;
+    }
+
+    if (name.length > 100) {
+      showToast('Invalid Input', 'Item name must be 100 characters or less', 'error');
+      return;
+    }
+
+    if (description.length > 500) {
+      showToast('Invalid Input', 'Description must be 500 characters or less', 'error');
+      return;
+    }
+
+    if (isNaN(stock) || (stock !== -1 && stock < 0)) {
+      showToast('Invalid Input', 'Stock must be -1 (unlimited) or a non-negative number', 'error');
+      return;
+    }
+
+    if (type === 'role' && !roleId) {
+      showToast('Invalid Input', 'Please select a role', 'error');
+      return;
+    }
+
+    const response = await fetch(`/api/guild/${guildId}/economy/shop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description, price, stock, type, roleId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create shop item');
+    }
+
+    showToast('Success', 'Shop item created successfully!', 'success');
+    closeAddShopItemModal();
+    loadShopItems();
+  } catch (error) {
+    console.error('Error creating shop item:', error);
+    showToast('Error', error.message || 'Failed to create shop item', 'error');
+  }
+}
+
+function editShopItem(itemId) {
+  const item = shopItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  // Populate the edit modal with current values
+  document.getElementById('edit-shop-item-id').value = itemId;
+  document.getElementById('edit-shop-item-price').value = item.price;
+  document.getElementById('edit-shop-item-stock').value = item.stock;
+
+  // Show the modal
+  document.getElementById('edit-shop-item-modal').style.display = 'flex';
+}
+
+function closeEditShopItemModal() {
+  document.getElementById('edit-shop-item-modal').style.display = 'none';
+  // Clear the form
+  document.getElementById('edit-shop-item-id').value = '';
+  document.getElementById('edit-shop-item-price').value = '';
+  document.getElementById('edit-shop-item-stock').value = '';
+}
+
+async function updateShopItem() {
+  try {
+    const itemId = document.getElementById('edit-shop-item-id').value;
+    const price = parseInt(document.getElementById('edit-shop-item-price').value);
+    const stock = parseInt(document.getElementById('edit-shop-item-stock').value);
+
+    if (isNaN(price) || price < 0) {
+      showToast('Invalid Input', 'Price must be a non-negative number', 'error');
+      return;
+    }
+
+    if (isNaN(stock) || (stock !== -1 && stock < 0)) {
+      showToast('Invalid Input', 'Stock must be -1 (unlimited) or a non-negative number', 'error');
+      return;
+    }
+
+    const response = await fetch(`/api/guild/${guildId}/economy/shop/${itemId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ price, stock }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update shop item');
+    }
+
+    showToast('Success', 'Shop item updated successfully!', 'success');
+    closeEditShopItemModal();
+    loadShopItems();
+  } catch (error) {
+    console.error('Error updating shop item:', error);
+    showToast('Error', error.message || 'Failed to update shop item', 'error');
+  }
+}
+
+async function deleteShopItem(itemId) {
+  const item = shopItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  if (!confirm(`Are you sure you want to delete "${item.name}"?`)) return;
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/economy/shop/${itemId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) throw new Error('Failed to delete shop item');
+
+    showToast('Success', 'Shop item deleted!', 'success');
+    loadShopItems();
+  } catch (error) {
+    console.error('Error deleting shop item:', error);
+    showToast('Error', 'Failed to delete shop item', 'error');
+  }
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 
@@ -1448,4 +1985,12 @@ document.addEventListener('DOMContentLoaded', () => {
   loadGuildInfo();
   initializeDisclosures();
   initializeHealthToggle();
+  loadShopItems();
+
+  // Setup analytics link with proper href for accessibility
+  const analyticsLink = document.getElementById('analytics-link');
+  if (analyticsLink) {
+    const baseHref = analyticsLink.dataset.guildHref || '/analytics.html?guild=';
+    analyticsLink.href = `${baseHref}${guildId}`;
+  }
 });

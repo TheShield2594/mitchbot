@@ -1,4 +1,5 @@
 const { Events, PermissionFlagsBits } = require('discord.js');
+const { recordMemberChange } = require('../utils/analytics');
 const { getGuildConfig, addLog, trackMemberJoin, getRecentJoins } = require('../utils/moderation');
 const logger = require('../utils/logger');
 
@@ -8,6 +9,11 @@ module.exports = {
 
   async execute(member) {
     try {
+      // Record member join for analytics
+      await recordMemberChange(member.guild.id, 'join', member.guild.memberCount);
+
+      console.log(`Member ${member.user.tag} joined ${member.guild.name}. Total members: ${member.guild.memberCount}`);
+
       const config = getGuildConfig(member.guild.id);
 
       // Initialize antiRaid config if it doesn't exist

@@ -68,6 +68,14 @@
             </svg>
             <span>Dashboard</span>
           </a>
+          <a href="#" class="guild-sidebar__link" id="analytics-link" data-guild-href="/analytics.html?guild=">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            <span>Analytics</span>
+          </a>
         </div>
 
         <div class="guild-sidebar__section">
@@ -143,6 +151,12 @@
               <path d="M12 6v6l4 2"/>
             </svg>
             <span>Economy</span>
+          </a>
+          <a href="#xp" class="guild-sidebar__link" data-section="xp">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+            </svg>
+            <span>XP & Levels</span>
           </a>
         </div>
       </nav>
@@ -974,8 +988,326 @@
               </div>
             </div>
 
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="work-reward-min">
+                  Work Reward (Min)
+                  <span class="form-hint">Minimum payout for /work command</span>
+                </label>
+                <input type="number" class="form-input" id="work-reward-min" min="1" max="10000" placeholder="50">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="work-reward-max">
+                  Work Reward (Max)
+                  <span class="form-hint">Maximum payout for /work command</span>
+                </label>
+                <input type="number" class="form-input" id="work-reward-max" min="1" max="10000" placeholder="150">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="work-cooldown">
+                  Work Cooldown (minutes)
+                  <span class="form-hint">Time between /work uses (1-1440 minutes)</span>
+                </label>
+                <input type="number" class="form-input" id="work-cooldown" min="1" max="1440" placeholder="60">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="starting-balance">
+                  Starting Balance
+                  <span class="form-hint">Initial currency for new members</span>
+                </label>
+                <input type="number" class="form-input" id="starting-balance" min="0" max="100000" placeholder="100">
+              </div>
+            </div>
+
             <div class="mt-6">
               <button class="btn btn-primary" onclick="saveEconomySettings()">Save Economy Settings</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Economy Shop Section -->
+      <section id="section-shop" class="guild-section">
+        <div class="card">
+          <div class="card__header">
+            <h3 class="card__title">
+              <span class="card__icon">🛒</span>
+              Economy Shop
+            </h3>
+          </div>
+
+          <p class="card__description">
+            Manage shop items that users can purchase with currency. Create items or roles that players can buy.
+          </p>
+
+          <div class="mb-4">
+            <button class="btn btn-primary" onclick="openAddShopItemModal()">Add Shop Item</button>
+          </div>
+
+          <div id="shop-items-list">
+            <p class="text-gray-500">Loading shop items...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Add Shop Item Modal -->
+      <div id="add-shop-item-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 class="modal-title">Add Shop Item</h3>
+            <button class="modal-close" onclick="closeAddShopItemModal()">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label" for="shop-item-name">Item Name</label>
+              <input type="text" class="form-input" id="shop-item-name" placeholder="Cool Item" maxlength="100" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="shop-item-description">Description</label>
+              <textarea class="form-input" id="shop-item-description" placeholder="A cool item that does something" rows="3" maxlength="500"></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="shop-item-price">Price</label>
+                <input type="number" class="form-input" id="shop-item-price" min="0" placeholder="100" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="shop-item-stock">
+                  Stock
+                  <span class="form-hint">-1 for unlimited</span>
+                </label>
+                <input type="number" class="form-input" id="shop-item-stock" min="-1" placeholder="-1" value="-1">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="shop-item-type">Item Type</label>
+              <select class="form-input" id="shop-item-type" onchange="toggleRoleSelect()">
+                <option value="item">Regular Item</option>
+                <option value="role">Role (Auto-assign)</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="shop-item-role-group" style="display: none;">
+              <label class="form-label" for="shop-item-role">Role to Assign</label>
+              <select class="form-input" id="shop-item-role">
+                <option value="">Select a role...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeAddShopItemModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveShopItem()">Add Item</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Shop Item Modal -->
+      <div id="edit-shop-item-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 class="modal-title">Edit Shop Item</h3>
+            <button class="modal-close" onclick="closeEditShopItemModal()">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <input type="hidden" id="edit-shop-item-id">
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-shop-item-price">Price</label>
+                <input type="number" class="form-input" id="edit-shop-item-price" min="0" placeholder="100" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="edit-shop-item-stock">
+                  Stock
+                  <span class="form-hint">-1 for unlimited</span>
+                </label>
+                <input type="number" class="form-input" id="edit-shop-item-stock" min="-1" placeholder="-1">
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeEditShopItemModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="updateShopItem()">Update Item</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- XP & Levels Section -->
+      <section id="section-xp" class="guild-section">
+        <div class="card">
+          <div class="card__header">
+            <h3 class="card__title">
+              <span class="card__icon">⭐</span>
+              XP & Leveling System
+              <span class="badge" id="xp-status-badge">Active</span>
+            </h3>
+          </div>
+
+          <p class="card__description">
+            Reward members for participating in your server with XP, levels, and role rewards.
+          </p>
+
+          <!-- Enable/Disable Toggle -->
+          <div class="form-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="xp-enabled" onchange="updateXPStatus()">
+              <span class="toggle-switch__slider"></span>
+              <span class="toggle-switch__label">Enable XP System</span>
+            </label>
+          </div>
+
+          <div id="xp-settings">
+            <!-- Basic XP Settings -->
+            <div class="card__section">
+              <h4 class="card__section-title">XP Configuration</h4>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="xp-min">
+                    Min XP Per Message
+                    <span class="form-hint">Minimum XP awarded per message (1-100)</span>
+                  </label>
+                  <input type="number" class="form-input" id="xp-min" min="1" max="100" placeholder="10">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="xp-max">
+                    Max XP Per Message
+                    <span class="form-hint">Maximum XP awarded per message (1-100)</span>
+                  </label>
+                  <input type="number" class="form-input" id="xp-max" min="1" max="100" placeholder="20">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="xp-cooldown">
+                  XP Cooldown (seconds)
+                  <span class="form-hint">Time between XP gains (0-3600 seconds)</span>
+                </label>
+                <input type="number" class="form-input" id="xp-cooldown" min="0" max="3600" placeholder="60">
+              </div>
+            </div>
+
+            <!-- Level-Up Announcements -->
+            <div class="card__section">
+              <h4 class="card__section-title">Level-Up Announcements</h4>
+
+              <div class="form-group">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="xp-announce-levelup">
+                  <span class="toggle-switch__slider"></span>
+                  <span class="toggle-switch__label">Announce Level-Ups</span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="xp-levelup-channel">
+                  Level-Up Channel
+                  <span class="form-hint">Channel for level-up announcements (leave empty for same channel)</span>
+                </label>
+                <select class="form-input" id="xp-levelup-channel">
+                  <option value="">Same channel as message</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="xp-levelup-message">
+                  Level-Up Message
+                  <span class="form-hint">Use {user}, {level}, {xp} as placeholders</span>
+                </label>
+                <textarea class="form-input" id="xp-levelup-message" rows="2" placeholder="🎉 {user} just reached **Level {level}**! Keep it up!"></textarea>
+              </div>
+            </div>
+
+            <!-- Level Role Rewards -->
+            <div class="card__section">
+              <h4 class="card__section-title">Level Role Rewards</h4>
+              <p class="form-hint mb-4">Automatically assign roles when members reach specific levels</p>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="level-role-level">Level</label>
+                  <input type="number" class="form-input" id="level-role-level" min="1" max="1000" placeholder="5">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="level-role-role">Role</label>
+                  <select class="form-input" id="level-role-role">
+                    <option value="">Select a role...</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                  <button class="btn btn-secondary" onclick="addLevelRole()">Add Reward</button>
+                </div>
+              </div>
+
+              <div id="level-roles-list" class="mt-4">
+                <div class="loading">Loading level rewards...</div>
+              </div>
+            </div>
+
+            <!-- XP Leaderboard -->
+            <div class="card__section">
+              <h4 class="card__section-title">XP Leaderboard</h4>
+              <div id="xp-leaderboard" class="mt-4">
+                <div class="loading">Loading leaderboard...</div>
+              </div>
+            </div>
+
+            <!-- Advanced Settings -->
+            <div class="card__section">
+              <h4 class="card__section-title">Advanced Settings</h4>
+
+              <div class="form-group">
+                <label class="form-label">
+                  XP Gain Channels
+                  <span class="form-hint">If set, only these channels will give XP (leave empty for all channels)</span>
+                </label>
+                <div id="xp-gain-channels-list" class="role-list">
+                  <div class="form-hint">No channels selected (all channels give XP)</div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">
+                  No XP Channels
+                  <span class="form-hint">Channels that won't give XP</span>
+                </label>
+                <div id="no-xp-channels-list" class="role-list">
+                  <div class="form-hint">No channels blacklisted</div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">
+                  No XP Roles
+                  <span class="form-hint">Users with these roles won't gain XP</span>
+                </label>
+                <div id="no-xp-roles-list" class="role-list">
+                  <div class="form-hint">No roles blacklisted</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="mt-6">
+              <button class="btn btn-primary" onclick="saveXPSettings()">Save XP Settings</button>
+              <button class="btn btn-secondary ml-2" onclick="loadXPConfig()">Reset Changes</button>
             </div>
           </div>
         </div>

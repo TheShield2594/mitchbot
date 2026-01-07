@@ -39,12 +39,8 @@
         return;
       }
 
-      console.log('Total guilds:', user.guilds.length);
-
       // Filter manageable guilds - backend already filters, so use all guilds
       const manageableGuilds = user.guilds;
-
-      console.log('Manageable guilds:', manageableGuilds.length);
 
       if (manageableGuilds.length === 0) {
         showEmptyState(user.debugInfo);
@@ -171,20 +167,16 @@
 
     serverList.innerHTML = guilds.map(guild => createServerCard(guild)).join('');
 
+    // Show server list and hide empty state
+    serverList.style.display = '';
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+
     // Add click handlers
     document.querySelectorAll('.server-card').forEach(card => {
-      card.addEventListener('click', function(e) {
-        const button = e.target.closest('.server-card__action');
-        if (button) {
-          // Button clicked - navigate to guild page
-          e.stopPropagation();
-          const guildId = button.getAttribute('data-guild-id');
-          window.location.href = `/guild/${guildId}`;
-        } else {
-          // Card clicked (but not button) - also navigate
-          const guildId = this.getAttribute('data-guild-id');
-          window.location.href = `/guild/${guildId}`;
-        }
+      card.addEventListener('click', function() {
+        const guildId = this.getAttribute('data-guild-id');
+        window.location.href = `/guild/${guildId}`;
       });
     });
   }
@@ -403,7 +395,7 @@
               card.style.display = hasBot ? '' : 'none';
               break;
             case 'available':
-              card.style.display = !hasBot ? '' : 'none';
+              card.style.display = hasBot ? '' : 'none';
               break;
           }
         });

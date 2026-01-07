@@ -3,7 +3,34 @@ const router = express.Router();
 const { ensureServerManager } = require('../middleware/auth');
 const { getGuildConfig, updateGuildConfig, getLogs, getWarnings, clearWarnings } = require('../../utils/moderation');
 const { getBirthdays, addBirthday, removeBirthday } = require('../../utils/birthdays');
-const { getEconomyConfig, updateEconomyConfig } = require('../../utils/economy');
+const {
+  getEconomyConfig,
+  updateEconomyConfig,
+  getShopItems,
+  addShopItem,
+  updateShopItem,
+  deleteShopItem,
+} = require('../../utils/economy');
+const {
+  getGuildConfig: getXPGuildConfig,
+  updateGuildConfig: updateXPGuildConfig,
+  setLevelRole,
+  removeLevelRole,
+  getLeaderboard,
+  getUserData,
+  getUserRank,
+  resetUserXP,
+  resetGuildXP,
+  setChannelMultiplier,
+  setRoleMultiplier,
+} = require('../../utils/xp');
+const {
+  getMemberGrowthData,
+  getCommandAnalytics,
+  getTopUsers,
+  getAutomodViolations,
+  getAnalyticsSummary
+} = require('../../utils/analytics');
 
 // Get bot client ID for OAuth links
 router.get('/client-id', (req, res) => {
@@ -169,46 +196,6 @@ router.delete('/guild/:guildId/birthdays/:userId', ensureServerManager, (req, re
   }
 });
 
-// Update birthday configuration
-router.patch('/guild/:guildId/config/birthday', ensureServerManager, async (req, res) => {
-  try {
-    const { guildId } = req.params;
-    const { enabled, channelId, roleId, customMessage } = req.body;
-
-    // Validate snowflake IDs if provided
-    const snowflakeRegex = /^\d{17,19}$/;
-    if (channelId !== undefined && channelId !== null && channelId !== '' && !snowflakeRegex.test(channelId)) {
-      return res.status(400).json({ error: 'Invalid channel ID format' });
-    }
-    if (roleId !== undefined && roleId !== null && roleId !== '' && !snowflakeRegex.test(roleId)) {
-      return res.status(400).json({ error: 'Invalid role ID format' });
-    }
-
-    // Validate custom message length
-    if (customMessage !== undefined && customMessage !== null) {
-      if (typeof customMessage !== 'string') {
-        return res.status(400).json({ error: 'Custom message must be a string' });
-      }
-      if (customMessage.length > 2000) {
-        return res.status(400).json({ error: 'Custom message must be 2000 characters or less' });
-      }
-    }
-
-    // Build update object with only provided fields
-    const updates = {};
-    if (enabled !== undefined) updates.enabled = enabled;
-    if (channelId !== undefined) updates.channelId = channelId;
-    if (roleId !== undefined) updates.roleId = roleId;
-    if (customMessage !== undefined) updates.customMessage = customMessage;
-
-    const config = await updateGuildConfig(guildId, { birthday: updates });
-    res.json({ success: true, birthday: config.birthday });
-  } catch (error) {
-    console.error('Error updating birthday config:', error);
-    res.status(500).json({ error: 'Failed to update birthday configuration' });
-  }
-});
-
 // Get guild info from bot
 router.get('/guild/:guildId/info', ensureServerManager, async (req, res) => {
   try {
@@ -236,6 +223,158 @@ router.get('/guild/:guildId/info', ensureServerManager, async (req, res) => {
     res.status(500).json({ error: 'Failed to get guild info' });
   }
 });
+
+// ============== ANALYTICS ENDPOINTS ==============
+
+// Get comprehensive analytics summary
+router.get('/guild/:guildId/analytics', ensureServerManager, async (req, res) => {
+  try {
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
+    const analytics = await getAnalyticsSummary(req.params.guildId, days);
+    res.json(analytics);
+  } catch (error) {
+    console.error('Error getting analytics summary:', error);
+    res.status(500).json({ error: 'Failed to get analytics' });
+  }
+});
+
+// Get member growth data
+router.get('/guild/:guildId/analytics/member-growth', ensureServerManager, async (req, res) => {
+  try {
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
+    const data = await getMemberGrowthData(req.params.guildId, days);
+    res.json(data);
+  } catch (error) {
+    console.error('Error getting member growth data:', error);
+    res.status(500).json({ error: 'Failed to get member growth data' });
+  }
+});
+
+// Get command usage analytics
+router.get('/guild/:guildId/analytics/commands', ensureServerManager, async (req, res) => {
+  try {
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
+    const data = await getCommandAnalytics(req.params.guildId, days);
+    res.json(data);
+  } catch (error) {
+    console.error('Error getting command analytics:', error);
+    res.status(500).json({ error: 'Failed to get command analytics' });
+  }
+});
+
+// Get top active users
+router.get('/guild/:guildId/analytics/top-users', ensureServerManager, async (req, res) => {
+  try {
+    let limit = parseInt(req.query.limit, 10);
+    if (isNaN(limit)) {
+      limit = 10;
+    }
+    // Clamp limit between 1 and 100
+    limit = Math.max(1, Math.min(100, limit));
+    const data = await getTopUsers(req.params.guildId, limit);
+
+    // Fetch user details from Discord
+    try {
+      const client = req.app.get('client');
+      const guild = await client.guilds.fetch(req.params.guildId);
+
+      const usersWithDetails = await Promise.all(
+        data.map(async (user) => {
+          try {
+            const member = await guild.members.fetch(user.userId);
+            return {
+              ...user,
+              username: member.user.username,
+              displayName: member.displayName,
+              avatar: member.user.displayAvatarURL(),
+            };
+          } catch (memberError) {
+            // User may have left the server
+            return {
+              ...user,
+              username: 'Unknown User',
+              displayName: 'Unknown User',
+              avatar: null,
+            };
+          }
+        })
+      );
+
+      res.json(usersWithDetails);
+    } catch (guildError) {
+      console.warn('Could not fetch Discord user details:', guildError.message);
+      // If we can't fetch Discord data, return without user details
+      res.json(data);
+    }
+  } catch (error) {
+    console.error('Error getting top users:', error);
+    res.status(500).json({ error: 'Failed to get top users' });
+  }
+});
+
+// Get automod violation analytics
+router.get('/guild/:guildId/analytics/automod-violations', ensureServerManager, async (req, res) => {
+  try {
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
+    const data = await getAutomodViolations(req.params.guildId, days);
+
+    // Fetch user details for top violators
+    try {
+      const client = req.app.get('client');
+      const guild = await client.guilds.fetch(req.params.guildId);
+
+      const violatorsWithDetails = await Promise.all(
+        data.topViolators.map(async (violator) => {
+          try {
+            const member = await guild.members.fetch(violator.userId);
+            return {
+              ...violator,
+              username: member.user.username,
+              displayName: member.displayName,
+              avatar: member.user.displayAvatarURL(),
+            };
+          } catch (memberError) {
+            // User may have left the server
+            return {
+              ...violator,
+              username: 'Unknown User',
+              displayName: 'Unknown User',
+              avatar: null,
+            };
+          }
+        })
+      );
+
+      res.json({
+        ...data,
+        topViolators: violatorsWithDetails,
+      });
+    } catch (guildError) {
+      console.warn('Could not fetch Discord user details:', guildError.message);
+      // If we can't fetch Discord data, return without user details
+      res.json(data);
+    }
+  } catch (error) {
+    console.error('Error getting automod violations:', error);
+    res.status(500).json({ error: 'Failed to get automod violations' });
+  }
+});
+
+// ============================================
+// ECONOMY SYSTEM ENDPOINTS
+// ============================================
 
 // Get economy configuration
 router.get('/guild/:guildId/economy/config', ensureServerManager, (req, res) => {
@@ -282,6 +421,344 @@ router.post('/guild/:guildId/economy/config', ensureServerManager, async (req, r
   } catch (error) {
     console.error('Error updating economy config:', error);
     res.status(500).json({ error: 'Failed to update economy configuration' });
+  }
+});
+
+// ============================================
+// XP SYSTEM ENDPOINTS
+// ============================================
+
+// Get XP configuration
+router.get('/guild/:guildId/xp/config', ensureServerManager, (req, res) => {
+  try {
+    const config = getXPGuildConfig(req.params.guildId);
+    res.json(config);
+  } catch (error) {
+    console.error('Error getting XP config:', error);
+    res.status(500).json({ error: 'Failed to get XP configuration' });
+  }
+});
+
+// Update XP configuration
+router.post('/guild/:guildId/xp/config', ensureServerManager, async (req, res) => {
+  try {
+    const updates = req.body;
+
+    // Validate inputs
+    if (updates.minXpPerMessage !== undefined) {
+      const min = Number(updates.minXpPerMessage);
+      if (isNaN(min) || min < 1 || min > 100) {
+        return res.status(400).json({ error: 'Min XP must be between 1 and 100' });
+      }
+      updates.minXpPerMessage = min;
+    }
+
+    if (updates.maxXpPerMessage !== undefined) {
+      const max = Number(updates.maxXpPerMessage);
+      if (isNaN(max) || max < 1 || max > 100) {
+        return res.status(400).json({ error: 'Max XP must be between 1 and 100' });
+      }
+      updates.maxXpPerMessage = max;
+    }
+
+    if (updates.cooldown !== undefined) {
+      const cooldown = Number(updates.cooldown);
+      if (isNaN(cooldown) || cooldown < 0 || cooldown > 3600) {
+        return res.status(400).json({ error: 'Cooldown must be between 0 and 3600 seconds' });
+      }
+      updates.cooldown = cooldown;
+    }
+
+    // Cross-validate min and max XP
+    if (updates.minXpPerMessage !== undefined && updates.maxXpPerMessage !== undefined) {
+      if (updates.minXpPerMessage > updates.maxXpPerMessage) {
+        return res.status(400).json({ error: 'Min XP must not exceed Max XP' });
+      }
+    }
+
+    const config = await updateXPGuildConfig(req.params.guildId, updates);
+    res.json({ success: true, config });
+  } catch (error) {
+    console.error('Error updating XP config:', error);
+    res.status(500).json({ error: 'Failed to update XP configuration' });
+  }
+});
+
+// Get XP leaderboard
+router.get('/guild/:guildId/xp/leaderboard', ensureServerManager, (req, res) => {
+  try {
+    let limit = parseInt(req.query.limit);
+    if (isNaN(limit)) {
+      limit = 10;
+    }
+    // Clamp limit between 1 and 100
+    limit = Math.max(1, Math.min(100, limit));
+    const leaderboard = getLeaderboard(req.params.guildId, limit);
+    res.json(leaderboard);
+  } catch (error) {
+    console.error('Error getting XP leaderboard:', error);
+    res.status(500).json({ error: 'Failed to get leaderboard' });
+  }
+});
+
+// Get user XP data
+router.get('/guild/:guildId/xp/user/:userId', ensureServerManager, (req, res) => {
+  try {
+    const userData = getUserData(req.params.guildId, req.params.userId);
+    const rank = getUserRank(req.params.guildId, req.params.userId);
+    res.json({ ...userData, rank });
+  } catch (error) {
+    console.error('Error getting user XP:', error);
+    res.status(500).json({ error: 'Failed to get user XP data' });
+  }
+});
+
+// Add level role reward
+router.post('/guild/:guildId/xp/level-roles', ensureServerManager, async (req, res) => {
+  try {
+    const { level, roleId } = req.body;
+
+    if (!level || !roleId) {
+      return res.status(400).json({ error: 'level and roleId are required' });
+    }
+
+    const levelNum = Number(level);
+    if (isNaN(levelNum) || levelNum < 1 || levelNum > 1000) {
+      return res.status(400).json({ error: 'Level must be between 1 and 1000' });
+    }
+
+    // Check for duplicate level
+    const config = getXPGuildConfig(req.params.guildId);
+    const existingReward = config.levelRoles?.find(r => r.level === levelNum);
+    if (existingReward) {
+      return res.status(400).json({ error: `A role reward already exists for level ${levelNum}` });
+    }
+
+    await setLevelRole(req.params.guildId, levelNum, roleId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error adding level role:', error);
+    res.status(500).json({ error: 'Failed to add level role' });
+  }
+});
+
+// Remove level role reward
+router.delete('/guild/:guildId/xp/level-roles/:level', ensureServerManager, async (req, res) => {
+  try {
+    const level = Number(req.params.level);
+    if (isNaN(level)) {
+      return res.status(400).json({ error: 'Invalid level' });
+    }
+
+    // Check if level role exists before deleting
+    const config = getXPGuildConfig(req.params.guildId);
+    const existingReward = config.levelRoles?.find(r => r.level === level);
+    if (!existingReward) {
+      return res.status(404).json({ error: 'Level role not found' });
+    }
+
+    await removeLevelRole(req.params.guildId, level);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error removing level role:', error);
+    res.status(500).json({ error: 'Failed to remove level role' });
+  }
+});
+
+// Set channel XP multiplier
+router.post('/guild/:guildId/xp/channel-multiplier', ensureServerManager, async (req, res) => {
+  try {
+    const { channelId, multiplier } = req.body;
+
+    if (!channelId || multiplier === undefined) {
+      return res.status(400).json({ error: 'channelId and multiplier are required' });
+    }
+
+    const mult = Number(multiplier);
+    if (isNaN(mult) || mult < 0 || mult > 10) {
+      return res.status(400).json({ error: 'Multiplier must be between 0 and 10' });
+    }
+
+    await setChannelMultiplier(req.params.guildId, channelId, mult);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error setting channel multiplier:', error);
+    res.status(500).json({ error: 'Failed to set channel multiplier' });
+  }
+});
+
+// Set role XP multiplier
+router.post('/guild/:guildId/xp/role-multiplier', ensureServerManager, async (req, res) => {
+  try {
+    const { roleId, multiplier } = req.body;
+
+    if (!roleId || multiplier === undefined) {
+      return res.status(400).json({ error: 'roleId and multiplier are required' });
+    }
+
+    const mult = Number(multiplier);
+    if (isNaN(mult) || mult < 0 || mult > 10) {
+      return res.status(400).json({ error: 'Multiplier must be between 0 and 10' });
+    }
+
+    await setRoleMultiplier(req.params.guildId, roleId, mult);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error setting role multiplier:', error);
+    res.status(500).json({ error: 'Failed to set role multiplier' });
+  }
+});
+
+// Reset user XP
+router.delete('/guild/:guildId/xp/user/:userId', ensureServerManager, async (req, res) => {
+  try {
+    const success = await resetUserXP(req.params.guildId, req.params.userId);
+    res.json({ success });
+  } catch (error) {
+    console.error('Error resetting user XP:', error);
+    res.status(500).json({ error: 'Failed to reset user XP' });
+  }
+});
+
+// Reset all guild XP
+router.delete('/guild/:guildId/xp/reset', ensureServerManager, async (req, res) => {
+  try {
+    const success = await resetGuildXP(req.params.guildId);
+    res.json({ success });
+  } catch (error) {
+    console.error('Error resetting guild XP:', error);
+    res.status(500).json({ error: 'Failed to reset guild XP' });
+  }
+});
+
+// ============================================
+// ECONOMY SHOP ROUTES
+// ============================================
+
+// Get all shop items
+router.get('/guild/:guildId/economy/shop', ensureServerManager, async (req, res) => {
+  try {
+    const items = getShopItems(req.params.guildId);
+    res.json({ items });
+  } catch (error) {
+    console.error('Error fetching shop items:', error);
+    res.status(500).json({ error: 'Failed to fetch shop items' });
+  }
+});
+
+// Create a shop item
+router.post('/guild/:guildId/economy/shop', ensureServerManager, async (req, res) => {
+  try {
+    const { name, description, price, type, roleId, stock } = req.body;
+
+    if (!name || price === undefined) {
+      return res.status(400).json({ error: 'name and price are required' });
+    }
+
+    if (name.length > 100) {
+      return res.status(400).json({ error: 'name must be 100 characters or less' });
+    }
+
+    if (description && description.length > 500) {
+      return res.status(400).json({ error: 'description must be 500 characters or less' });
+    }
+
+    const priceNum = Number(price);
+    if (isNaN(priceNum) || priceNum < 0) {
+      return res.status(400).json({ error: 'price must be a non-negative number' });
+    }
+
+    if (type === 'role' && !roleId) {
+      return res.status(400).json({ error: 'roleId is required for role items' });
+    }
+
+    const stockNum = stock !== undefined ? Number(stock) : -1;
+    if (isNaN(stockNum) || stockNum < -1) {
+      return res.status(400).json({ error: 'stock must be -1 (unlimited) or a non-negative number' });
+    }
+
+    const item = addShopItem(req.params.guildId, {
+      name: name.trim(),
+      description: description?.trim() || '',
+      price: priceNum,
+      type: type || 'item',
+      roleId: roleId || null,
+      stock: stockNum,
+    });
+
+    res.json({ item });
+  } catch (error) {
+    console.error('Error creating shop item:', error);
+    res.status(500).json({ error: 'Failed to create shop item' });
+  }
+});
+
+// Update a shop item
+router.put('/guild/:guildId/economy/shop/:itemId', ensureServerManager, async (req, res) => {
+  try {
+    const { name, description, price, type, roleId, stock } = req.body;
+    const updates = {};
+
+    if (name !== undefined) {
+      const trimmedName = name.trim();
+      if (trimmedName.length > 100) {
+        return res.status(400).json({ error: 'name must be 100 characters or less' });
+      }
+      updates.name = trimmedName;
+    }
+
+    if (description !== undefined) {
+      const trimmedDescription = description.trim();
+      if (trimmedDescription.length > 500) {
+        return res.status(400).json({ error: 'description must be 500 characters or less' });
+      }
+      updates.description = trimmedDescription;
+    }
+    if (price !== undefined) {
+      const trimmedPrice = typeof price === 'string' ? price.trim() : price;
+      const priceNum = Number(trimmedPrice);
+      if (isNaN(priceNum) || priceNum < 0) {
+        return res.status(400).json({ error: 'price must be a non-negative number' });
+      }
+      updates.price = priceNum;
+    }
+    if (type !== undefined) updates.type = type;
+    if (roleId !== undefined) updates.roleId = roleId;
+    if (stock !== undefined) {
+      const trimmedStock = typeof stock === 'string' ? stock.trim() : stock;
+      const stockNum = Number(trimmedStock);
+      if (isNaN(stockNum) || stockNum < -1) {
+        return res.status(400).json({ error: 'stock must be -1 (unlimited) or a non-negative number' });
+      }
+      updates.stock = stockNum;
+    }
+
+    const item = updateShopItem(req.params.guildId, req.params.itemId, updates);
+
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    res.json({ item });
+  } catch (error) {
+    console.error('Error updating shop item:', error);
+    res.status(500).json({ error: 'Failed to update shop item' });
+  }
+});
+
+// Delete a shop item
+router.delete('/guild/:guildId/economy/shop/:itemId', ensureServerManager, async (req, res) => {
+  try {
+    const success = deleteShopItem(req.params.guildId, req.params.itemId);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting shop item:', error);
+    res.status(500).json({ error: 'Failed to delete shop item' });
   }
 });
 
