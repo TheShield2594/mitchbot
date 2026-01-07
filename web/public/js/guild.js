@@ -1859,6 +1859,16 @@ async function saveShopItem() {
       return;
     }
 
+    if (name.length > 100) {
+      showToast('Invalid Input', 'Item name must be 100 characters or less', 'error');
+      return;
+    }
+
+    if (description.length > 500) {
+      showToast('Invalid Input', 'Description must be 500 characters or less', 'error');
+      return;
+    }
+
     if (isNaN(stock) || (stock !== -1 && stock < 0)) {
       showToast('Invalid Input', 'Stock must be -1 (unlimited) or a non-negative number', 'error');
       return;
@@ -1916,8 +1926,8 @@ async function updateShopItem() {
     const price = parseInt(document.getElementById('edit-shop-item-price').value);
     const stock = parseInt(document.getElementById('edit-shop-item-stock').value);
 
-    if (isNaN(price)) {
-      showToast('Invalid Input', 'Price is required', 'error');
+    if (isNaN(price) || price < 0) {
+      showToast('Invalid Input', 'Price must be a non-negative number', 'error');
       return;
     }
 

@@ -700,17 +700,19 @@ router.put('/guild/:guildId/economy/shop/:itemId', ensureServerManager, async (r
     const updates = {};
 
     if (name !== undefined) {
-      if (name.length > 100) {
+      const trimmedName = name.trim();
+      if (trimmedName.length > 100) {
         return res.status(400).json({ error: 'name must be 100 characters or less' });
       }
-      updates.name = name.trim();
+      updates.name = trimmedName;
     }
 
     if (description !== undefined) {
-      if (description.length > 500) {
+      const trimmedDescription = description.trim();
+      if (trimmedDescription.length > 500) {
         return res.status(400).json({ error: 'description must be 500 characters or less' });
       }
-      updates.description = description.trim();
+      updates.description = trimmedDescription;
     }
     if (price !== undefined) {
       const priceNum = Number(price);
