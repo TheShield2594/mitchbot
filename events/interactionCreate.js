@@ -30,6 +30,26 @@ module.exports = {
           customId: interaction.customId,
           error,
         });
+
+        // Respond to the user so their interaction doesn't hang
+        try {
+          if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({
+              content: 'An error occurred while processing your button click.',
+              ephemeral: true,
+            });
+          } else {
+            await interaction.reply({
+              content: 'An error occurred while processing your button click.',
+              ephemeral: true,
+            });
+          }
+        } catch (replyError) {
+          logger.error('Failed to send button error response', {
+            customId: interaction.customId,
+            error: replyError,
+          });
+        }
       }
     }
 

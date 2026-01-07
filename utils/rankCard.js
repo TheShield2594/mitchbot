@@ -191,8 +191,9 @@ async function generateRankCard(options) {
     ctx.fillStyle = '#2C2F33';
     ctx.fillRect(progressBarX, progressBarY, progressBarWidth, progressBarHeight);
 
-    // Progress bar fill
-    const progress = currentXP / requiredXP;
+    // Clamp displayed XP when currentXP exceeds requiredXP
+    const displayXP = Math.min(currentXP, requiredXP);
+    const progress = displayXP / requiredXP;
     const fillWidth = Math.min(progressBarWidth * progress, progressBarWidth);
 
     const progressGradient = ctx.createLinearGradient(progressBarX, 0, progressBarX + progressBarWidth, 0);
@@ -207,13 +208,13 @@ async function generateRankCard(options) {
     ctx.lineWidth = 2;
     ctx.strokeRect(progressBarX, progressBarY, progressBarWidth, progressBarHeight);
 
-    // XP Text on progress bar
+    // XP Text on progress bar (use displayXP for consistency)
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(
-        `${currentXP.toLocaleString()} / ${requiredXP.toLocaleString()} XP`,
+        `${displayXP.toLocaleString()} / ${requiredXP.toLocaleString()} XP`,
         progressBarX + progressBarWidth / 2,
         progressBarY + progressBarHeight / 2
     );

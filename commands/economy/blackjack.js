@@ -3,6 +3,7 @@ const {
     getBalance,
     addBalance,
     logTransaction,
+    getEconomyConfig,
     ECONOMY_EMBED_COLOR,
     formatCoins,
     initEconomy,
@@ -115,6 +116,15 @@ module.exports = {
         ),
     async execute(interaction) {
         const betAmount = interaction.options.getInteger("amount");
+
+        // Validate betAmount
+        if (!Number.isInteger(betAmount) || betAmount <= 0) {
+            await interaction.reply({
+                content: "Invalid bet amount. Please enter a positive number.",
+                ephemeral: true,
+            });
+            return;
+        }
 
         // Validate gambling command (checks guild, balance, initializes economy)
         const config = await validateGamblingCommand(interaction, betAmount);
