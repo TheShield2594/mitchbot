@@ -1367,6 +1367,10 @@ function loadEconomyConfig() {
   document.getElementById('currency-symbol').value = config.economy.currencySymbol || '💰';
   document.getElementById('daily-reward').value = config.economy.dailyReward || 100;
   document.getElementById('daily-cooldown').value = config.economy.dailyCooldownHours || 24;
+  document.getElementById('work-reward-min').value = config.economy.workRewardMin || 50;
+  document.getElementById('work-reward-max').value = config.economy.workRewardMax || 150;
+  document.getElementById('work-cooldown').value = config.economy.workCooldownMinutes || 60;
+  document.getElementById('starting-balance').value = config.economy.startingBalance || 100;
 
   updateEconomyStatus();
 }
@@ -1405,6 +1409,10 @@ async function saveEconomySettings() {
       currencySymbol: document.getElementById('currency-symbol').value.trim() || '💰',
       dailyReward: parseInt(document.getElementById('daily-reward').value) || 100,
       dailyCooldownHours: parseInt(document.getElementById('daily-cooldown').value) || 24,
+      workRewardMin: parseInt(document.getElementById('work-reward-min').value) || 50,
+      workRewardMax: parseInt(document.getElementById('work-reward-max').value) || 150,
+      workCooldownMinutes: parseInt(document.getElementById('work-cooldown').value) || 60,
+      startingBalance: parseInt(document.getElementById('starting-balance').value) || 100,
     };
 
     // Validate inputs
@@ -1415,6 +1423,31 @@ async function saveEconomySettings() {
 
     if (updates.dailyCooldownHours < 1 || updates.dailyCooldownHours > 168) {
       showToast('Invalid Input', 'Daily cooldown must be between 1 and 168 hours', 'error');
+      return;
+    }
+
+    if (updates.workRewardMin < 1 || updates.workRewardMin > 10000) {
+      showToast('Invalid Input', 'Work reward min must be between 1 and 10,000', 'error');
+      return;
+    }
+
+    if (updates.workRewardMax < 1 || updates.workRewardMax > 10000) {
+      showToast('Invalid Input', 'Work reward max must be between 1 and 10,000', 'error');
+      return;
+    }
+
+    if (updates.workRewardMin > updates.workRewardMax) {
+      showToast('Invalid Input', 'Work reward min cannot exceed max', 'error');
+      return;
+    }
+
+    if (updates.workCooldownMinutes < 1 || updates.workCooldownMinutes > 1440) {
+      showToast('Invalid Input', 'Work cooldown must be between 1 and 1440 minutes', 'error');
+      return;
+    }
+
+    if (updates.startingBalance < 0 || updates.startingBalance > 100000) {
+      showToast('Invalid Input', 'Starting balance must be between 0 and 100,000', 'error');
       return;
     }
 
@@ -1724,6 +1757,186 @@ function escapeHtml(text) {
 }
 
 // ============================================
+// ECONOMY SHOP MANAGEMENT
+// ============================================
+
+let shopItems = [];
+
+async function loadShopItems() {
+  try {
+    const response = await fetch(`/api/guild/${guildId}/economy/shop`);
+    if (!response.ok) throw new Error('Failed to load shop items');
+
+    const data = await response.json();
+    shopItems = data.items || [];
+    renderShopItems();
+  } catch (error) {
+    console.error('Error loading shop items:', error);
+    document.getElementById('shop-items-list').innerHTML = '<p class="text-red-500">Failed to load shop items.</p>';
+  }
+}
+
+function renderShopItems() {
+  const container = document.getElementById('shop-items-list');
+
+  if (shopItems.length === 0) {
+    container.innerHTML = '<p class="text-gray-500">No shop items yet. Click "Add Shop Item" to create one.</p>';
+    return;
+  }
+
+  const itemsHTML = shopItems.map(item => {
+    const typeEmoji = item.type === 'role' ? '🎭' : '📦';
+    const stockText = item.stock === -1 ? '∞' : item.stock;
+    const stockClass = item.stock === 0 ? 'text-red-500' : '';
+
+    return `
+      <div class="card mb-3">
+        <div class="flex justify-between items-start">
+          <div class="flex-1">
+            <h4 class="font-semibold text-lg">${typeEmoji} ${escapeHtml(item.name)}</h4>
+            <p class="text-gray-600 text-sm mb-2">${escapeHtml(item.description || 'No description')}</p>
+            <div class="flex gap-4 text-sm">
+              <span><strong>Price:</strong> ${item.price}</span>
+              <span class="${stockClass}"><strong>Stock:</strong> ${stockText}</span>
+              <span><strong>Type:</strong> ${item.type}</span>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-sm btn-secondary" onclick="editShopItem('${item.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteShopItem('${item.id}')">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = itemsHTML;
+}
+
+function openAddShopItemModal() {
+  document.getElementById('add-shop-item-modal').style.display = 'flex';
+  document.getElementById('shop-item-name').value = '';
+  document.getElementById('shop-item-description').value = '';
+  document.getElementById('shop-item-price').value = '';
+  document.getElementById('shop-item-stock').value = '-1';
+  document.getElementById('shop-item-type').value = 'item';
+  toggleRoleSelect();
+  loadRolesForShop();
+}
+
+function closeAddShopItemModal() {
+  document.getElementById('add-shop-item-modal').style.display = 'none';
+}
+
+function toggleRoleSelect() {
+  const type = document.getElementById('shop-item-type').value;
+  const roleGroup = document.getElementById('shop-item-role-group');
+  roleGroup.style.display = type === 'role' ? 'block' : 'none';
+}
+
+async function loadRolesForShop() {
+  const roleSelect = document.getElementById('shop-item-role');
+  if (!config.roles) return;
+
+  roleSelect.innerHTML = '<option value="">Select a role...</option>' +
+    config.roles
+      .filter(r => !r.managed && r.name !== '@everyone')
+      .map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`)
+      .join('');
+}
+
+async function saveShopItem() {
+  try {
+    const name = document.getElementById('shop-item-name').value.trim();
+    const description = document.getElementById('shop-item-description').value.trim();
+    const price = parseInt(document.getElementById('shop-item-price').value);
+    const stock = parseInt(document.getElementById('shop-item-stock').value);
+    const type = document.getElementById('shop-item-type').value;
+    const roleId = type === 'role' ? document.getElementById('shop-item-role').value : null;
+
+    if (!name || isNaN(price)) {
+      showToast('Invalid Input', 'Name and price are required', 'error');
+      return;
+    }
+
+    if (type === 'role' && !roleId) {
+      showToast('Invalid Input', 'Please select a role', 'error');
+      return;
+    }
+
+    const response = await fetch(`/api/guild/${guildId}/economy/shop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description, price, stock, type, roleId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create shop item');
+    }
+
+    showToast('Success', 'Shop item created successfully!', 'success');
+    closeAddShopItemModal();
+    loadShopItems();
+  } catch (error) {
+    console.error('Error creating shop item:', error);
+    showToast('Error', error.message || 'Failed to create shop item', 'error');
+  }
+}
+
+async function editShopItem(itemId) {
+  const item = shopItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  // For simplicity, we'll prompt for new values. In a real app, you'd use a modal like add
+  const newPrice = prompt(`Edit price for "${item.name}":`, item.price);
+  if (newPrice === null) return;
+
+  const newStock = prompt(`Edit stock for "${item.name}" (-1 for unlimited):`, item.stock);
+  if (newStock === null) return;
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/economy/shop/${itemId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        price: parseInt(newPrice),
+        stock: parseInt(newStock),
+      }),
+    });
+
+    if (!response.ok) throw new Error('Failed to update shop item');
+
+    showToast('Success', 'Shop item updated!', 'success');
+    loadShopItems();
+  } catch (error) {
+    console.error('Error updating shop item:', error);
+    showToast('Error', 'Failed to update shop item', 'error');
+  }
+}
+
+async function deleteShopItem(itemId) {
+  const item = shopItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  if (!confirm(`Are you sure you want to delete "${item.name}"?`)) return;
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/economy/shop/${itemId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) throw new Error('Failed to delete shop item');
+
+    showToast('Success', 'Shop item deleted!', 'success');
+    loadShopItems();
+  } catch (error) {
+    console.error('Error deleting shop item:', error);
+    showToast('Error', 'Failed to delete shop item', 'error');
+  }
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 
@@ -1731,6 +1944,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadGuildInfo();
   initializeDisclosures();
   initializeHealthToggle();
+  loadShopItems();
 
   // Setup analytics link with proper href for accessibility
   const analyticsLink = document.getElementById('analytics-link');

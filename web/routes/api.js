@@ -624,4 +624,119 @@ router.delete('/guild/:guildId/xp/reset', ensureServerManager, async (req, res) 
   }
 });
 
+// ============================================
+// ECONOMY SHOP ROUTES
+// ============================================
+
+const {
+  getShopItems,
+  addShopItem,
+  updateShopItem,
+  deleteShopItem,
+} = require('../../utils/economy');
+
+// Get all shop items
+router.get('/guild/:guildId/economy/shop', ensureServerManager, async (req, res) => {
+  try {
+    const items = getShopItems(req.params.guildId);
+    res.json({ items });
+  } catch (error) {
+    console.error('Error fetching shop items:', error);
+    res.status(500).json({ error: 'Failed to fetch shop items' });
+  }
+});
+
+// Create a shop item
+router.post('/guild/:guildId/economy/shop', ensureServerManager, async (req, res) => {
+  try {
+    const { name, description, price, type, roleId, stock } = req.body;
+
+    if (!name || price === undefined) {
+      return res.status(400).json({ error: 'name and price are required' });
+    }
+
+    const priceNum = Number(price);
+    if (isNaN(priceNum) || priceNum < 0) {
+      return res.status(400).json({ error: 'price must be a positive number' });
+    }
+
+    if (type === 'role' && !roleId) {
+      return res.status(400).json({ error: 'roleId is required for role items' });
+    }
+
+    const stockNum = stock !== undefined ? Number(stock) : -1;
+    if (isNaN(stockNum) || stockNum < -1) {
+      return res.status(400).json({ error: 'stock must be -1 (unlimited) or a positive number' });
+    }
+
+    const item = addShopItem(req.params.guildId, {
+      name: name.trim(),
+      description: description?.trim() || '',
+      price: priceNum,
+      type: type || 'item',
+      roleId: roleId || null,
+      stock: stockNum,
+    });
+
+    res.json({ item });
+  } catch (error) {
+    console.error('Error creating shop item:', error);
+    res.status(500).json({ error: 'Failed to create shop item' });
+  }
+});
+
+// Update a shop item
+router.put('/guild/:guildId/economy/shop/:itemId', ensureServerManager, async (req, res) => {
+  try {
+    const { name, description, price, type, roleId, stock } = req.body;
+    const updates = {};
+
+    if (name !== undefined) updates.name = name.trim();
+    if (description !== undefined) updates.description = description.trim();
+    if (price !== undefined) {
+      const priceNum = Number(price);
+      if (isNaN(priceNum) || priceNum < 0) {
+        return res.status(400).json({ error: 'price must be a positive number' });
+      }
+      updates.price = priceNum;
+    }
+    if (type !== undefined) updates.type = type;
+    if (roleId !== undefined) updates.roleId = roleId;
+    if (stock !== undefined) {
+      const stockNum = Number(stock);
+      if (isNaN(stockNum) || stockNum < -1) {
+        return res.status(400).json({ error: 'stock must be -1 (unlimited) or a positive number' });
+      }
+      updates.stock = stockNum;
+    }
+
+    const item = updateShopItem(req.params.guildId, req.params.itemId, updates);
+
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    res.json({ item });
+  } catch (error) {
+    console.error('Error updating shop item:', error);
+    res.status(500).json({ error: 'Failed to update shop item' });
+  }
+});
+
+// Delete a shop item
+router.delete('/guild/:guildId/economy/shop/:itemId', ensureServerManager, async (req, res) => {
+  try {
+    const success = deleteShopItem(req.params.guildId, req.params.itemId);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting shop item:', error);
+    res.status(500).json({ error: 'Failed to delete shop item' });
+  }
+});
+
 module.exports = router;

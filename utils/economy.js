@@ -21,6 +21,10 @@ function getDefaultEconomyConfig() {
     currencySymbol: "💰",
     dailyReward: 100,
     dailyCooldownHours: 24,
+    workRewardMin: 50,
+    workRewardMax: 150,
+    workCooldownMinutes: 60,
+    startingBalance: 100,
   };
 }
 
@@ -29,7 +33,10 @@ function getDefaultGuildEconomy() {
     config: getDefaultEconomyConfig(),
     balances: {},
     daily: {},
+    work: {},
     transactions: [],
+    shop: [],
+    inventory: {},
   };
 }
 
@@ -133,6 +140,17 @@ function updateEconomyConfig(guildId, updates) {
 
 function getBalance(guildId, userId) {
   const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+
+  // If user has no balance set and starting balance is configured, initialize it
+  if (guildData.balances[userId] === undefined) {
+    const startingBalance = config.startingBalance || 0;
+    if (startingBalance > 0) {
+      guildData.balances[userId] = startingBalance;
+      saveEconomyData();
+    }
+  }
+
   return Number(guildData.balances[userId] || 0);
 }
 
@@ -241,14 +259,250 @@ function formatCoins(amount, currencyName = "coins") {
   return `${Number(amount || 0).toLocaleString()} ${currencyName}`;
 }
 
+// Work command functionality
+function claimWork(guildId, userId, now = new Date()) {
+  const nowMs = now.getTime();
+  const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+  const workData = guildData.work[userId] || {};
+
+  const cooldownMs = (config.workCooldownMinutes || 60) * 60 * 1000;
+
+  if (workData.lastWorkAt) {
+    const lastWorkMs = new Date(workData.lastWorkAt).getTime();
+    const elapsed = nowMs - lastWorkMs;
+
+    if (elapsed < cooldownMs) {
+      const remainingMs = cooldownMs - elapsed;
+      return {
+        ok: false,
+        remainingMs,
+        nextWorkAt: new Date(nowMs + remainingMs).toISOString(),
+        balance: getBalance(guildId, userId),
+      };
+    }
+  }
+
+  // Calculate random reward between min and max
+  const min = config.workRewardMin || 50;
+  const max = config.workRewardMax || 150;
+  const reward = Math.floor(Math.random() * (max - min + 1)) + min;
+
+  workData.lastWorkAt = new Date(nowMs).toISOString();
+  workData.totalWorks = (workData.totalWorks || 0) + 1;
+  guildData.work[userId] = workData;
+
+  const result = addBalance(guildId, userId, reward, {
+    type: "work_reward",
+    reason: "Work command",
+  });
+
+  return {
+    ok: true,
+    reward,
+    balance: result.balance,
+    nextWorkAt: new Date(nowMs + cooldownMs).toISOString(),
+  };
+}
+
+// Shop item management
+function addShopItem(guildId, itemData) {
+  const guildData = getGuildEconomy(guildId);
+  const item = {
+    id: randomUUID(),
+    name: itemData.name,
+    description: itemData.description || "",
+    price: itemData.price,
+    type: itemData.type || "item", // "item", "role"
+    roleId: itemData.roleId || null,
+    metadata: itemData.metadata || {},
+    stock: itemData.stock || -1, // -1 = unlimited
+    createdAt: new Date().toISOString(),
+  };
+
+  guildData.shop.push(item);
+  saveEconomyData();
+  return item;
+}
+
+function getShopItems(guildId) {
+  const guildData = getGuildEconomy(guildId);
+  return guildData.shop || [];
+}
+
+function getShopItem(guildId, itemId) {
+  const guildData = getGuildEconomy(guildId);
+  return guildData.shop.find(item => item.id === itemId);
+}
+
+function updateShopItem(guildId, itemId, updates) {
+  const guildData = getGuildEconomy(guildId);
+  const itemIndex = guildData.shop.findIndex(item => item.id === itemId);
+
+  if (itemIndex === -1) {
+    return null;
+  }
+
+  guildData.shop[itemIndex] = {
+    ...guildData.shop[itemIndex],
+    ...updates,
+    id: itemId, // Preserve ID
+  };
+
+  saveEconomyData();
+  return guildData.shop[itemIndex];
+}
+
+function deleteShopItem(guildId, itemId) {
+  const guildData = getGuildEconomy(guildId);
+  const itemIndex = guildData.shop.findIndex(item => item.id === itemId);
+
+  if (itemIndex === -1) {
+    return false;
+  }
+
+  guildData.shop.splice(itemIndex, 1);
+  saveEconomyData();
+  return true;
+}
+
+// Purchase and inventory management
+function purchaseItem(guildId, userId, itemId) {
+  const guildData = getGuildEconomy(guildId);
+  const item = getShopItem(guildId, itemId);
+
+  if (!item) {
+    return { ok: false, error: "Item not found" };
+  }
+
+  if (item.stock !== -1 && item.stock <= 0) {
+    return { ok: false, error: "Item out of stock" };
+  }
+
+  const balance = getBalance(guildId, userId);
+
+  if (balance < item.price) {
+    return { ok: false, error: "Insufficient funds", balance, price: item.price };
+  }
+
+  // Deduct balance
+  addBalance(guildId, userId, -item.price, {
+    type: "purchase",
+    reason: `Purchased ${item.name}`,
+    metadata: { itemId: item.id, itemName: item.name },
+  });
+
+  // Add to inventory
+  if (!guildData.inventory[userId]) {
+    guildData.inventory[userId] = [];
+  }
+
+  const inventoryItem = {
+    id: randomUUID(),
+    itemId: item.id,
+    name: item.name,
+    description: item.description,
+    type: item.type,
+    roleId: item.roleId,
+    metadata: item.metadata,
+    purchasedAt: new Date().toISOString(),
+  };
+
+  guildData.inventory[userId].push(inventoryItem);
+
+  // Decrease stock if limited
+  if (item.stock !== -1) {
+    item.stock -= 1;
+  }
+
+  saveEconomyData();
+
+  return {
+    ok: true,
+    item: inventoryItem,
+    balance: getBalance(guildId, userId),
+  };
+}
+
+function getInventory(guildId, userId) {
+  const guildData = getGuildEconomy(guildId);
+  return guildData.inventory[userId] || [];
+}
+
+function removeInventoryItem(guildId, userId, inventoryItemId) {
+  const guildData = getGuildEconomy(guildId);
+
+  if (!guildData.inventory[userId]) {
+    return false;
+  }
+
+  const itemIndex = guildData.inventory[userId].findIndex(item => item.id === inventoryItemId);
+
+  if (itemIndex === -1) {
+    return false;
+  }
+
+  guildData.inventory[userId].splice(itemIndex, 1);
+  saveEconomyData();
+  return true;
+}
+
+// Leaderboard
+function getLeaderboard(guildId, limit = 10) {
+  const guildData = getGuildEconomy(guildId);
+  const balances = Object.entries(guildData.balances || {})
+    .map(([userId, balance]) => ({ userId, balance: Number(balance) }))
+    .filter(entry => entry.balance > 0)
+    .sort((a, b) => b.balance - a.balance)
+    .slice(0, limit);
+
+  return balances;
+}
+
+// Transfer coins between users
+function transferCoins(guildId, fromUserId, toUserId, amount) {
+  if (amount <= 0) {
+    return { ok: false, error: "Amount must be positive" };
+  }
+
+  const fromBalance = getBalance(guildId, fromUserId);
+
+  if (fromBalance < amount) {
+    return { ok: false, error: "Insufficient funds", balance: fromBalance };
+  }
+
+  // Deduct from sender
+  addBalance(guildId, fromUserId, -amount, {
+    type: "transfer_out",
+    reason: `Transferred to <@${toUserId}>`,
+    metadata: { recipientId: toUserId },
+  });
+
+  // Add to recipient
+  addBalance(guildId, toUserId, amount, {
+    type: "transfer_in",
+    reason: `Received from <@${fromUserId}>`,
+    metadata: { senderId: fromUserId },
+  });
+
+  return {
+    ok: true,
+    amount,
+    fromBalance: getBalance(guildId, fromUserId),
+    toBalance: getBalance(guildId, toUserId),
+  };
+}
+
 module.exports = {
   DAILY_REWARD,
   DAILY_COOLDOWN_MS,
   ECONOMY_EMBED_COLOR,
   addBalance,
   claimDaily,
+  claimWork,
   formatCoins,
   getBalance,
+  setBalance,
   getDailyCooldown,
   getEconomyConfig,
   updateEconomyConfig,
@@ -256,4 +510,14 @@ module.exports = {
   loadEconomyData,
   logTransaction,
   saveEconomyData,
+  addShopItem,
+  getShopItems,
+  getShopItem,
+  updateShopItem,
+  deleteShopItem,
+  purchaseItem,
+  getInventory,
+  removeInventoryItem,
+  getLeaderboard,
+  transferCoins,
 };
