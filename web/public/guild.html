@@ -144,6 +144,12 @@
             </svg>
             <span>Economy</span>
           </a>
+          <a href="#xp" class="guild-sidebar__link" data-section="xp">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+            </svg>
+            <span>XP & Levels</span>
+          </a>
         </div>
       </nav>
 
@@ -976,6 +982,173 @@
 
             <div class="mt-6">
               <button class="btn btn-primary" onclick="saveEconomySettings()">Save Economy Settings</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- XP & Levels Section -->
+      <section id="section-xp" class="guild-section">
+        <div class="card">
+          <div class="card__header">
+            <h3 class="card__title">
+              <span class="card__icon">⭐</span>
+              XP & Leveling System
+              <span class="badge" id="xp-status-badge">Active</span>
+            </h3>
+          </div>
+
+          <p class="card__description">
+            Reward members for participating in your server with XP, levels, and role rewards.
+          </p>
+
+          <!-- Enable/Disable Toggle -->
+          <div class="form-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="xp-enabled" onchange="updateXPStatus()">
+              <span class="toggle-switch__slider"></span>
+              <span class="toggle-switch__label">Enable XP System</span>
+            </label>
+          </div>
+
+          <div id="xp-settings">
+            <!-- Basic XP Settings -->
+            <div class="card__section">
+              <h4 class="card__section-title">XP Configuration</h4>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="xp-min">
+                    Min XP Per Message
+                    <span class="form-hint">Minimum XP awarded per message (1-100)</span>
+                  </label>
+                  <input type="number" class="form-input" id="xp-min" min="1" max="100" placeholder="10">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="xp-max">
+                    Max XP Per Message
+                    <span class="form-hint">Maximum XP awarded per message (1-100)</span>
+                  </label>
+                  <input type="number" class="form-input" id="xp-max" min="1" max="100" placeholder="20">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="xp-cooldown">
+                  XP Cooldown (seconds)
+                  <span class="form-hint">Time between XP gains (0-3600 seconds)</span>
+                </label>
+                <input type="number" class="form-input" id="xp-cooldown" min="0" max="3600" placeholder="60">
+              </div>
+            </div>
+
+            <!-- Level-Up Announcements -->
+            <div class="card__section">
+              <h4 class="card__section-title">Level-Up Announcements</h4>
+
+              <div class="form-group">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="xp-announce-levelup">
+                  <span class="toggle-switch__slider"></span>
+                  <span class="toggle-switch__label">Announce Level-Ups</span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="xp-levelup-channel">
+                  Level-Up Channel
+                  <span class="form-hint">Channel for level-up announcements (leave empty for same channel)</span>
+                </label>
+                <select class="form-input" id="xp-levelup-channel">
+                  <option value="">Same channel as message</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="xp-levelup-message">
+                  Level-Up Message
+                  <span class="form-hint">Use {user}, {level}, {xp} as placeholders</span>
+                </label>
+                <textarea class="form-input" id="xp-levelup-message" rows="2" placeholder="🎉 {user} just reached **Level {level}**! Keep it up!"></textarea>
+              </div>
+            </div>
+
+            <!-- Level Role Rewards -->
+            <div class="card__section">
+              <h4 class="card__section-title">Level Role Rewards</h4>
+              <p class="form-hint mb-4">Automatically assign roles when members reach specific levels</p>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="level-role-level">Level</label>
+                  <input type="number" class="form-input" id="level-role-level" min="1" max="1000" placeholder="5">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="level-role-role">Role</label>
+                  <select class="form-input" id="level-role-role">
+                    <option value="">Select a role...</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                  <button class="btn btn-secondary" onclick="addLevelRole()">Add Reward</button>
+                </div>
+              </div>
+
+              <div id="level-roles-list" class="mt-4">
+                <div class="loading">Loading level rewards...</div>
+              </div>
+            </div>
+
+            <!-- XP Leaderboard -->
+            <div class="card__section">
+              <h4 class="card__section-title">XP Leaderboard</h4>
+              <div id="xp-leaderboard" class="mt-4">
+                <div class="loading">Loading leaderboard...</div>
+              </div>
+            </div>
+
+            <!-- Advanced Settings -->
+            <div class="card__section">
+              <h4 class="card__section-title">Advanced Settings</h4>
+
+              <div class="form-group">
+                <label class="form-label">
+                  XP Gain Channels
+                  <span class="form-hint">If set, only these channels will give XP (leave empty for all channels)</span>
+                </label>
+                <div id="xp-gain-channels-list" class="role-list">
+                  <div class="form-hint">No channels selected (all channels give XP)</div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">
+                  No XP Channels
+                  <span class="form-hint">Channels that won't give XP</span>
+                </label>
+                <div id="no-xp-channels-list" class="role-list">
+                  <div class="form-hint">No channels blacklisted</div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">
+                  No XP Roles
+                  <span class="form-hint">Users with these roles won't gain XP</span>
+                </label>
+                <div id="no-xp-roles-list" class="role-list">
+                  <div class="form-hint">No roles blacklisted</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="mt-6">
+              <button class="btn btn-primary" onclick="saveXPSettings()">Save XP Settings</button>
+              <button class="btn btn-secondary ml-2" onclick="loadXPConfig()">Reset Changes</button>
             </div>
           </div>
         </div>
