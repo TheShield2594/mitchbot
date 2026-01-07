@@ -115,16 +115,8 @@ const data = new SlashCommandBuilder()
     );
 
 async function execute(interaction) {
+        // Discord API enforces setMinValue(1), so betAmount is guaranteed to be >= 1
         const betAmount = interaction.options.getInteger("amount");
-
-        // Validate betAmount
-        if (!Number.isInteger(betAmount) || betAmount <= 0) {
-            await interaction.reply({
-                content: "Invalid bet amount. Please enter a positive number.",
-                ephemeral: true,
-            });
-            return;
-        }
 
         // Validate gambling command (checks guild, balance, initializes economy)
         const config = await validateGamblingCommand(interaction, betAmount);
@@ -222,7 +214,7 @@ async function execute(interaction) {
         await interaction.reply({ embeds: [embed], components: [row] });
 
             // Set timeout to auto-forfeit and refund after 2 minutes
-            setTimeout(async () => {
+            const timeoutId = setTimeout(async () => {
                 if (activeGames.has(gameId)) {
                     const expiredGame = activeGames.get(gameId);
                     activeGames.delete(gameId);
@@ -249,6 +241,9 @@ async function execute(interaction) {
                     }
                 }
             }, 120000);
+
+            // Store timeout ID on game object so it can be cleared when game ends
+            game.timeoutId = timeoutId;
         } catch (error) {
             // Refund bet on any error during game setup
             addBalance(interaction.guildId, interaction.user.id, betAmount, {
@@ -324,6 +319,8 @@ async function handleBlackjackButton(interaction) {
                 .setColor("#e74c3c")
                 .setDescription(`💥 **BUST!** You went over 21. You lost ${formatCoins(game.bet, config.currencyName)}.`);
 
+            // Clear timeout before deleting game
+            if (game.timeoutId) clearTimeout(game.timeoutId);
             activeGames.delete(gameId);
             await interaction.update({ embeds: [embed], components: [] });
 
@@ -430,6 +427,8 @@ async function handleBlackjackButton(interaction) {
             .setDescription(resultMessage)
             .addFields({ name: "New Balance", value: formatCoins(newBalance, config.currencyName), inline: true });
 
+        // Clear timeout before deleting game
+        if (game.timeoutId) clearTimeout(game.timeoutId);
         activeGames.delete(gameId);
         await interaction.update({ embeds: [embed], components: [] });
     }
