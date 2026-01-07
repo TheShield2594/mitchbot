@@ -4,6 +4,7 @@ const { updateUserStats } = require('../utils/achievements');
 const { awardCommandXP, getRolesForLevel, getGuildConfig } = require('../utils/xp');
 const logger = require('../utils/logger');
 const { handleCommandError } = require('../utils/commandErrors');
+const { handleBlackjackButton } = require('../commands/economy/blackjack');
 
 function getInteractionContext(interaction) {
   return {
@@ -17,6 +18,41 @@ function getInteractionContext(interaction) {
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
+    // Handle button interactions (e.g., blackjack)
+    if (interaction.isButton()) {
+      try {
+        const handled = await handleBlackjackButton(interaction);
+        if (handled) return;
+        // If blackjack didn't handle it, allow other button handlers to run
+        // Future button handlers can be added here
+      } catch (error) {
+        logger.error('Button interaction error', {
+          customId: interaction.customId,
+          error,
+        });
+
+        // Respond to the user so their interaction doesn't hang
+        try {
+          if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({
+              content: 'An error occurred while processing your button click.',
+              ephemeral: true,
+            });
+          } else {
+            await interaction.reply({
+              content: 'An error occurred while processing your button click.',
+              ephemeral: true,
+            });
+          }
+        } catch (replyError) {
+          logger.error('Failed to send button error response', {
+            customId: interaction.customId,
+            error: replyError,
+          });
+        }
+      }
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const interactionContext = getInteractionContext(interaction);
