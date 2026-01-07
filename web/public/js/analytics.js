@@ -4,6 +4,19 @@ let currentGuildId = null;
 let currentDays = 30;
 let charts = {};
 
+// HTML escape function to prevent XSS
+function escapeHtml(text) {
+  if (!text) return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
 // Get guild ID from URL
 function getGuildIdFromUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -572,15 +585,20 @@ function updateTopUsersLeaderboard(topUsers) {
     const rank = index + 1;
     const rankClass = rank <= 3 ? `leaderboard-rank--${rank}` : 'leaderboard-rank--other';
 
+    const escapedDisplayName = escapeHtml(user.displayName || user.username || 'Unknown User');
+    const escapedUsername = escapeHtml(user.username || 'Unknown User');
+    const escapedAvatar = escapeHtml(user.avatar);
+    const lastActive = user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'Never';
+
     return `
       <div class="leaderboard-item">
         <div class="leaderboard-rank ${rankClass}">${rank}</div>
         <div class="leaderboard-avatar">
-          ${user.avatar ? `<img src="${user.avatar}" alt="${user.displayName || user.username}">` : user.username.charAt(0).toUpperCase()}
+          ${escapedAvatar ? `<img src="${escapedAvatar}" alt="${escapedDisplayName}">` : escapeHtml(escapedUsername.charAt(0).toUpperCase())}
         </div>
         <div class="leaderboard-info">
-          <div class="leaderboard-name">${user.displayName || user.username || 'Unknown User'}</div>
-          <div class="leaderboard-detail">Last active: ${new Date(user.lastActive).toLocaleDateString()}</div>
+          <div class="leaderboard-name">${escapedDisplayName}</div>
+          <div class="leaderboard-detail">Last active: ${lastActive}</div>
         </div>
         <div class="leaderboard-value">${user.commandCount}</div>
       </div>
@@ -601,14 +619,19 @@ function updateTopViolatorsLeaderboard(topViolators) {
     const rank = index + 1;
     const rankClass = rank <= 3 ? `leaderboard-rank--${rank}` : 'leaderboard-rank--other';
 
+    const escapedDisplayName = escapeHtml(violator.displayName || violator.username || 'Unknown User');
+    const escapedUsername = escapeHtml(violator.username || 'Unknown User');
+    const escapedAvatar = escapeHtml(violator.avatar);
+    const firstLetter = escapedUsername.charAt(0).toUpperCase() || '?';
+
     return `
       <div class="leaderboard-item">
         <div class="leaderboard-rank ${rankClass}">${rank}</div>
         <div class="leaderboard-avatar">
-          ${violator.avatar ? `<img src="${violator.avatar}" alt="${violator.displayName || violator.username}">` : violator.username?.charAt(0).toUpperCase() || '?'}
+          ${escapedAvatar ? `<img src="${escapedAvatar}" alt="${escapedDisplayName}">` : firstLetter}
         </div>
         <div class="leaderboard-info">
-          <div class="leaderboard-name">${violator.displayName || violator.username || 'Unknown User'}</div>
+          <div class="leaderboard-name">${escapedDisplayName}</div>
           <div class="leaderboard-detail">AutoMod violations</div>
         </div>
         <div class="leaderboard-value">${violator.count}</div>

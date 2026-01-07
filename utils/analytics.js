@@ -2,6 +2,25 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const ANALYTICS_FILE = path.join(__dirname, '../data/analytics.json');
+const LOCK_FILE = path.join(__dirname, '../data/analytics.lock');
+
+// Simple file lock implementation
+const locks = new Map();
+
+async function acquireLock(key, timeout = 5000) {
+  const startTime = Date.now();
+  while (locks.has(key)) {
+    if (Date.now() - startTime > timeout) {
+      throw new Error(`Failed to acquire lock for ${key} after ${timeout}ms`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  locks.set(key, true);
+}
+
+function releaseLock(key) {
+  locks.delete(key);
+}
 
 // Initialize analytics data structure
 async function initAnalytics() {
@@ -29,26 +48,34 @@ async function writeAnalytics(data) {
 
 // Record member join/leave for growth tracking
 async function recordMemberChange(guildId, type, memberCount) {
-  const data = await readAnalytics();
+  const lockKey = 'analytics';
 
-  if (!data.memberGrowth[guildId]) {
-    data.memberGrowth[guildId] = [];
+  try {
+    await acquireLock(lockKey);
+
+    const data = await readAnalytics();
+
+    if (!data.memberGrowth[guildId]) {
+      data.memberGrowth[guildId] = [];
+    }
+
+    // Add new entry
+    data.memberGrowth[guildId].push({
+      timestamp: Date.now(),
+      count: memberCount,
+      type: type, // 'join' or 'leave'
+    });
+
+    // Keep only last 365 days of data (cleanup old entries)
+    const oneYearAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
+    data.memberGrowth[guildId] = data.memberGrowth[guildId].filter(
+      entry => entry.timestamp > oneYearAgo
+    );
+
+    await writeAnalytics(data);
+  } finally {
+    releaseLock(lockKey);
   }
-
-  // Add new entry
-  data.memberGrowth[guildId].push({
-    timestamp: Date.now(),
-    count: memberCount,
-    type: type, // 'join' or 'leave'
-  });
-
-  // Keep only last 365 days of data (cleanup old entries)
-  const oneYearAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
-  data.memberGrowth[guildId] = data.memberGrowth[guildId].filter(
-    entry => entry.timestamp > oneYearAgo
-  );
-
-  await writeAnalytics(data);
 }
 
 // Get member growth data for a time period
@@ -108,31 +135,53 @@ async function getCommandAnalytics(guildId, days = 30) {
       };
     }
 
-    // Get current week stats
+    const cutoffTime = Date.now() - (days * 24 * 60 * 60 * 1000);
     const currentWeek = guildStats.currentWeek || {};
-    const commands = currentWeek.commands || {};
+    const weeklySnapshots = guildStats.weeklySnapshots || [];
+
+    // Filter snapshots within the time window
+    const relevantSnapshots = weeklySnapshots.filter(
+      snapshot => snapshot.weekStart >= cutoffTime
+    );
+
+    // Include current week if it's within the window
+    const currentWeekStart = currentWeek.weekStart || Date.now();
+    if (currentWeekStart >= cutoffTime) {
+      relevantSnapshots.push(currentWeek);
+    }
+
+    // Aggregate commands from relevant time period
+    const aggregatedCommands = {};
+    relevantSnapshots.forEach(snapshot => {
+      const snapshotCommands = snapshot.commands || {};
+      Object.entries(snapshotCommands).forEach(([name, count]) => {
+        aggregatedCommands[name] = (aggregatedCommands[name] || 0) + count;
+      });
+    });
 
     // Sort commands by usage
-    const topCommands = Object.entries(commands)
+    const topCommands = Object.entries(aggregatedCommands)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10); // Top 10 commands
 
-    // Get historical trends from weekly snapshots
-    const weeklySnapshots = guildStats.weeklySnapshots || [];
-    const commandTrends = weeklySnapshots.slice(-12).map(snapshot => ({
-      week: new Date(snapshot.weekStart).toISOString().split('T')[0],
-      totalCommands: Object.values(snapshot.commands || {}).reduce((sum, count) => sum + count, 0),
-      uniqueUsers: Object.keys(snapshot.users || {}).length,
-    }));
+    // Get historical trends from filtered snapshots
+    const commandTrends = relevantSnapshots
+      .filter(snapshot => snapshot.weekStart) // Only snapshots with weekStart
+      .map(snapshot => ({
+        week: new Date(snapshot.weekStart).toISOString().split('T')[0],
+        totalCommands: Object.values(snapshot.commands || {}).reduce((sum, count) => sum + count, 0),
+        uniqueUsers: Object.keys(snapshot.users || {}).length,
+      }))
+      .sort((a, b) => new Date(a.week) - new Date(b.week));
 
-    const totalCommands = Object.values(commands).reduce((sum, count) => sum + count, 0);
+    const totalCommands = Object.values(aggregatedCommands).reduce((sum, count) => sum + count, 0);
 
     return {
       topCommands,
       totalCommands,
       commandTrends,
-      commandBreakdown: commands,
+      commandBreakdown: aggregatedCommands,
     };
   } catch (error) {
     console.error('Error reading command analytics:', error);
@@ -198,15 +247,22 @@ async function getAutomodViolations(guildId, days = 30) {
     const violationsByDate = {};
 
     violations.forEach(violation => {
-      // Extract violation type from reason
+      // Extract violation type from reason (case-insensitive)
       let type = 'Other';
-      if (violation.reason) {
-        if (violation.reason.includes('spam')) type = 'Spam';
-        else if (violation.reason.includes('invite')) type = 'Invite';
-        else if (violation.reason.includes('link')) type = 'Link';
-        else if (violation.reason.includes('word') || violation.reason.includes('filter')) type = 'Word Filter';
-        else if (violation.reason.includes('mention')) type = 'Mention Spam';
-        else if (violation.reason.includes('caps')) type = 'Caps';
+      const reason = (violation.reason || '').toLowerCase();
+
+      if (reason.includes('spam')) {
+        type = 'Spam';
+      } else if (reason.includes('invite')) {
+        type = 'Invite';
+      } else if (reason.includes('link')) {
+        type = 'Link';
+      } else if (reason.includes('word') || reason.includes('filter')) {
+        type = 'Word Filter';
+      } else if (reason.includes('mention')) {
+        type = 'Mention Spam';
+      } else if (reason.includes('caps')) {
+        type = 'Caps';
       }
 
       violationTypes[type] = (violationTypes[type] || 0) + 1;

@@ -222,7 +222,10 @@ router.get('/guild/:guildId/info', ensureServerManager, async (req, res) => {
 // Get comprehensive analytics summary
 router.get('/guild/:guildId/analytics', ensureServerManager, async (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 30;
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
     const analytics = await getAnalyticsSummary(req.params.guildId, days);
     res.json(analytics);
   } catch (error) {
@@ -234,7 +237,10 @@ router.get('/guild/:guildId/analytics', ensureServerManager, async (req, res) =>
 // Get member growth data
 router.get('/guild/:guildId/analytics/member-growth', ensureServerManager, async (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 30;
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
     const data = await getMemberGrowthData(req.params.guildId, days);
     res.json(data);
   } catch (error) {
@@ -246,7 +252,10 @@ router.get('/guild/:guildId/analytics/member-growth', ensureServerManager, async
 // Get command usage analytics
 router.get('/guild/:guildId/analytics/commands', ensureServerManager, async (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 30;
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
     const data = await getCommandAnalytics(req.params.guildId, days);
     res.json(data);
   } catch (error) {
@@ -258,7 +267,12 @@ router.get('/guild/:guildId/analytics/commands', ensureServerManager, async (req
 // Get top active users
 router.get('/guild/:guildId/analytics/top-users', ensureServerManager, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
+    let limit = parseInt(req.query.limit, 10);
+    if (isNaN(limit)) {
+      limit = 10;
+    }
+    // Clamp limit between 1 and 100
+    limit = Math.max(1, Math.min(100, limit));
     const data = await getTopUsers(req.params.guildId, limit);
 
     // Fetch user details from Discord
@@ -276,7 +290,8 @@ router.get('/guild/:guildId/analytics/top-users', ensureServerManager, async (re
               displayName: member.displayName,
               avatar: member.user.displayAvatarURL(),
             };
-          } catch {
+          } catch (memberError) {
+            // User may have left the server
             return {
               ...user,
               username: 'Unknown User',
@@ -288,7 +303,8 @@ router.get('/guild/:guildId/analytics/top-users', ensureServerManager, async (re
       );
 
       res.json(usersWithDetails);
-    } catch {
+    } catch (guildError) {
+      console.warn('Could not fetch Discord user details:', guildError.message);
       // If we can't fetch Discord data, return without user details
       res.json(data);
     }
@@ -301,7 +317,10 @@ router.get('/guild/:guildId/analytics/top-users', ensureServerManager, async (re
 // Get automod violation analytics
 router.get('/guild/:guildId/analytics/automod-violations', ensureServerManager, async (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 30;
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
     const data = await getAutomodViolations(req.params.guildId, days);
 
     // Fetch user details for top violators
@@ -319,7 +338,8 @@ router.get('/guild/:guildId/analytics/automod-violations', ensureServerManager, 
               displayName: member.displayName,
               avatar: member.user.displayAvatarURL(),
             };
-          } catch {
+          } catch (memberError) {
+            // User may have left the server
             return {
               ...violator,
               username: 'Unknown User',
@@ -334,7 +354,8 @@ router.get('/guild/:guildId/analytics/automod-violations', ensureServerManager, 
         ...data,
         topViolators: violatorsWithDetails,
       });
-    } catch {
+    } catch (guildError) {
+      console.warn('Could not fetch Discord user details:', guildError.message);
       // If we can't fetch Discord data, return without user details
       res.json(data);
     }

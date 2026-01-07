@@ -1732,12 +1732,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeDisclosures();
   initializeHealthToggle();
 
-  // Setup analytics link
+  // Setup analytics link with proper href for accessibility
   const analyticsLink = document.getElementById('analytics-link');
   if (analyticsLink) {
-    analyticsLink.addEventListener('click', (e) => {
-      e.preventDefault();
-      window.location.href = `/analytics.html?guild=${guildId}`;
-    });
+    const baseHref = analyticsLink.dataset.guildHref || '/analytics.html?guild=';
+    analyticsLink.href = `${baseHref}${guildId}`;
   }
 });
