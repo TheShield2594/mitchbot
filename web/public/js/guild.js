@@ -580,8 +580,8 @@ async function loadGuildInfo() {
     // Load logs
     loadLogs();
 
-    // Load birthdays
-    loadBirthdays();
+    // Initialize birthday UI now that config is loaded
+    initializeBirthdayUI();
   } catch (error) {
     console.error('Error loading guild info:', error);
     showToast('Error', 'Failed to load guild information', 'error');
@@ -1070,8 +1070,83 @@ async function loadLogs() {
 }
 
 // ============================================
-// LOAD BIRTHDAYS
+// BIRTHDAY MANAGEMENT
 // ============================================
+
+async function loadBirthdayConfig() {
+  try {
+    const response = await fetch(`/api/guild/${guildId}/config`);
+
+    if (!response.ok) {
+      throw new Error('Failed to load config');
+    }
+
+    const fetchedConfig = await response.json();
+    const birthdayConfig = fetchedConfig.birthday || {
+      enabled: false,
+      channelId: null,
+      roleId: null,
+      customMessage: 'Happy Birthday, {mention}! 🎉'
+    };
+
+    // Update UI
+    const enabledCheckbox = document.getElementById('birthday-enabled');
+    const configOptions = document.getElementById('birthday-config-options');
+    const channelSelect = document.getElementById('birthday-channel');
+    const roleSelect = document.getElementById('birthday-role');
+    const messageTextarea = document.getElementById('birthday-message');
+
+    enabledCheckbox.checked = birthdayConfig.enabled;
+    configOptions.style.display = birthdayConfig.enabled ? 'block' : 'none';
+
+    if (birthdayConfig.channelId) {
+      channelSelect.value = birthdayConfig.channelId;
+    }
+
+    if (birthdayConfig.roleId) {
+      roleSelect.value = birthdayConfig.roleId;
+    }
+
+    messageTextarea.value = birthdayConfig.customMessage || 'Happy Birthday, {mention}! 🎉';
+
+  } catch (error) {
+    console.error('Error loading birthday config:', error);
+    showToast('Error', 'Failed to load birthday configuration', 'error');
+  }
+}
+
+async function saveBirthdayConfig() {
+  try {
+    const enabledCheckbox = document.getElementById('birthday-enabled');
+    const channelSelect = document.getElementById('birthday-channel');
+    const roleSelect = document.getElementById('birthday-role');
+    const messageTextarea = document.getElementById('birthday-message');
+
+    const birthdayConfig = {
+      enabled: enabledCheckbox.checked,
+      channelId: channelSelect.value || null,
+      roleId: roleSelect.value || null,
+      customMessage: messageTextarea.value || 'Happy Birthday, {mention}! 🎉'
+    };
+
+    const response = await fetch(`/api/guild/${guildId}/config/birthday`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(birthdayConfig),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save config');
+    }
+
+    showToast('Success', 'Birthday configuration saved successfully!', 'success');
+  } catch (error) {
+    console.error('Error saving birthday config:', error);
+    showToast('Error', 'Failed to save birthday configuration', 'error');
+  }
+}
 
 async function loadBirthdays() {
   try {
@@ -1091,18 +1166,178 @@ async function loadBirthdays() {
       return;
     }
 
-    container.innerHTML = '<ul style="list-style: none; padding: 0;">';
+    // Create UL element properly
+    const ul = document.createElement('ul');
+    ul.style.cssText = 'list-style: none; padding: 0; margin: 0;';
 
     for (const [userId, date] of Object.entries(birthdays)) {
-      container.innerHTML += `<li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--border-color-light);">User ${escapeHtml(userId)}: ${escapeHtml(date)}</li>`;
+      const listItem = document.createElement('li');
+      listItem.style.cssText = 'padding: var(--space-2) 0; border-bottom: 1px solid var(--border-color-light); display: flex; justify-content: space-between; align-items: center;';
+
+      listItem.innerHTML = `
+        <span>User ${escapeHtml(userId)}: ${escapeHtml(date)}</span>
+        <button class="btn btn--danger btn--sm" data-delete-birthday="${userId}">Delete</button>
+      `;
+
+      ul.appendChild(listItem);
     }
 
-    container.innerHTML += '</ul>';
+    // Clear container and append the complete list
+    container.innerHTML = '';
+    container.appendChild(ul);
   } catch (error) {
     console.error('Error loading birthdays:', error);
     document.getElementById('birthdays-container').innerHTML =
       '<p class="text-muted">Failed to load birthdays.</p>';
   }
+}
+
+async function addBirthday() {
+  try {
+    const userIdInput = document.getElementById('birthday-user-id');
+    const dateInput = document.getElementById('birthday-date');
+
+    const userId = userIdInput.value.trim();
+    const date = dateInput.value.trim();
+
+    if (!userId || !date) {
+      showToast('Error', 'Please enter both User ID and Birthday', 'error');
+      return;
+    }
+
+    // Validate date format
+    const dateRegex = /^\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      showToast('Error', 'Invalid date format. Use MM-DD (e.g., 01-15)', 'error');
+      return;
+    }
+
+    // Proper date validation - check if date is actually valid
+    const [month, day] = date.split('-').map(Number);
+
+    // Use a leap year to allow Feb 29
+    const testDate = new Date(2024, month - 1, day);
+    if (testDate.getMonth() !== month - 1 || testDate.getDate() !== day) {
+      showToast('Error', 'Invalid date. Please enter a valid calendar date', 'error');
+      return;
+    }
+
+    const response = await fetch(`/api/guild/${guildId}/birthdays`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId, date }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to add birthday');
+    }
+
+    showToast('Success', 'Birthday added successfully!', 'success');
+    userIdInput.value = '';
+    dateInput.value = '';
+    loadBirthdays();
+  } catch (error) {
+    console.error('Error adding birthday:', error);
+    showToast('Error', 'Failed to add birthday', 'error');
+  }
+}
+
+async function deleteBirthday(userId) {
+  if (!confirm(`Are you sure you want to delete the birthday for user ${userId}?`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/birthdays/${userId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete birthday');
+    }
+
+    showToast('Success', 'Birthday deleted successfully!', 'success');
+    loadBirthdays();
+  } catch (error) {
+    console.error('Error deleting birthday:', error);
+    showToast('Error', 'Failed to delete birthday', 'error');
+  }
+}
+
+function populateBirthdayChannels() {
+  const channelSelect = document.getElementById('birthday-channel');
+
+  // Clear existing options except the first one
+  channelSelect.innerHTML = '<option value="">Select a channel...</option>';
+
+  // Add text channels from cached config
+  if (config && config.channels && Array.isArray(config.channels)) {
+    config.channels
+      .filter(ch => ch.type === 'GUILD_TEXT' || ch.type === 0)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `# ${channel.name}`;
+        channelSelect.appendChild(option);
+      });
+  }
+}
+
+function populateBirthdayRoles() {
+  const roleSelect = document.getElementById('birthday-role');
+
+  // Clear existing options except the first one
+  roleSelect.innerHTML = '<option value="">No role</option>';
+
+  // Add roles from cached config
+  if (config && config.roles && Array.isArray(config.roles)) {
+    config.roles
+      .filter(role => role.name !== '@everyone')
+      .sort((a, b) => b.position - a.position)
+      .forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        roleSelect.appendChild(option);
+      });
+  }
+}
+
+function initializeBirthdayUI() {
+  // Toggle config options when enabled checkbox changes
+  const enabledCheckbox = document.getElementById('birthday-enabled');
+  const configOptions = document.getElementById('birthday-config-options');
+
+  enabledCheckbox.addEventListener('change', () => {
+    configOptions.style.display = enabledCheckbox.checked ? 'block' : 'none';
+  });
+
+  // Save config button
+  const saveConfigBtn = document.getElementById('save-birthday-config');
+  saveConfigBtn.addEventListener('click', saveBirthdayConfig);
+
+  // Add birthday button
+  const addBirthdayBtn = document.getElementById('add-birthday-btn');
+  addBirthdayBtn.addEventListener('click', addBirthday);
+
+  // Delegated event listener for delete buttons
+  const birthdaysContainer = document.getElementById('birthdays-container');
+  birthdaysContainer.addEventListener('click', (event) => {
+    const deleteBtn = event.target.closest('[data-delete-birthday]');
+    if (deleteBtn) {
+      const userId = deleteBtn.dataset.deleteBirthday;
+      deleteBirthday(userId);
+    }
+  });
+
+  // Load data
+  populateBirthdayChannels();
+  populateBirthdayRoles();
+  loadBirthdayConfig();
+  loadBirthdays();
 }
 
 // ============================================

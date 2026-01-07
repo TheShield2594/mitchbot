@@ -823,8 +823,96 @@
             Automatically celebrate member birthdays with announcements and special roles.
           </p>
 
-          <div id="birthdays-container">
-            <div class="loading">Loading birthday data...</div>
+          <!-- Birthday Configuration -->
+          <div class="form-group">
+            <h4 class="section-subtitle">Configuration</h4>
+
+            <label class="toggle-label" for="birthday-enabled">
+              <input type="checkbox" id="birthday-enabled" class="toggle-input" />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">Enable Birthday Notifications</span>
+            </label>
+
+            <div id="birthday-config-options" style="display: none; margin-top: 1rem;">
+              <div class="form-group">
+                <label for="birthday-channel">Announcement Channel</label>
+                <select id="birthday-channel" class="form-input">
+                  <option value="">Select a channel...</option>
+                </select>
+                <p class="form-help">Channel where birthday announcements will be posted</p>
+              </div>
+
+              <div class="form-group">
+                <label for="birthday-role">Birthday Role (Optional)</label>
+                <select id="birthday-role" class="form-input">
+                  <option value="">No role</option>
+                </select>
+                <p class="form-help">Role to assign to members on their birthday (removed after 24 hours)</p>
+              </div>
+
+              <div class="form-group">
+                <label for="birthday-message">Custom Message</label>
+                <textarea
+                  id="birthday-message"
+                  class="form-input"
+                  rows="3"
+                  placeholder="Happy Birthday, {mention}! 🎉"
+                ></textarea>
+                <p class="form-help">
+                  Available placeholders: {mention}, {username}, {user}<br>
+                  Example: "Happy Birthday, {mention}! Have an amazing day! 🎂"
+                </p>
+              </div>
+
+              <button id="save-birthday-config" class="btn btn--primary">
+                Save Configuration
+              </button>
+            </div>
+          </div>
+
+          <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);">
+
+          <!-- Add Birthday Form -->
+          <div class="form-group">
+            <h4 class="section-subtitle">Add Birthday</h4>
+
+            <div style="display: flex; gap: 1rem; align-items: flex-end;">
+              <div style="flex: 1;">
+                <label for="birthday-user-id">User ID</label>
+                <input
+                  type="text"
+                  id="birthday-user-id"
+                  class="form-input"
+                  placeholder="123456789012345678"
+                />
+              </div>
+
+              <div style="flex: 1;">
+                <label for="birthday-date">Birthday (MM-DD)</label>
+                <input
+                  type="text"
+                  id="birthday-date"
+                  class="form-input"
+                  placeholder="01-15"
+                  pattern="\d{2}-\d{2}"
+                />
+              </div>
+
+              <button id="add-birthday-btn" class="btn btn--primary">
+                Add Birthday
+              </button>
+            </div>
+            <p class="form-help">Enter the user ID and birthday in MM-DD format (e.g., 01-15 for January 15th)</p>
+          </div>
+
+          <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);">
+
+          <!-- Birthdays List -->
+          <div class="form-group">
+            <h4 class="section-subtitle">Registered Birthdays</h4>
+            <div id="birthdays-container">
+              <div class="loading">Loading birthday data...</div>
+            </div>
           </div>
         </div>
       </section>
