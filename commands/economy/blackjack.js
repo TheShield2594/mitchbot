@@ -142,18 +142,21 @@ async function execute(interaction) {
         });
 
         try {
-
         // Initialize game
         const deck = shuffleDeck(createDeck());
+        const playerHand = [deck.pop(), deck.pop()];
+        const dealerHand = [deck.pop(), deck.pop()];
+
         const game = {
             deck,
-            playerHand: [deck.pop(), deck.pop()],
-            dealerHand: [deck.pop(), deck.pop()],
+            playerHand,
+            dealerHand,
             bet: betAmount,
             guildId: interaction.guildId,
             userId: interaction.user.id,
         };
 
+        // Set immediately after game creation to prevent race condition
         activeGames.set(gameId, game);
 
         const playerValue = calculateHand(game.playerHand);
