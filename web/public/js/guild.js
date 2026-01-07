@@ -1731,4 +1731,11 @@ document.addEventListener('DOMContentLoaded', () => {
   loadGuildInfo();
   initializeDisclosures();
   initializeHealthToggle();
+
+  // Setup analytics link with proper href for accessibility
+  const analyticsLink = document.getElementById('analytics-link');
+  if (analyticsLink) {
+    const baseHref = analyticsLink.dataset.guildHref || '/analytics.html?guild=';
+    analyticsLink.href = `${baseHref}${guildId}`;
+  }
 });

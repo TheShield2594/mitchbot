@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics - Mitchbot</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/analytics.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+          integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="
+          crossorigin="anonymous"></script>
+</head>
+<body class="analytics-page">
+  <!-- Top Navigation -->
+  <nav class="navbar navbar--fixed">
+    <div class="navbar__container">
+      <div class="navbar__brand">
+        <span class="navbar__logo">📊</span>
+        <span class="navbar__title">Analytics</span>
+      </div>
+      <div class="navbar__nav">
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+          <span class="theme-toggle__icon">🌙</span>
+        </button>
+        <a href="/dashboard" class="btn btn-secondary btn-sm">
+          Dashboard
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <div class="analytics-container">
+    <div class="analytics-header">
+      <h1>Server Analytics</h1>
+      <div class="analytics-header__guild">
+        <img id="guild-icon" alt="Server icon" style="display: none;">
+        <span id="guild-name">Loading...</span>
+      </div>
+    </div>
+
+    <!-- Time Range Filter -->
+    <div class="time-filter">
+      <button type="button" data-days="7">Last 7 Days</button>
+      <button type="button" data-days="30" class="active">Last 30 Days</button>
+      <button type="button" data-days="90">Last 90 Days</button>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="loading-container">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="analytics-content" style="display: none;">
+      <!-- Stats Overview -->
+      <div class="analytics-grid">
+        <div class="stat-card">
+          <div class="stat-card__header">
+            <div class="stat-card__icon stat-card__icon--primary">👥</div>
+            <div class="stat-card__info">
+              <h3>Total Members</h3>
+              <div class="stat-card__value" id="stat-members">-</div>
+            </div>
+          </div>
+          <div class="stat-card__trend" id="stat-members-trend"></div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card__header">
+            <div class="stat-card__icon stat-card__icon--success">⚡</div>
+            <div class="stat-card__info">
+              <h3>Total Commands</h3>
+              <div class="stat-card__value" id="stat-commands">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card__header">
+            <div class="stat-card__icon stat-card__icon--warning">🎯</div>
+            <div class="stat-card__info">
+              <h3>Active Users</h3>
+              <div class="stat-card__value" id="stat-active-users">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card__header">
+            <div class="stat-card__icon stat-card__icon--danger">🛡️</div>
+            <div class="stat-card__info">
+              <h3>AutoMod Actions</h3>
+              <div class="stat-card__value" id="stat-violations">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Member Growth Chart -->
+      <div class="chart-card">
+        <h2>📈 Member Growth</h2>
+        <div class="chart-container">
+          <canvas id="member-growth-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Command Usage Charts -->
+      <div class="analytics-grid-2col">
+        <div class="chart-card">
+          <h2>⚡ Command Usage Over Time</h2>
+          <div class="chart-container">
+            <canvas id="command-trends-chart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h2>🎯 Top Commands</h2>
+          <div class="chart-container">
+            <canvas id="top-commands-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- AutoMod Violations -->
+      <div class="analytics-grid-2col">
+        <div class="chart-card">
+          <h2>🛡️ AutoMod Violations by Type</h2>
+          <div class="chart-container">
+            <canvas id="violations-type-chart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h2>📊 Violation Trends</h2>
+          <div class="chart-container">
+            <canvas id="violations-trends-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaderboards -->
+      <div class="analytics-grid-2col">
+        <div class="leaderboard">
+          <h2>🏆 Most Active Users</h2>
+          <div class="leaderboard-list" id="top-users-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="leaderboard">
+          <h2>⚠️ Top AutoMod Violators</h2>
+          <div class="leaderboard-list" id="top-violators-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Data State -->
+    <div id="no-data-state" style="display: none;">
+      <div class="no-data">
+        <div class="no-data__icon">📊</div>
+        <div class="no-data__text">Not enough data yet. Start using the bot to see analytics!</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/theme.js"></script>
+  <script src="/js/analytics.js"></script>
+</body>
+</html>

@@ -17,6 +17,13 @@ const {
   setChannelMultiplier,
   setRoleMultiplier,
 } = require('../../utils/xp');
+const {
+  getMemberGrowthData,
+  getCommandAnalytics,
+  getTopUsers,
+  getAutomodViolations,
+  getAnalyticsSummary
+} = require('../../utils/analytics');
 
 // Get bot client ID for OAuth links
 router.get('/client-id', (req, res) => {
@@ -182,46 +189,6 @@ router.delete('/guild/:guildId/birthdays/:userId', ensureServerManager, (req, re
   }
 });
 
-// Update birthday configuration
-router.patch('/guild/:guildId/config/birthday', ensureServerManager, async (req, res) => {
-  try {
-    const { guildId } = req.params;
-    const { enabled, channelId, roleId, customMessage } = req.body;
-
-    // Validate snowflake IDs if provided
-    const snowflakeRegex = /^\d{17,19}$/;
-    if (channelId !== undefined && channelId !== null && channelId !== '' && !snowflakeRegex.test(channelId)) {
-      return res.status(400).json({ error: 'Invalid channel ID format' });
-    }
-    if (roleId !== undefined && roleId !== null && roleId !== '' && !snowflakeRegex.test(roleId)) {
-      return res.status(400).json({ error: 'Invalid role ID format' });
-    }
-
-    // Validate custom message length
-    if (customMessage !== undefined && customMessage !== null) {
-      if (typeof customMessage !== 'string') {
-        return res.status(400).json({ error: 'Custom message must be a string' });
-      }
-      if (customMessage.length > 2000) {
-        return res.status(400).json({ error: 'Custom message must be 2000 characters or less' });
-      }
-    }
-
-    // Build update object with only provided fields
-    const updates = {};
-    if (enabled !== undefined) updates.enabled = enabled;
-    if (channelId !== undefined) updates.channelId = channelId;
-    if (roleId !== undefined) updates.roleId = roleId;
-    if (customMessage !== undefined) updates.customMessage = customMessage;
-
-    const config = await updateGuildConfig(guildId, { birthday: updates });
-    res.json({ success: true, birthday: config.birthday });
-  } catch (error) {
-    console.error('Error updating birthday config:', error);
-    res.status(500).json({ error: 'Failed to update birthday configuration' });
-  }
-});
-
 // Get guild info from bot
 router.get('/guild/:guildId/info', ensureServerManager, async (req, res) => {
   try {
@@ -249,6 +216,158 @@ router.get('/guild/:guildId/info', ensureServerManager, async (req, res) => {
     res.status(500).json({ error: 'Failed to get guild info' });
   }
 });
+
+// ============== ANALYTICS ENDPOINTS ==============
+
+// Get comprehensive analytics summary
+router.get('/guild/:guildId/analytics', ensureServerManager, async (req, res) => {
+  try {
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
+    const analytics = await getAnalyticsSummary(req.params.guildId, days);
+    res.json(analytics);
+  } catch (error) {
+    console.error('Error getting analytics summary:', error);
+    res.status(500).json({ error: 'Failed to get analytics' });
+  }
+});
+
+// Get member growth data
+router.get('/guild/:guildId/analytics/member-growth', ensureServerManager, async (req, res) => {
+  try {
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
+    const data = await getMemberGrowthData(req.params.guildId, days);
+    res.json(data);
+  } catch (error) {
+    console.error('Error getting member growth data:', error);
+    res.status(500).json({ error: 'Failed to get member growth data' });
+  }
+});
+
+// Get command usage analytics
+router.get('/guild/:guildId/analytics/commands', ensureServerManager, async (req, res) => {
+  try {
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
+    const data = await getCommandAnalytics(req.params.guildId, days);
+    res.json(data);
+  } catch (error) {
+    console.error('Error getting command analytics:', error);
+    res.status(500).json({ error: 'Failed to get command analytics' });
+  }
+});
+
+// Get top active users
+router.get('/guild/:guildId/analytics/top-users', ensureServerManager, async (req, res) => {
+  try {
+    let limit = parseInt(req.query.limit, 10);
+    if (isNaN(limit)) {
+      limit = 10;
+    }
+    // Clamp limit between 1 and 100
+    limit = Math.max(1, Math.min(100, limit));
+    const data = await getTopUsers(req.params.guildId, limit);
+
+    // Fetch user details from Discord
+    try {
+      const client = req.app.get('client');
+      const guild = await client.guilds.fetch(req.params.guildId);
+
+      const usersWithDetails = await Promise.all(
+        data.map(async (user) => {
+          try {
+            const member = await guild.members.fetch(user.userId);
+            return {
+              ...user,
+              username: member.user.username,
+              displayName: member.displayName,
+              avatar: member.user.displayAvatarURL(),
+            };
+          } catch (memberError) {
+            // User may have left the server
+            return {
+              ...user,
+              username: 'Unknown User',
+              displayName: 'Unknown User',
+              avatar: null,
+            };
+          }
+        })
+      );
+
+      res.json(usersWithDetails);
+    } catch (guildError) {
+      console.warn('Could not fetch Discord user details:', guildError.message);
+      // If we can't fetch Discord data, return without user details
+      res.json(data);
+    }
+  } catch (error) {
+    console.error('Error getting top users:', error);
+    res.status(500).json({ error: 'Failed to get top users' });
+  }
+});
+
+// Get automod violation analytics
+router.get('/guild/:guildId/analytics/automod-violations', ensureServerManager, async (req, res) => {
+  try {
+    let days = parseInt(req.query.days, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      days = 30; // Default to 30 days
+    }
+    const data = await getAutomodViolations(req.params.guildId, days);
+
+    // Fetch user details for top violators
+    try {
+      const client = req.app.get('client');
+      const guild = await client.guilds.fetch(req.params.guildId);
+
+      const violatorsWithDetails = await Promise.all(
+        data.topViolators.map(async (violator) => {
+          try {
+            const member = await guild.members.fetch(violator.userId);
+            return {
+              ...violator,
+              username: member.user.username,
+              displayName: member.displayName,
+              avatar: member.user.displayAvatarURL(),
+            };
+          } catch (memberError) {
+            // User may have left the server
+            return {
+              ...violator,
+              username: 'Unknown User',
+              displayName: 'Unknown User',
+              avatar: null,
+            };
+          }
+        })
+      );
+
+      res.json({
+        ...data,
+        topViolators: violatorsWithDetails,
+      });
+    } catch (guildError) {
+      console.warn('Could not fetch Discord user details:', guildError.message);
+      // If we can't fetch Discord data, return without user details
+      res.json(data);
+    }
+  } catch (error) {
+    console.error('Error getting automod violations:', error);
+    res.status(500).json({ error: 'Failed to get automod violations' });
+  }
+});
+
+// ============================================
+// ECONOMY SYSTEM ENDPOINTS
+// ============================================
 
 // Get economy configuration
 router.get('/guild/:guildId/economy/config', ensureServerManager, (req, res) => {
