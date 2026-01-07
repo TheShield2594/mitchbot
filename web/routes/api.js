@@ -3,6 +3,13 @@ const router = express.Router();
 const { ensureServerManager } = require('../middleware/auth');
 const { getGuildConfig, updateGuildConfig, getLogs, getWarnings, clearWarnings } = require('../../utils/moderation');
 const { getBirthdays, addBirthday, removeBirthday } = require('../../utils/birthdays');
+const {
+  getMemberGrowthData,
+  getCommandAnalytics,
+  getTopUsers,
+  getAutomodViolations,
+  getAnalyticsSummary
+} = require('../../utils/analytics');
 
 // Get bot client ID for OAuth links
 router.get('/client-id', (req, res) => {
@@ -193,6 +200,133 @@ router.get('/guild/:guildId/info', ensureServerManager, async (req, res) => {
   } catch (error) {
     console.error('Error getting guild info:', error);
     res.status(500).json({ error: 'Failed to get guild info' });
+  }
+});
+
+// ============== ANALYTICS ENDPOINTS ==============
+
+// Get comprehensive analytics summary
+router.get('/guild/:guildId/analytics', ensureServerManager, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const analytics = await getAnalyticsSummary(req.params.guildId, days);
+    res.json(analytics);
+  } catch (error) {
+    console.error('Error getting analytics summary:', error);
+    res.status(500).json({ error: 'Failed to get analytics' });
+  }
+});
+
+// Get member growth data
+router.get('/guild/:guildId/analytics/member-growth', ensureServerManager, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const data = await getMemberGrowthData(req.params.guildId, days);
+    res.json(data);
+  } catch (error) {
+    console.error('Error getting member growth data:', error);
+    res.status(500).json({ error: 'Failed to get member growth data' });
+  }
+});
+
+// Get command usage analytics
+router.get('/guild/:guildId/analytics/commands', ensureServerManager, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const data = await getCommandAnalytics(req.params.guildId, days);
+    res.json(data);
+  } catch (error) {
+    console.error('Error getting command analytics:', error);
+    res.status(500).json({ error: 'Failed to get command analytics' });
+  }
+});
+
+// Get top active users
+router.get('/guild/:guildId/analytics/top-users', ensureServerManager, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const data = await getTopUsers(req.params.guildId, limit);
+
+    // Fetch user details from Discord
+    try {
+      const client = req.app.get('client');
+      const guild = await client.guilds.fetch(req.params.guildId);
+
+      const usersWithDetails = await Promise.all(
+        data.map(async (user) => {
+          try {
+            const member = await guild.members.fetch(user.userId);
+            return {
+              ...user,
+              username: member.user.username,
+              displayName: member.displayName,
+              avatar: member.user.displayAvatarURL(),
+            };
+          } catch {
+            return {
+              ...user,
+              username: 'Unknown User',
+              displayName: 'Unknown User',
+              avatar: null,
+            };
+          }
+        })
+      );
+
+      res.json(usersWithDetails);
+    } catch {
+      // If we can't fetch Discord data, return without user details
+      res.json(data);
+    }
+  } catch (error) {
+    console.error('Error getting top users:', error);
+    res.status(500).json({ error: 'Failed to get top users' });
+  }
+});
+
+// Get automod violation analytics
+router.get('/guild/:guildId/analytics/automod-violations', ensureServerManager, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const data = await getAutomodViolations(req.params.guildId, days);
+
+    // Fetch user details for top violators
+    try {
+      const client = req.app.get('client');
+      const guild = await client.guilds.fetch(req.params.guildId);
+
+      const violatorsWithDetails = await Promise.all(
+        data.topViolators.map(async (violator) => {
+          try {
+            const member = await guild.members.fetch(violator.userId);
+            return {
+              ...violator,
+              username: member.user.username,
+              displayName: member.displayName,
+              avatar: member.user.displayAvatarURL(),
+            };
+          } catch {
+            return {
+              ...violator,
+              username: 'Unknown User',
+              displayName: 'Unknown User',
+              avatar: null,
+            };
+          }
+        })
+      );
+
+      res.json({
+        ...data,
+        topViolators: violatorsWithDetails,
+      });
+    } catch {
+      // If we can't fetch Discord data, return without user details
+      res.json(data);
+    }
+  } catch (error) {
+    console.error('Error getting automod violations:', error);
+    res.status(500).json({ error: 'Failed to get automod violations' });
   }
 });
 

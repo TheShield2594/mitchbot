@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics - Mitchbot</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .analytics-page {
+      background: var(--background);
+      min-height: 100vh;
+    }
+
+    .analytics-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 80px 20px 40px;
+    }
+
+    .analytics-header {
+      margin-bottom: 30px;
+    }
+
+    .analytics-header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .analytics-header__guild {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-secondary);
+    }
+
+    .analytics-header__guild img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+    }
+
+    .time-filter {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+
+    .time-filter button {
+      padding: 8px 16px;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      color: var(--text-primary);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+
+    .time-filter button:hover {
+      border-color: var(--primary);
+      background: var(--surface-hover);
+    }
+
+    .time-filter button.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      transition: transform 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .stat-card__header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card__icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .stat-card__icon--primary {
+      background: rgba(88, 101, 242, 0.1);
+    }
+
+    .stat-card__icon--success {
+      background: rgba(87, 242, 135, 0.1);
+    }
+
+    .stat-card__icon--warning {
+      background: rgba(254, 231, 92, 0.1);
+    }
+
+    .stat-card__icon--danger {
+      background: rgba(237, 66, 69, 0.1);
+    }
+
+    .stat-card__info h3 {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .stat-card__value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .stat-card__trend {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.875rem;
+      margin-top: 8px;
+    }
+
+    .stat-card__trend--positive {
+      color: var(--success);
+    }
+
+    .stat-card__trend--negative {
+      color: var(--danger);
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .chart-card h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+
+    .chart-container--tall {
+      height: 400px;
+    }
+
+    .leaderboard {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .leaderboard h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+    }
+
+    .leaderboard-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .leaderboard-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px;
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+
+    .leaderboard-item:hover {
+      background: var(--surface-hover);
+    }
+
+    .leaderboard-rank {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.875rem;
+    }
+
+    .leaderboard-rank--1 {
+      background: linear-gradient(135deg, #FFD700, #FFA500);
+      color: #000;
+    }
+
+    .leaderboard-rank--2 {
+      background: linear-gradient(135deg, #C0C0C0, #808080);
+      color: #000;
+    }
+
+    .leaderboard-rank--3 {
+      background: linear-gradient(135deg, #CD7F32, #8B4513);
+      color: #fff;
+    }
+
+    .leaderboard-rank--other {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .leaderboard-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .leaderboard-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .leaderboard-info {
+      flex: 1;
+    }
+
+    .leaderboard-name {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .leaderboard-detail {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .leaderboard-value {
+      font-weight: 700;
+      font-size: 1.125rem;
+      color: var(--text-primary);
+    }
+
+    .loading-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 400px;
+    }
+
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-secondary);
+    }
+
+    .no-data__icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+    }
+
+    .no-data__text {
+      font-size: 1.125rem;
+      font-weight: 500;
+    }
+
+    .analytics-grid-2col {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .analytics-container {
+        padding: 70px 15px 30px;
+      }
+
+      .analytics-header h1 {
+        font-size: 1.5rem;
+      }
+
+      .analytics-grid-2col {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-container {
+        height: 250px;
+      }
+    }
+  </style>
+</head>
+<body class="analytics-page">
+  <!-- Top Navigation -->
+  <nav class="navbar navbar--fixed">
+    <div class="navbar__container">
+      <div class="navbar__brand">
+        <span class="navbar__logo">📊</span>
+        <span class="navbar__title">Analytics</span>
+      </div>
+      <div class="navbar__nav">
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+          <span class="theme-toggle__icon">🌙</span>
+        </button>
+        <a href="/dashboard" class="btn btn-secondary btn-sm">
+          Dashboard
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <div class="analytics-container">
+    <div class="analytics-header">
+      <h1>Server Analytics</h1>
+      <div class="analytics-header__guild">
+        <img id="guild-icon" src="" alt="Server icon" style="display: none;">
+        <span id="guild-name">Loading...</span>
+      </div>
+    </div>
+
+    <!-- Time Range Filter -->
+    <div class="time-filter">
+      <button data-days="7">Last 7 Days</button>
+      <button data-days="30" class="active">Last 30 Days</button>
+      <button data-days="90">Last 90 Days</button>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="loading-container">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="analytics-content" style="display: none;">
+      <!-- Stats Overview -->
+      <div class="analytics-grid">
+        <div class="stat-card">
+          <div class="stat-card__header">
+            <div class="stat-card__icon stat-card__icon--primary">👥</div>
+            <div class="stat-card__info">
+              <h3>Total Members</h3>
+              <div class="stat-card__value" id="stat-members">-</div>
+            </div>
+          </div>
+          <div class="stat-card__trend" id="stat-members-trend"></div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card__header">
+            <div class="stat-card__icon stat-card__icon--success">⚡</div>
+            <div class="stat-card__info">
+              <h3>Total Commands</h3>
+              <div class="stat-card__value" id="stat-commands">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card__header">
+            <div class="stat-card__icon stat-card__icon--warning">🎯</div>
+            <div class="stat-card__info">
+              <h3>Active Users</h3>
+              <div class="stat-card__value" id="stat-active-users">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card__header">
+            <div class="stat-card__icon stat-card__icon--danger">🛡️</div>
+            <div class="stat-card__info">
+              <h3>AutoMod Actions</h3>
+              <div class="stat-card__value" id="stat-violations">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Member Growth Chart -->
+      <div class="chart-card">
+        <h2>📈 Member Growth</h2>
+        <div class="chart-container">
+          <canvas id="member-growth-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Command Usage Charts -->
+      <div class="analytics-grid-2col">
+        <div class="chart-card">
+          <h2>⚡ Command Usage Over Time</h2>
+          <div class="chart-container">
+            <canvas id="command-trends-chart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h2>🎯 Top Commands</h2>
+          <div class="chart-container">
+            <canvas id="top-commands-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- AutoMod Violations -->
+      <div class="analytics-grid-2col">
+        <div class="chart-card">
+          <h2>🛡️ AutoMod Violations by Type</h2>
+          <div class="chart-container">
+            <canvas id="violations-type-chart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h2>📊 Violation Trends</h2>
+          <div class="chart-container">
+            <canvas id="violations-trends-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaderboards -->
+      <div class="analytics-grid-2col">
+        <div class="leaderboard">
+          <h2>🏆 Most Active Users</h2>
+          <div class="leaderboard-list" id="top-users-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="leaderboard">
+          <h2>⚠️ Top AutoMod Violators</h2>
+          <div class="leaderboard-list" id="top-violators-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Data State -->
+    <div id="no-data-state" style="display: none;">
+      <div class="no-data">
+        <div class="no-data__icon">📊</div>
+        <div class="no-data__text">Not enough data yet. Start using the bot to see analytics!</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/theme.js"></script>
+  <script src="/js/analytics.js"></script>
+</body>
+</html>

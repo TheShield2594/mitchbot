@@ -904,4 +904,13 @@ document.addEventListener('DOMContentLoaded', () => {
   loadGuildInfo();
   initializeDisclosures();
   initializeHealthToggle();
+
+  // Setup analytics link
+  const analyticsLink = document.getElementById('analytics-link');
+  if (analyticsLink) {
+    analyticsLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.href = `/analytics.html?guild=${guildId}`;
+    });
+  }
 });
