@@ -101,7 +101,7 @@ module.exports = {
 
             const medals = ["🥇", "🥈", "🥉"];
             const description = leaderboard.map((entry, index) => {
-                const medal = index < 3 ? medals[index] : `**${index + 1}.**`;
+                const medal = medals[index] ?? `**${index + 1}.**`;
                 return `${medal} <@${entry.userId}> - ${formatCoins(entry.balance, config.currencyName)}`;
             }).join("\n");
 

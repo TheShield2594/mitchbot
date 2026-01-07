@@ -665,7 +665,7 @@ router.post('/guild/:guildId/economy/shop', ensureServerManager, async (req, res
 
     const priceNum = Number(price);
     if (isNaN(priceNum) || priceNum < 0) {
-      return res.status(400).json({ error: 'price must be a positive number' });
+      return res.status(400).json({ error: 'price must be a non-negative number' });
     }
 
     if (type === 'role' && !roleId) {
@@ -674,7 +674,7 @@ router.post('/guild/:guildId/economy/shop', ensureServerManager, async (req, res
 
     const stockNum = stock !== undefined ? Number(stock) : -1;
     if (isNaN(stockNum) || stockNum < -1) {
-      return res.status(400).json({ error: 'stock must be -1 (unlimited) or a positive number' });
+      return res.status(400).json({ error: 'stock must be -1 (unlimited) or a non-negative number' });
     }
 
     const item = addShopItem(req.params.guildId, {
@@ -718,7 +718,7 @@ router.put('/guild/:guildId/economy/shop/:itemId', ensureServerManager, async (r
       const trimmedPrice = typeof price === 'string' ? price.trim() : price;
       const priceNum = Number(trimmedPrice);
       if (isNaN(priceNum) || priceNum < 0) {
-        return res.status(400).json({ error: 'price must be a positive number' });
+        return res.status(400).json({ error: 'price must be a non-negative number' });
       }
       updates.price = priceNum;
     }
@@ -728,7 +728,7 @@ router.put('/guild/:guildId/economy/shop/:itemId', ensureServerManager, async (r
       const trimmedStock = typeof stock === 'string' ? stock.trim() : stock;
       const stockNum = Number(trimmedStock);
       if (isNaN(stockNum) || stockNum < -1) {
-        return res.status(400).json({ error: 'stock must be -1 (unlimited) or a positive number' });
+        return res.status(400).json({ error: 'stock must be -1 (unlimited) or a non-negative number' });
       }
       updates.stock = stockNum;
     }
