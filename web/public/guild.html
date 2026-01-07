@@ -1123,6 +1123,16 @@
           <div class="modal-body">
             <input type="hidden" id="edit-shop-item-id">
 
+            <div class="form-group">
+              <label class="form-label" for="edit-shop-item-name">Item Name</label>
+              <input type="text" class="form-input" id="edit-shop-item-name" maxlength="100" placeholder="Cool Item" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-shop-item-description">Description</label>
+              <textarea class="form-input" id="edit-shop-item-description" maxlength="500" rows="3" placeholder="A cool item that does something"></textarea>
+            </div>
+
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="edit-shop-item-price">Price</label>
@@ -1136,6 +1146,21 @@
                 </label>
                 <input type="number" class="form-input" id="edit-shop-item-stock" min="-1" placeholder="-1">
               </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-shop-item-type">Item Type</label>
+              <select class="form-input" id="edit-shop-item-type" onchange="toggleEditShopItemRoleSelect()">
+                <option value="item">Regular Item</option>
+                <option value="role">Role</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="edit-shop-item-role-group" style="display: none;">
+              <label class="form-label" for="edit-shop-item-role">Role</label>
+              <select class="form-input" id="edit-shop-item-role">
+                <option value="">Select a role...</option>
+              </select>
             </div>
           </div>
 
@@ -1278,7 +1303,13 @@
                   XP Gain Channels
                   <span class="form-hint">If set, only these channels will give XP (leave empty for all channels)</span>
                 </label>
-                <div id="xp-gain-channels-list" class="role-list">
+                <div class="form-row">
+                  <select class="form-input" id="xp-gain-channel-select" style="flex: 1;">
+                    <option value="">Select a channel...</option>
+                  </select>
+                  <button class="btn btn-secondary" onclick="addXPGainChannel()">Add</button>
+                </div>
+                <div id="xp-gain-channels-list" class="role-list mt-2">
                   <div class="form-hint">No channels selected (all channels give XP)</div>
                 </div>
               </div>
@@ -1288,7 +1319,13 @@
                   No XP Channels
                   <span class="form-hint">Channels that won't give XP</span>
                 </label>
-                <div id="no-xp-channels-list" class="role-list">
+                <div class="form-row">
+                  <select class="form-input" id="no-xp-channel-select" style="flex: 1;">
+                    <option value="">Select a channel...</option>
+                  </select>
+                  <button class="btn btn-secondary" onclick="addNoXPChannel()">Add</button>
+                </div>
+                <div id="no-xp-channels-list" class="role-list mt-2">
                   <div class="form-hint">No channels blacklisted</div>
                 </div>
               </div>
@@ -1298,7 +1335,13 @@
                   No XP Roles
                   <span class="form-hint">Users with these roles won't gain XP</span>
                 </label>
-                <div id="no-xp-roles-list" class="role-list">
+                <div class="form-row">
+                  <select class="form-input" id="no-xp-role-select" style="flex: 1;">
+                    <option value="">Select a role...</option>
+                  </select>
+                  <button class="btn btn-secondary" onclick="addNoXPRole()">Add</button>
+                </div>
+                <div id="no-xp-roles-list" class="role-list mt-2">
                   <div class="form-hint">No roles blacklisted</div>
                 </div>
               </div>

@@ -1524,6 +1524,9 @@ async function loadXPConfig() {
     // Load leaderboard
     loadXPLeaderboard();
 
+    // Initialize XP filters (channel/role dropdowns and current lists)
+    initializeXPFilters();
+
   } catch (error) {
     console.error('Error loading XP config:', error);
     showToast('Load Failed', 'Could not load XP configuration', 'error');
@@ -1556,6 +1559,9 @@ async function saveXPSettings() {
       announceLevelUp: document.getElementById('xp-announce-levelup').checked,
       levelUpChannel: document.getElementById('xp-levelup-channel').value || null,
       levelUpMessage: document.getElementById('xp-levelup-message').value.trim() || '🎉 {user} just reached **Level {level}**! Keep it up!',
+      xpGainChannels: xpConfig.xpGainChannels || [],
+      noXpChannels: xpConfig.noXpChannels || [],
+      noXpRoles: xpConfig.noXpRoles || [],
     };
 
     // Validate inputs
@@ -1746,6 +1752,181 @@ async function loadXPLeaderboard() {
   }
 }
 
+// XP FILTER MANAGEMENT
+function initializeXPFilters() {
+  // Populate channel dropdowns
+  const gainChannelSelect = document.getElementById('xp-gain-channel-select');
+  const noXpChannelSelect = document.getElementById('no-xp-channel-select');
+  const noXpRoleSelect = document.getElementById('no-xp-role-select');
+
+  if (config && config.channels) {
+    config.channels.forEach(channel => {
+      if (channel.type === 0 || channel.type === 'GUILD_TEXT') { // Text channels only
+        const option1 = document.createElement('option');
+        option1.value = channel.id;
+        option1.textContent = `#${channel.name}`;
+        gainChannelSelect.appendChild(option1);
+
+        const option2 = document.createElement('option');
+        option2.value = channel.id;
+        option2.textContent = `#${channel.name}`;
+        noXpChannelSelect.appendChild(option2);
+      }
+    });
+  }
+
+  // Populate role dropdown
+  if (guildRoles && guildRoles.length > 0) {
+    guildRoles.forEach(role => {
+      if (role.name !== '@everyone') {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        noXpRoleSelect.appendChild(option);
+      }
+    });
+  }
+
+  // Render current filters
+  renderXPFilters();
+}
+
+function renderXPFilters() {
+  if (!xpConfig) return;
+
+  // Render XP Gain Channels
+  const gainChannelsList = document.getElementById('xp-gain-channels-list');
+  if (!xpConfig.xpGainChannels || xpConfig.xpGainChannels.length === 0) {
+    gainChannelsList.innerHTML = '<div class="form-hint">No channels selected (all channels give XP)</div>';
+  } else {
+    gainChannelsList.innerHTML = xpConfig.xpGainChannels.map(channelId => {
+      const channel = config?.channels?.find(c => c.id === channelId);
+      const channelName = channel ? `#${channel.name}` : 'Unknown Channel';
+      return `
+        <div class="role-item">
+          <span>${escapeHtml(channelName)}</span>
+          <button class="btn btn-sm btn-danger" onclick="removeXPGainChannel('${channelId}')">Remove</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Render No XP Channels
+  const noXpChannelsList = document.getElementById('no-xp-channels-list');
+  if (!xpConfig.noXpChannels || xpConfig.noXpChannels.length === 0) {
+    noXpChannelsList.innerHTML = '<div class="form-hint">No channels blacklisted</div>';
+  } else {
+    noXpChannelsList.innerHTML = xpConfig.noXpChannels.map(channelId => {
+      const channel = config?.channels?.find(c => c.id === channelId);
+      const channelName = channel ? `#${channel.name}` : 'Unknown Channel';
+      return `
+        <div class="role-item">
+          <span>${escapeHtml(channelName)}</span>
+          <button class="btn btn-sm btn-danger" onclick="removeNoXPChannel('${channelId}')">Remove</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Render No XP Roles
+  const noXpRolesList = document.getElementById('no-xp-roles-list');
+  if (!xpConfig.noXpRoles || xpConfig.noXpRoles.length === 0) {
+    noXpRolesList.innerHTML = '<div class="form-hint">No roles blacklisted</div>';
+  } else {
+    noXpRolesList.innerHTML = xpConfig.noXpRoles.map(roleId => {
+      const role = guildRoles?.find(r => r.id === roleId);
+      const roleName = role ? role.name : 'Unknown Role';
+      return `
+        <div class="role-item">
+          <span>${escapeHtml(roleName)}</span>
+          <button class="btn btn-sm btn-danger" onclick="removeNoXPRole('${roleId}')">Remove</button>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function addXPGainChannel() {
+  const select = document.getElementById('xp-gain-channel-select');
+  const channelId = select.value;
+
+  if (!channelId) {
+    showToast('No Selection', 'Please select a channel', 'warning');
+    return;
+  }
+
+  if (!xpConfig.xpGainChannels) xpConfig.xpGainChannels = [];
+
+  if (xpConfig.xpGainChannels.includes(channelId)) {
+    showToast('Already Added', 'This channel is already in the list', 'warning');
+    return;
+  }
+
+  xpConfig.xpGainChannels.push(channelId);
+  renderXPFilters();
+  select.value = '';
+}
+
+function removeXPGainChannel(channelId) {
+  if (!xpConfig.xpGainChannels) return;
+  xpConfig.xpGainChannels = xpConfig.xpGainChannels.filter(id => id !== channelId);
+  renderXPFilters();
+}
+
+function addNoXPChannel() {
+  const select = document.getElementById('no-xp-channel-select');
+  const channelId = select.value;
+
+  if (!channelId) {
+    showToast('No Selection', 'Please select a channel', 'warning');
+    return;
+  }
+
+  if (!xpConfig.noXpChannels) xpConfig.noXpChannels = [];
+
+  if (xpConfig.noXpChannels.includes(channelId)) {
+    showToast('Already Added', 'This channel is already in the blacklist', 'warning');
+    return;
+  }
+
+  xpConfig.noXpChannels.push(channelId);
+  renderXPFilters();
+  select.value = '';
+}
+
+function removeNoXPChannel(channelId) {
+  if (!xpConfig.noXpChannels) return;
+  xpConfig.noXpChannels = xpConfig.noXpChannels.filter(id => id !== channelId);
+  renderXPFilters();
+}
+
+function addNoXPRole() {
+  const select = document.getElementById('no-xp-role-select');
+  const roleId = select.value;
+
+  if (!roleId) {
+    showToast('No Selection', 'Please select a role', 'warning');
+    return;
+  }
+
+  if (!xpConfig.noXpRoles) xpConfig.noXpRoles = [];
+
+  if (xpConfig.noXpRoles.includes(roleId)) {
+    showToast('Already Added', 'This role is already in the blacklist', 'warning');
+    return;
+  }
+
+  xpConfig.noXpRoles.push(roleId);
+  renderXPFilters();
+  select.value = '';
+}
+
+function removeNoXPRole(roleId) {
+  if (!xpConfig.noXpRoles) return;
+  xpConfig.noXpRoles = xpConfig.noXpRoles.filter(id => id !== roleId);
+  renderXPFilters();
+}
+
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
@@ -1905,26 +2086,78 @@ function editShopItem(itemId) {
 
   // Populate the edit modal with current values
   document.getElementById('edit-shop-item-id').value = itemId;
+  document.getElementById('edit-shop-item-name').value = item.name;
+  document.getElementById('edit-shop-item-description').value = item.description || '';
   document.getElementById('edit-shop-item-price').value = item.price;
   document.getElementById('edit-shop-item-stock').value = item.stock;
+  document.getElementById('edit-shop-item-type').value = item.type || 'item';
+
+  // Populate role dropdown with current guild roles
+  const roleSelect = document.getElementById('edit-shop-item-role');
+  roleSelect.innerHTML = '<option value="">Select a role...</option>';
+  if (guildRoles && guildRoles.length > 0) {
+    guildRoles.forEach(role => {
+      if (role.name !== '@everyone') {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        if (item.roleId === role.id) option.selected = true;
+        roleSelect.appendChild(option);
+      }
+    });
+  }
+
+  // Show/hide role selector based on type
+  toggleEditShopItemRoleSelect();
 
   // Show the modal
   document.getElementById('edit-shop-item-modal').style.display = 'flex';
+}
+
+function toggleEditShopItemRoleSelect() {
+  const typeSelect = document.getElementById('edit-shop-item-type');
+  const roleGroup = document.getElementById('edit-shop-item-role-group');
+  roleGroup.style.display = typeSelect.value === 'role' ? 'block' : 'none';
 }
 
 function closeEditShopItemModal() {
   document.getElementById('edit-shop-item-modal').style.display = 'none';
   // Clear the form
   document.getElementById('edit-shop-item-id').value = '';
+  document.getElementById('edit-shop-item-name').value = '';
+  document.getElementById('edit-shop-item-description').value = '';
   document.getElementById('edit-shop-item-price').value = '';
   document.getElementById('edit-shop-item-stock').value = '';
+  document.getElementById('edit-shop-item-type').value = 'item';
+  document.getElementById('edit-shop-item-role').value = '';
+  document.getElementById('edit-shop-item-role-group').style.display = 'none';
 }
 
 async function updateShopItem() {
   try {
     const itemId = document.getElementById('edit-shop-item-id').value;
+    const name = document.getElementById('edit-shop-item-name').value.trim();
+    const description = document.getElementById('edit-shop-item-description').value.trim();
     const price = parseInt(document.getElementById('edit-shop-item-price').value);
     const stock = parseInt(document.getElementById('edit-shop-item-stock').value);
+    const type = document.getElementById('edit-shop-item-type').value;
+    const roleId = document.getElementById('edit-shop-item-role').value || null;
+
+    // Validation
+    if (!name) {
+      showToast('Invalid Input', 'Item name is required', 'error');
+      return;
+    }
+
+    if (name.length > 100) {
+      showToast('Invalid Input', 'Item name must be 100 characters or less', 'error');
+      return;
+    }
+
+    if (description.length > 500) {
+      showToast('Invalid Input', 'Description must be 500 characters or less', 'error');
+      return;
+    }
 
     if (isNaN(price) || price < 0) {
       showToast('Invalid Input', 'Price must be a non-negative number', 'error');
@@ -1936,10 +2169,15 @@ async function updateShopItem() {
       return;
     }
 
+    if (type === 'role' && !roleId) {
+      showToast('Invalid Input', 'Please select a role for role-type items', 'error');
+      return;
+    }
+
     const response = await fetch(`/api/guild/${guildId}/economy/shop/${itemId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ price, stock }),
+      body: JSON.stringify({ name, description, price, stock, type, roleId }),
     });
 
     if (!response.ok) {

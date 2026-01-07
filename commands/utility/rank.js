@@ -1,10 +1,11 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const {
   getUserData,
   getUserRank,
   getXpForNextLevel,
   initXP,
 } = require('../../utils/xp');
+const { generateRankCard } = require('../../utils/rankCard');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -26,6 +27,8 @@ module.exports = {
       return;
     }
 
+    await interaction.deferReply();
+
     await initXP();
 
     const targetUser = interaction.options.getUser('user') || interaction.user;
@@ -41,47 +44,34 @@ module.exports = {
     const nextLevelXp = getXpForNextLevel(userData.level);
     const xpInCurrentLevel = userData.totalXp - currentLevelXp;
     const xpNeededForLevel = nextLevelXp - currentLevelXp;
-    const progressPercentage = Math.floor(
-      (xpInCurrentLevel / xpNeededForLevel) * 100
-    );
 
-    // Create progress bar
-    const barLength = 20;
-    const filledBars = Math.floor((xpInCurrentLevel / xpNeededForLevel) * barLength);
-    const emptyBars = barLength - filledBars;
-    const progressBar = '█'.repeat(filledBars) + '░'.repeat(emptyBars);
+    try {
+      // Generate rank card image
+      const cardBuffer = await generateRankCard({
+        username: targetUser.username,
+        avatarURL: targetUser.displayAvatarURL({ extension: 'png', size: 256 }),
+        level: userData.level,
+        rank: rank || 0,
+        currentXP: xpInCurrentLevel,
+        requiredXP: xpNeededForLevel,
+        totalXP: userData.totalXp,
+        accentColor: '#5865F2',
+      });
 
-    const embed = new EmbedBuilder()
-      .setColor(0x5865f2)
-      .setTitle(`${targetUser.username}'s Rank`)
-      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-      .addFields(
-        {
-          name: 'Level',
-          value: `**${userData.level}**`,
-          inline: true,
-        },
-        {
-          name: 'Rank',
-          value: rank ? `#${rank}` : 'Unranked',
-          inline: true,
-        },
-        {
-          name: 'Total XP',
-          value: `${userData.totalXp.toLocaleString()}`,
-          inline: true,
-        },
-        {
-          name: 'Progress to Next Level',
-          value: `${progressBar}\n${xpInCurrentLevel.toLocaleString()} / ${xpNeededForLevel.toLocaleString()} XP (${progressPercentage}%)`,
-          inline: false,
-        }
-      )
-      .setFooter({
-        text: `${userData.messageCount || 0} messages sent`,
-      })
-      .setTimestamp();
+      const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank-card.png' });
 
-    await interaction.reply({ embeds: [embed] });
+      await interaction.editReply({ files: [attachment] });
+    } catch (error) {
+      console.error('Error generating rank card:', error);
+
+      // Fallback to text-based response if image generation fails
+      await interaction.editReply({
+        content: `**${targetUser.username}'s Rank**\n` +
+                 `Level: **${userData.level}**\n` +
+                 `Rank: ${rank ? `#${rank}` : 'Unranked'}\n` +
+                 `Total XP: ${userData.totalXp.toLocaleString()}\n` +
+                 `Progress: ${xpInCurrentLevel.toLocaleString()} / ${xpNeededForLevel.toLocaleString()} XP`,
+      });
+    }
   },
 };

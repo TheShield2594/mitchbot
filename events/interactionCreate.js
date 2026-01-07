@@ -4,6 +4,7 @@ const { updateUserStats } = require('../utils/achievements');
 const { awardCommandXP, getRolesForLevel, getGuildConfig } = require('../utils/xp');
 const logger = require('../utils/logger');
 const { handleCommandError } = require('../utils/commandErrors');
+const { handleBlackjackButton } = require('../commands/economy/blackjack');
 
 function getInteractionContext(interaction) {
   return {
@@ -17,6 +18,20 @@ function getInteractionContext(interaction) {
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
+    // Handle button interactions (e.g., blackjack)
+    if (interaction.isButton()) {
+      try {
+        const handled = await handleBlackjackButton(interaction);
+        if (handled) return;
+      } catch (error) {
+        logger.error('Button interaction error', {
+          customId: interaction.customId,
+          error,
+        });
+      }
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const interactionContext = getInteractionContext(interaction);
