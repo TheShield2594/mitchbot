@@ -213,6 +213,12 @@ function updateMemberGrowthChart(memberGrowth) {
     return;
   }
 
+  // Check if Chart.js is loaded
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js not loaded');
+    return;
+  }
+
   const labels = memberGrowth.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
   const memberCounts = memberGrowth.map(d => d.memberCount);
   const joins = memberGrowth.map(d => d.joins);
@@ -338,6 +344,11 @@ function updateCommandTrendsChart(commandTrends) {
     return;
   }
 
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js not loaded');
+    return;
+  }
+
   const labels = commandTrends.map(t => new Date(t.week).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
   const commandCounts = commandTrends.map(t => t.totalCommands);
   const uniqueUsers = commandTrends.map(t => t.uniqueUsers);
@@ -427,6 +438,11 @@ function updateTopCommandsChart(topCommands) {
     return;
   }
 
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js not loaded');
+    return;
+  }
+
   const labels = topCommands.map(c => '/' + c.name);
   const counts = topCommands.map(c => c.count);
 
@@ -503,6 +519,11 @@ function updateViolationTypeChart(violationTypes) {
     return;
   }
 
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js not loaded');
+    return;
+  }
+
   const labels = Object.keys(violationTypes);
   const counts = Object.values(violationTypes);
 
@@ -561,6 +582,11 @@ function updateViolationTrendsChart(violationTrends) {
   }
 
   if (!violationTrends || violationTrends.length === 0) {
+    return;
+  }
+
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js not loaded');
     return;
   }
 
@@ -644,7 +670,7 @@ function updateTopUsersLeaderboard(topUsers) {
       <div class="leaderboard-item">
         <div class="leaderboard-rank ${rankClass}">${rank}</div>
         <div class="leaderboard-avatar">
-          ${safeAvatar ? `<img src="${escapeHtml(safeAvatar)}" alt="${escapedDisplayName}">` : firstLetter}
+          ${safeAvatar ? `<img src="${safeAvatar}" alt="${escapedDisplayName}">` : firstLetter}
         </div>
         <div class="leaderboard-info">
           <div class="leaderboard-name">${escapedDisplayName}</div>
@@ -678,7 +704,7 @@ function updateTopViolatorsLeaderboard(topViolators) {
       <div class="leaderboard-item">
         <div class="leaderboard-rank ${rankClass}">${rank}</div>
         <div class="leaderboard-avatar">
-          ${safeAvatar ? `<img src="${escapeHtml(safeAvatar)}" alt="${escapedDisplayName}">` : firstLetter}
+          ${safeAvatar ? `<img src="${safeAvatar}" alt="${escapedDisplayName}">` : firstLetter}
         </div>
         <div class="leaderboard-info">
           <div class="leaderboard-name">${escapedDisplayName}</div>
