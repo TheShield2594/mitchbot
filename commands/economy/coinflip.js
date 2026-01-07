@@ -2,11 +2,9 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const {
     getBalance,
     addBalance,
-    ECONOMY_EMBED_COLOR,
     formatCoins,
-    getEconomyConfig,
-    initEconomy,
 } = require("../../utils/economy");
+const { validateGamblingCommand } = require("../../utils/gamblingValidation");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -30,33 +28,12 @@ module.exports = {
                 )
         ),
     async execute(interaction) {
-        if (!interaction.guildId) {
-            await interaction.reply({
-                content: "Coinflip is only available inside servers.",
-                ephemeral: true,
-            });
-            return;
-        }
-
-        await initEconomy();
-
-        const config = getEconomyConfig(interaction.guildId);
         const betAmount = interaction.options.getInteger("amount");
         const userChoice = interaction.options.getString("choice");
 
-        // Check balance
-        const currentBalance = getBalance(interaction.guildId, interaction.user.id);
-        if (currentBalance < betAmount) {
-            const embed = new EmbedBuilder()
-                .setColor(ECONOMY_EMBED_COLOR)
-                .setTitle("Insufficient Balance")
-                .setDescription(`You need ${formatCoins(betAmount, config.currencyName)} to play, but you only have ${formatCoins(currentBalance, config.currencyName)}.`)
-                .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
-                .setTimestamp();
-
-            await interaction.reply({ embeds: [embed], ephemeral: true });
-            return;
-        }
+        // Validate gambling command (checks guild, balance, initializes economy)
+        const config = await validateGamblingCommand(interaction, betAmount);
+        if (!config) return;
 
         // Flip the coin
         const coinResult = Math.random() < 0.5 ? "heads" : "tails";

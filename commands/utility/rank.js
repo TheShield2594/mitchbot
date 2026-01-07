@@ -6,6 +6,7 @@ const {
   initXP,
 } = require('../../utils/xp');
 const { generateRankCard } = require('../../utils/rankCard');
+const logger = require('../../utils/logger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -62,7 +63,11 @@ module.exports = {
 
       await interaction.editReply({ files: [attachment] });
     } catch (error) {
-      console.error('Error generating rank card:', error);
+      logger.error('Error generating rank card', {
+        guildId: interaction.guildId,
+        userId: targetUser.id,
+        error,
+      });
 
       // Fallback to text-based response if image generation fails
       await interaction.editReply({

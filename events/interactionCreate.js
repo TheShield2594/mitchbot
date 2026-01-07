@@ -23,13 +23,14 @@ module.exports = {
       try {
         const handled = await handleBlackjackButton(interaction);
         if (handled) return;
+        // If blackjack didn't handle it, allow other button handlers to run
+        // Future button handlers can be added here
       } catch (error) {
         logger.error('Button interaction error', {
           customId: interaction.customId,
           error,
         });
       }
-      return;
     }
 
     if (!interaction.isChatInputCommand()) return;

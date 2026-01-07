@@ -26,6 +26,32 @@ async function generateRankCard(options) {
         accentColor = '#5865F2',
     } = options;
 
+    // Validate required parameters
+    if (!username || typeof username !== 'string') {
+        throw new Error('Invalid username: must be a non-empty string');
+    }
+    if (!avatarURL || typeof avatarURL !== 'string') {
+        throw new Error('Invalid avatarURL: must be a non-empty string');
+    }
+    if (typeof level !== 'number' || level < 0) {
+        throw new Error('Invalid level: must be a non-negative number');
+    }
+    if (typeof rank !== 'number' || rank < 0) {
+        throw new Error('Invalid rank: must be a non-negative number');
+    }
+    if (typeof currentXP !== 'number' || currentXP < 0) {
+        throw new Error('Invalid currentXP: must be a non-negative number');
+    }
+    if (typeof requiredXP !== 'number' || requiredXP <= 0) {
+        throw new Error('Invalid requiredXP: must be a positive number');
+    }
+    if (typeof totalXP !== 'number' || totalXP < 0) {
+        throw new Error('Invalid totalXP: must be a non-negative number');
+    }
+    if (typeof accentColor !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(accentColor)) {
+        throw new Error('Invalid accentColor: must be a valid hex color (e.g., #5865F2)');
+    }
+
     // Card dimensions
     const width = 934;
     const height = 282;
@@ -60,8 +86,24 @@ async function generateRankCard(options) {
 
     // Load and draw avatar
     try {
-        const avatarResponse = await request(avatarURL);
+        const avatarResponse = await request(avatarURL, {
+            method: 'GET',
+            headersTimeout: 5000,
+            bodyTimeout: 10000,
+            maxRedirections: 3,
+        });
+
+        const contentLength = avatarResponse.headers['content-length'];
+        if (contentLength && parseInt(contentLength) > 5 * 1024 * 1024) {
+            throw new Error('Avatar too large (max 5MB)');
+        }
+
         const avatarBuffer = Buffer.from(await avatarResponse.body.arrayBuffer());
+
+        if (avatarBuffer.length > 5 * 1024 * 1024) {
+            throw new Error('Avatar too large (max 5MB)');
+        }
+
         const avatar = await loadImage(avatarBuffer);
 
         ctx.save();
@@ -196,11 +238,32 @@ async function generateRankCard(options) {
  * @returns {string} Lightened hex color
  */
 function lightenColor(color, percent) {
-    const num = parseInt(color.replace('#', ''), 16);
-    const amt = Math.round(2.55 * percent);
-    const R = Math.min(255, (num >> 16) + amt);
-    const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
-    const B = Math.min(255, (num & 0x0000FF) + amt);
+    // Validate color format (accept #RRGGBB and #RGB)
+    if (typeof color !== 'string' || !/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(color)) {
+        throw new Error('Invalid color: must be in format #RGB or #RRGGBB');
+    }
+
+    // Normalize #RGB to #RRGGBB
+    let normalizedColor = color;
+    if (color.length === 4) {
+        normalizedColor = '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
+    }
+
+    // Validate and clamp percent
+    if (typeof percent !== 'number' || !isFinite(percent)) {
+        throw new Error('Invalid percent: must be a finite number');
+    }
+    const clampedPercent = Math.max(-100, Math.min(100, percent));
+
+    const num = parseInt(normalizedColor.replace('#', ''), 16);
+    if (isNaN(num)) {
+        throw new Error('Failed to parse color');
+    }
+
+    const amt = Math.round(2.55 * clampedPercent);
+    const R = Math.min(255, Math.max(0, (num >> 16) + amt));
+    const G = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amt));
+    const B = Math.min(255, Math.max(0, (num & 0x0000FF) + amt));
     return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
 }
 

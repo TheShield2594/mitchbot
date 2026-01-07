@@ -2,11 +2,9 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const {
     getBalance,
     addBalance,
-    ECONOMY_EMBED_COLOR,
     formatCoins,
-    getEconomyConfig,
-    initEconomy,
 } = require("../../utils/economy");
+const { validateGamblingCommand } = require("../../utils/gamblingValidation");
 
 const SLOT_SYMBOLS = ["🍒", "🍋", "🍊", "🍇", "🔔", "💎", "7️⃣"];
 
@@ -22,32 +20,11 @@ module.exports = {
                 .setMinValue(1)
         ),
     async execute(interaction) {
-        if (!interaction.guildId) {
-            await interaction.reply({
-                content: "Slots are only available inside servers.",
-                ephemeral: true,
-            });
-            return;
-        }
-
-        await initEconomy();
-
-        const config = getEconomyConfig(interaction.guildId);
         const betAmount = interaction.options.getInteger("amount");
 
-        // Check balance
-        const currentBalance = getBalance(interaction.guildId, interaction.user.id);
-        if (currentBalance < betAmount) {
-            const embed = new EmbedBuilder()
-                .setColor(ECONOMY_EMBED_COLOR)
-                .setTitle("Insufficient Balance")
-                .setDescription(`You need ${formatCoins(betAmount, config.currencyName)} to play, but you only have ${formatCoins(currentBalance, config.currencyName)}.`)
-                .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
-                .setTimestamp();
-
-            await interaction.reply({ embeds: [embed], ephemeral: true });
-            return;
-        }
+        // Validate gambling command (checks guild, balance, initializes economy)
+        const config = await validateGamblingCommand(interaction, betAmount);
+        if (!config) return;
 
         // Spin the slots
         const reel1 = SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)];
@@ -89,7 +66,7 @@ module.exports = {
 
         // Create result embed
         const embed = new EmbedBuilder()
-            .setColor(won ? "#2ecc71" : multiplier === 0 ? "#e74c3c" : ECONOMY_EMBED_COLOR)
+            .setColor(won ? "#2ecc71" : "#e74c3c")
             .setTitle("🎰 Slot Machine")
             .setDescription(
                 `╔═══════════╗\n` +
@@ -98,9 +75,7 @@ module.exports = {
                 `${resultMessage}\n\n` +
                 `${won
                     ? `You won **${formatCoins(winnings, config.currencyName)}**! (${multiplier}x)`
-                    : multiplier > 0
-                        ? `You broke even!`
-                        : `You lost **${formatCoins(betAmount, config.currencyName)}**.`
+                    : `You lost **${formatCoins(betAmount, config.currencyName)}**.`
                 }`
             )
             .addFields(

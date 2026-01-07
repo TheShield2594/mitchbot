@@ -2,11 +2,13 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const {
     getBalance,
     addBalance,
+    logTransaction,
     ECONOMY_EMBED_COLOR,
     formatCoins,
-    getEconomyConfig,
     initEconomy,
 } = require("../../utils/economy");
+const { validateGamblingCommand } = require("../../utils/gamblingValidation");
+const logger = require("../../utils/logger");
 
 const CARD_SUITS = ["♠️", "♥️", "♣️", "♦️"];
 const CARD_VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -112,18 +114,12 @@ module.exports = {
                 .setMinValue(1)
         ),
     async execute(interaction) {
-        if (!interaction.guildId) {
-            await interaction.reply({
-                content: "Blackjack is only available inside servers.",
-                ephemeral: true,
-            });
-            return;
-        }
-
-        await initEconomy();
-
-        const config = getEconomyConfig(interaction.guildId);
         const betAmount = interaction.options.getInteger("amount");
+
+        // Validate gambling command (checks guild, balance, initializes economy)
+        const config = await validateGamblingCommand(interaction, betAmount);
+        if (!config) return;
+
         const gameId = `${interaction.guildId}-${interaction.user.id}`;
 
         // Check if user already has an active game
@@ -135,20 +131,6 @@ module.exports = {
             return;
         }
 
-        // Check balance
-        const currentBalance = getBalance(interaction.guildId, interaction.user.id);
-        if (currentBalance < betAmount) {
-            const embed = new EmbedBuilder()
-                .setColor(ECONOMY_EMBED_COLOR)
-                .setTitle("Insufficient Balance")
-                .setDescription(`You need ${formatCoins(betAmount, config.currencyName)} to play, but you only have ${formatCoins(currentBalance, config.currencyName)}.`)
-                .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
-                .setTimestamp();
-
-            await interaction.reply({ embeds: [embed], ephemeral: true });
-            return;
-        }
-
         // Deduct bet immediately
         addBalance(interaction.guildId, interaction.user.id, -betAmount, {
             type: "blackjack",
@@ -156,6 +138,8 @@ module.exports = {
             bet: betAmount,
             reason: "Blackjack bet placed",
         });
+
+        try {
 
         // Initialize game
         const deck = shuffleDeck(createDeck());
@@ -227,12 +211,55 @@ module.exports = {
         const embed = createGameEmbed(game, config, interaction.guild?.name || "Unknown");
         await interaction.reply({ embeds: [embed], components: [row] });
 
-        // Set timeout to auto-forfeit after 2 minutes
-        setTimeout(() => {
-            if (activeGames.has(gameId)) {
-                activeGames.delete(gameId);
-            }
-        }, 120000);
+            // Set timeout to auto-forfeit and refund after 2 minutes
+            setTimeout(async () => {
+                if (activeGames.has(gameId)) {
+                    const expiredGame = activeGames.get(gameId);
+                    activeGames.delete(gameId);
+
+                    // Refund the bet
+                    addBalance(expiredGame.guildId, expiredGame.userId, expiredGame.bet, {
+                        type: "blackjack",
+                        action: "game_expired_refund",
+                        bet: expiredGame.bet,
+                        reason: "Blackjack game expired - bet refunded",
+                    });
+
+                    // Notify user
+                    try {
+                        await interaction.followUp({
+                            content: `⏱️ Your blackjack game expired due to inactivity. Your bet of ${formatCoins(expiredGame.bet, config.currencyName)} has been refunded.`,
+                            ephemeral: true,
+                        });
+                    } catch (error) {
+                        logger.warn("Failed to send game expiration notification", {
+                            gameId,
+                            error,
+                        });
+                    }
+                }
+            }, 120000);
+        } catch (error) {
+            // Refund bet on any error during game setup
+            addBalance(interaction.guildId, interaction.user.id, betAmount, {
+                type: "blackjack",
+                action: "refund_on_error",
+                bet: betAmount,
+                reason: "Refund due to error during game initialization",
+            });
+
+            logger.error("Error initializing blackjack game", {
+                guildId: interaction.guildId,
+                userId: interaction.user.id,
+                betAmount,
+                error,
+            });
+
+            await interaction.reply({
+                content: "An error occurred while starting the game. Your bet has been refunded.",
+                ephemeral: true,
+            });
+        }
     },
 };
 
@@ -279,11 +306,15 @@ async function handleBlackjackButton(interaction) {
             activeGames.delete(gameId);
             await interaction.update({ embeds: [embed], components: [] });
 
-            addBalance(game.guildId, game.userId, 0, {
+            // Zero amount used intentionally for audit/logging — no balance change
+            logTransaction(game.guildId, {
+                userId: game.userId,
+                amount: -game.bet,
+                balanceAfter: getBalance(game.guildId, game.userId),
                 type: "blackjack",
                 action: "bust",
-                bet: game.bet,
                 reason: "Blackjack bust",
+                metadata: { bet: game.bet },
             });
         } else {
             // Continue game
@@ -360,11 +391,15 @@ async function handleBlackjackButton(interaction) {
             resultMessage = `💔 **You LOSE!** You lost ${formatCoins(game.bet, config.currencyName)}.`;
             resultColor = "#e74c3c";
 
-            addBalance(game.guildId, game.userId, 0, {
+            // Zero amount used intentionally for audit/logging — no balance change
+            logTransaction(game.guildId, {
+                userId: game.userId,
+                amount: -game.bet,
+                balanceAfter: getBalance(game.guildId, game.userId),
                 type: "blackjack",
                 action: "loss",
-                bet: game.bet,
                 reason: "Blackjack loss",
+                metadata: { bet: game.bet },
             });
         }
 
