@@ -988,12 +988,163 @@
               </div>
             </div>
 
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="work-reward-min">
+                  Work Reward (Min)
+                  <span class="form-hint">Minimum payout for /work command</span>
+                </label>
+                <input type="number" class="form-input" id="work-reward-min" min="1" max="10000" placeholder="50">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="work-reward-max">
+                  Work Reward (Max)
+                  <span class="form-hint">Maximum payout for /work command</span>
+                </label>
+                <input type="number" class="form-input" id="work-reward-max" min="1" max="10000" placeholder="150">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="work-cooldown">
+                  Work Cooldown (minutes)
+                  <span class="form-hint">Time between /work uses (1-1440 minutes)</span>
+                </label>
+                <input type="number" class="form-input" id="work-cooldown" min="1" max="1440" placeholder="60">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="starting-balance">
+                  Starting Balance
+                  <span class="form-hint">Initial currency for new members</span>
+                </label>
+                <input type="number" class="form-input" id="starting-balance" min="0" max="100000" placeholder="100">
+              </div>
+            </div>
+
             <div class="mt-6">
               <button class="btn btn-primary" onclick="saveEconomySettings()">Save Economy Settings</button>
             </div>
           </div>
         </div>
       </section>
+
+      <!-- Economy Shop Section -->
+      <section id="section-shop" class="guild-section">
+        <div class="card">
+          <div class="card__header">
+            <h3 class="card__title">
+              <span class="card__icon">🛒</span>
+              Economy Shop
+            </h3>
+          </div>
+
+          <p class="card__description">
+            Manage shop items that users can purchase with currency. Create items or roles that players can buy.
+          </p>
+
+          <div class="mb-4">
+            <button class="btn btn-primary" onclick="openAddShopItemModal()">Add Shop Item</button>
+          </div>
+
+          <div id="shop-items-list">
+            <p class="text-gray-500">Loading shop items...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Add Shop Item Modal -->
+      <div id="add-shop-item-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 class="modal-title">Add Shop Item</h3>
+            <button class="modal-close" onclick="closeAddShopItemModal()">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label" for="shop-item-name">Item Name</label>
+              <input type="text" class="form-input" id="shop-item-name" placeholder="Cool Item" maxlength="100" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="shop-item-description">Description</label>
+              <textarea class="form-input" id="shop-item-description" placeholder="A cool item that does something" rows="3" maxlength="500"></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="shop-item-price">Price</label>
+                <input type="number" class="form-input" id="shop-item-price" min="0" placeholder="100" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="shop-item-stock">
+                  Stock
+                  <span class="form-hint">-1 for unlimited</span>
+                </label>
+                <input type="number" class="form-input" id="shop-item-stock" min="-1" placeholder="-1" value="-1">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="shop-item-type">Item Type</label>
+              <select class="form-input" id="shop-item-type" onchange="toggleRoleSelect()">
+                <option value="item">Regular Item</option>
+                <option value="role">Role (Auto-assign)</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="shop-item-role-group" style="display: none;">
+              <label class="form-label" for="shop-item-role">Role to Assign</label>
+              <select class="form-input" id="shop-item-role">
+                <option value="">Select a role...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeAddShopItemModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveShopItem()">Add Item</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Shop Item Modal -->
+      <div id="edit-shop-item-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 class="modal-title">Edit Shop Item</h3>
+            <button class="modal-close" onclick="closeEditShopItemModal()">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <input type="hidden" id="edit-shop-item-id">
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-shop-item-price">Price</label>
+                <input type="number" class="form-input" id="edit-shop-item-price" min="0" placeholder="100" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="edit-shop-item-stock">
+                  Stock
+                  <span class="form-hint">-1 for unlimited</span>
+                </label>
+                <input type="number" class="form-input" id="edit-shop-item-stock" min="-1" placeholder="-1">
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeEditShopItemModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="updateShopItem()">Update Item</button>
+          </div>
+        </div>
+      </div>
 
       <!-- XP & Levels Section -->
       <section id="section-xp" class="guild-section">
