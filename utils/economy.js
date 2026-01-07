@@ -714,6 +714,64 @@ function removeInventoryItem(guildId, userId, inventoryItemId) {
   return true;
 }
 
+function tradeItem(guildId, fromUserId, toUserId, inventoryItemId) {
+  const guildData = getGuildEconomy(guildId);
+
+  // Check if sender has the item
+  if (!guildData.inventory[fromUserId]) {
+    return { ok: false, error: "no_inventory" };
+  }
+
+  const itemIndex = guildData.inventory[fromUserId].findIndex(item => item.id === inventoryItemId);
+
+  if (itemIndex === -1) {
+    return { ok: false, error: "item_not_found" };
+  }
+
+  const item = guildData.inventory[fromUserId][itemIndex];
+
+  // Remove from sender's inventory
+  guildData.inventory[fromUserId].splice(itemIndex, 1);
+
+  // Add to recipient's inventory
+  if (!guildData.inventory[toUserId]) {
+    guildData.inventory[toUserId] = [];
+  }
+
+  guildData.inventory[toUserId].push({
+    ...item,
+    id: randomUUID(), // Give it a new ID in recipient's inventory
+    tradedFrom: fromUserId,
+    tradedAt: new Date().toISOString(),
+  });
+
+  // Log transaction
+  logTransaction(guildId, {
+    userId: fromUserId,
+    amount: 0,
+    balanceAfter: getBalance(guildId, fromUserId),
+    type: "item_trade_sent",
+    reason: `Traded ${item.name} to user ${toUserId}`,
+    metadata: { itemId: inventoryItemId, itemName: item.name, recipientId: toUserId },
+  });
+
+  logTransaction(guildId, {
+    userId: toUserId,
+    amount: 0,
+    balanceAfter: getBalance(guildId, toUserId),
+    type: "item_trade_received",
+    reason: `Received ${item.name} from user ${fromUserId}`,
+    metadata: { itemId: inventoryItemId, itemName: item.name, senderId: fromUserId },
+  });
+
+  saveEconomyData();
+
+  return {
+    ok: true,
+    item,
+  };
+}
+
 // Leaderboard
 function getLeaderboard(guildId, limit = 10) {
   const guildData = getGuildEconomy(guildId);
@@ -788,6 +846,7 @@ module.exports = {
   purchaseItem,
   getInventory,
   removeInventoryItem,
+  tradeItem,
   getLeaderboard,
   transferCoins,
 };
