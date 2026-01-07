@@ -303,6 +303,13 @@ router.post('/guild/:guildId/xp/config', ensureServerManager, async (req, res) =
       updates.cooldown = cooldown;
     }
 
+    // Cross-validate min and max XP
+    if (updates.minXpPerMessage !== undefined && updates.maxXpPerMessage !== undefined) {
+      if (updates.minXpPerMessage > updates.maxXpPerMessage) {
+        return res.status(400).json({ error: 'Min XP must not exceed Max XP' });
+      }
+    }
+
     const config = await updateXPGuildConfig(req.params.guildId, updates);
     res.json({ success: true, config });
   } catch (error) {
@@ -314,7 +321,12 @@ router.post('/guild/:guildId/xp/config', ensureServerManager, async (req, res) =
 // Get XP leaderboard
 router.get('/guild/:guildId/xp/leaderboard', ensureServerManager, (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
+    let limit = parseInt(req.query.limit);
+    if (isNaN(limit)) {
+      limit = 10;
+    }
+    // Clamp limit between 1 and 100
+    limit = Math.max(1, Math.min(100, limit));
     const leaderboard = getLeaderboard(req.params.guildId, limit);
     res.json(leaderboard);
   } catch (error) {
@@ -370,6 +382,13 @@ router.delete('/guild/:guildId/xp/level-roles/:level', ensureServerManager, asyn
     const level = Number(req.params.level);
     if (isNaN(level)) {
       return res.status(400).json({ error: 'Invalid level' });
+    }
+
+    // Check if level role exists before deleting
+    const config = getXPGuildConfig(req.params.guildId);
+    const existingReward = config.levelRoles?.find(r => r.level === level);
+    if (!existingReward) {
+      return res.status(404).json({ error: 'Level role not found' });
     }
 
     await removeLevelRole(req.params.guildId, level);

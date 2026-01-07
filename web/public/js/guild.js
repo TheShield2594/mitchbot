@@ -1233,16 +1233,19 @@ async function loadXPConfig() {
 
     // Populate level-up channel dropdown
     const channelSelect = document.getElementById('xp-levelup-channel');
-    channelSelect.innerHTML = '<option value="">Same channel as message</option>';
-    config.channels.filter(c => c.type === 0).forEach(channel => {
-      const option = document.createElement('option');
-      option.value = channel.id;
-      option.textContent = `# ${channel.name}`;
-      if (xpConfig.levelUpChannel === channel.id) {
-        option.selected = true;
-      }
-      channelSelect.appendChild(option);
-    });
+    if (channelSelect) {
+      channelSelect.innerHTML = '<option value="">Same channel as message</option>';
+      const channels = (config && Array.isArray(config.channels)) ? config.channels : [];
+      channels.filter(c => c.type === 0).forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `# ${channel.name}`;
+        if (xpConfig.levelUpChannel === channel.id) {
+          option.selected = true;
+        }
+        channelSelect.appendChild(option);
+      });
+    }
 
     // Update status badge
     updateXPStatus();
@@ -1339,9 +1342,10 @@ function loadLevelRoles() {
 
   // Sort by level
   const sortedRoles = [...xpConfig.levelRoles].sort((a, b) => a.level - b.level);
+  const rolesList = (config && Array.isArray(config.roles)) ? config.roles : [];
 
   container.innerHTML = sortedRoles.map(reward => {
-    const role = config.roles.find(r => r.id === reward.roleId);
+    const role = rolesList.find(r => r.id === reward.roleId);
     const roleName = role ? role.name : 'Unknown Role';
 
     return `

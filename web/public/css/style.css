@@ -1868,7 +1868,7 @@ a:hover {
 }
 
 .leaderboard-item__rank {
-  font-size: 1.25rem;
+  font-size: var(--text-lg);
   font-weight: 700;
   min-width: 2rem;
   text-align: center;
@@ -1884,7 +1884,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 .leaderboard-item__level {
@@ -1935,7 +1935,7 @@ a:hover {
 
 .role-item__arrow {
   color: var(--text-tertiary);
-  font-size: 1.25rem;
+  font-size: var(--text-lg);
 }
 
 .role-item__role {
