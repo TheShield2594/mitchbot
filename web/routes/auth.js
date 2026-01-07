@@ -33,13 +33,24 @@ router.get('/callback',
           return res.status(500).send('Authentication failed. Please try again.');
         }
 
-        // Successfully authenticated and session secured
-        logger.info('User authenticated successfully', {
-          userId: user.id,
-          username: user.username,
-        });
+        // Save session before redirect to ensure it's persisted to Redis
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            logger.error('Session save failed after login', {
+              userId: user.id,
+              error: saveErr,
+            });
+            return res.status(500).send('Authentication failed. Please try again.');
+          }
 
-        res.redirect('/dashboard');
+          // Successfully authenticated and session secured
+          logger.info('User authenticated successfully', {
+            userId: user.id,
+            username: user.username,
+          });
+
+          res.redirect('/dashboard');
+        });
       });
     });
   }

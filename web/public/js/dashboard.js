@@ -39,28 +39,18 @@
         return;
       }
 
-      console.log('Total guilds:', user.guilds.length);
-
       // Filter manageable guilds - backend already filters, so use all guilds
       const manageableGuilds = user.guilds;
 
-      console.log('Manageable guilds:', manageableGuilds.length);
-      console.log('First guild:', manageableGuilds[0]);
-
       if (manageableGuilds.length === 0) {
-        console.log('No manageable guilds, showing empty state');
         showEmptyState(user.debugInfo);
         hideLoading();
         return;
       }
 
-      console.log('About to render servers...');
       renderServers(manageableGuilds);
-      console.log('About to update stats...');
       updateStats(manageableGuilds);
-      console.log('About to hide loading...');
       hideLoading();
-      console.log('loadServers completed successfully');
     } catch (error) {
       console.error('Error loading servers:', error);
       hideLoading();
@@ -172,48 +162,23 @@
 
   // Render server cards with modern design
   function renderServers(guilds) {
-    console.log('renderServers called with', guilds.length, 'guilds');
     const serverList = document.getElementById('server-list');
-    if (!serverList) {
-      console.error('server-list element not found!');
-      return;
-    }
+    if (!serverList) return;
 
-    try {
-      const cards = guilds.map(guild => {
-        console.log('Creating card for guild:', guild.name, guild.id);
-        return createServerCard(guild);
-      }).join('');
+    serverList.innerHTML = guilds.map(guild => createServerCard(guild)).join('');
 
-      console.log('Generated HTML length:', cards.length);
-      serverList.innerHTML = cards;
-      console.log('Server list updated, cards in DOM:', document.querySelectorAll('.server-card').length);
+    // Show server list and hide empty state
+    serverList.style.display = '';
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.style.display = 'none';
 
-      // Show server list and hide empty state
-      serverList.style.display = '';
-      const emptyState = document.getElementById('empty-state');
-      if (emptyState) emptyState.style.display = 'none';
-
-      // Add click handlers
-      document.querySelectorAll('.server-card').forEach(card => {
-        card.addEventListener('click', function(e) {
-          const button = e.target.closest('.server-card__action');
-          if (button) {
-            // Button clicked - navigate to guild page
-            e.stopPropagation();
-            const guildId = button.getAttribute('data-guild-id');
-            window.location.href = `/guild/${guildId}`;
-          } else {
-            // Card clicked (but not button) - also navigate
-            const guildId = this.getAttribute('data-guild-id');
-            window.location.href = `/guild/${guildId}`;
-          }
-        });
+    // Add click handlers
+    document.querySelectorAll('.server-card').forEach(card => {
+      card.addEventListener('click', function() {
+        const guildId = this.getAttribute('data-guild-id');
+        window.location.href = `/guild/${guildId}`;
       });
-    } catch (error) {
-      console.error('Error rendering servers:', error);
-      throw error;
-    }
+    });
   }
 
   // Create modern server card HTML
@@ -283,7 +248,6 @@
 
   // Show empty state with diagnostic info
   function showEmptyState(debugInfo) {
-    console.log('showEmptyState called with debugInfo:', debugInfo);
     const serverList = document.getElementById('server-list');
     const emptyState = document.getElementById('empty-state');
 
