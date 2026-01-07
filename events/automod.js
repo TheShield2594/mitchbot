@@ -173,7 +173,7 @@ module.exports = {
 
       const totalAttachments = recentAttachments.reduce((sum, att) => sum + att.count, 0);
 
-      if (totalAttachments >= threshold) {
+      if (totalAttachments > threshold) {
         violated = true;
         violationType = 'Attachment Spam';
         action = config.automod.attachmentSpam.action;

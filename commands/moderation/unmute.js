@@ -54,7 +54,7 @@ module.exports = {
     }
 
     // Check if user has an active timeout
-    if (target.communicationDisabledUntil && target.communicationDisabledUntil > Date.now()) {
+    if (target.communicationDisabledUntil && target.communicationDisabledUntil.getTime() > Date.now()) {
       hasTimeout = true;
     }
 

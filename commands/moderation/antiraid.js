@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildConfig } = require('../../utils/moderation');
+const { getGuildConfig, updateGuildConfig, ensureAntiRaidConfigDefaults } = require('../../utils/moderation');
 const { logCommandError } = require('../../utils/commandLogger');
 
 module.exports = {
@@ -115,15 +115,8 @@ module.exports = {
     const subcommand = interaction.options.getSubcommand();
     const config = getGuildConfig(interaction.guildId);
 
-    // Initialize antiRaid config if it doesn't exist
-    if (!config.antiRaid) {
-      config.antiRaid = {
-        accountAge: { enabled: false, minAgeDays: 7, action: 'kick' },
-        joinSpam: { enabled: false, threshold: 5, timeWindow: 10000, action: 'kick' },
-        lockdown: { active: false, lockedChannels: [] },
-        verification: { enabled: false, roleId: null, channelId: null, message: 'Welcome! Please verify by reacting to this message.' },
-      };
-    }
+    // Ensure antiRaid config has proper defaults
+    ensureAntiRaidConfigDefaults(config);
 
     try {
       if (subcommand === 'status') {
@@ -215,16 +208,42 @@ module.exports = {
         const channel = interaction.options.getChannel('channel');
         const message = interaction.options.getString('message');
 
+        // Validate channel type if provided
+        if (channel) {
+          const { ChannelType } = require('discord.js');
+          if (channel.type !== ChannelType.GuildText &&
+              channel.type !== ChannelType.GuildAnnouncement) {
+            await interaction.editReply('⚠️ The verification channel must be a text channel that supports reactions.');
+            return;
+          }
+        }
+
+        // Validate existing configured channel if falling back to it
+        let validChannelId = channel ? channel.id : config.antiRaid.verification?.channelId;
+        if (!channel && validChannelId) {
+          try {
+            const existingChannel = await interaction.guild.channels.fetch(validChannelId);
+            const { ChannelType } = require('discord.js');
+            if (!existingChannel ||
+                (existingChannel.type !== ChannelType.GuildText &&
+                 existingChannel.type !== ChannelType.GuildAnnouncement)) {
+              validChannelId = null; // Invalid existing channel
+            }
+          } catch (error) {
+            validChannelId = null; // Channel no longer exists
+          }
+        }
+
         const verificationConfig = {
           enabled,
           roleId: role ? role.id : (config.antiRaid.verification?.roleId || null),
-          channelId: channel ? channel.id : (config.antiRaid.verification?.channelId || null),
+          channelId: validChannelId,
           message: message || config.antiRaid.verification?.message || 'Welcome! Please verify by reacting to this message.',
         };
 
         // Validate that role and channel are set if enabling
         if (enabled && (!verificationConfig.roleId || !verificationConfig.channelId)) {
-          await interaction.editReply('⚠️ You must set both a role and channel to enable verification.');
+          await interaction.editReply('⚠️ You must set both a role and a valid text channel to enable verification.');
           return;
         }
 

@@ -254,6 +254,47 @@ async function initModeration() {
 }
 
 // Get or create guild config
+// Deep merge utility - recursively merges nested objects
+function deepMerge(target, source) {
+  // Handle null/undefined
+  if (source === null || source === undefined) {
+    return target;
+  }
+
+  // If source is not a plain object, replace target
+  if (typeof source !== 'object' || Array.isArray(source)) {
+    return source;
+  }
+
+  // Create result starting with target
+  const result = { ...target };
+
+  // Merge each property from source
+  for (const key in source) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      const sourceValue = source[key];
+      const targetValue = result[key];
+
+      // If both are plain objects, recursively merge
+      if (
+        typeof sourceValue === 'object' &&
+        !Array.isArray(sourceValue) &&
+        sourceValue !== null &&
+        typeof targetValue === 'object' &&
+        !Array.isArray(targetValue) &&
+        targetValue !== null
+      ) {
+        result[key] = deepMerge(targetValue, sourceValue);
+      } else {
+        // Otherwise, replace with source value
+        result[key] = sourceValue;
+      }
+    }
+  }
+
+  return result;
+}
+
 function getGuildConfig(guildId) {
   if (!moderationData[guildId]) {
     moderationData[guildId] = getDefaultGuildConfig();
@@ -277,44 +318,13 @@ function getGuildConfig(guildId) {
 async function updateGuildConfig(guildId, updates) {
   const config = getGuildConfig(guildId);
 
-  // Deep merge updates
-  if (updates.automod) {
-    config.automod = { ...config.automod, ...updates.automod };
-  }
-  if (updates.logging) {
-    config.logging = { ...config.logging, ...updates.logging };
-  }
-  if (updates.antiRaid) {
-    if (!config.antiRaid) {
-      config.antiRaid = getDefaultGuildConfig().antiRaid;
-    }
-    config.antiRaid = { ...config.antiRaid, ...updates.antiRaid };
-  }
-  if (updates.antiDehoist) {
-    if (!config.antiDehoist) {
-      config.antiDehoist = getDefaultGuildConfig().antiDehoist;
-    }
-    config.antiDehoist = { ...config.antiDehoist, ...updates.antiDehoist };
-  }
-  if (updates.birthday) {
-    config.birthday = { ...config.birthday, ...updates.birthday };
-  }
-  if (updates.welcome) {
-    config.welcome = { ...config.welcome, ...updates.welcome };
-  }
-  if (updates.leave) {
-    config.leave = { ...config.leave, ...updates.leave };
-  }
+  // Use deep merge to properly handle nested config updates
+  const updatedConfig = deepMerge(config, updates);
 
-  // Handle simple field updates
-  if (updates.muteRole !== undefined) {
-    config.muteRole = updates.muteRole;
-  }
-
-  moderationData[guildId] = config;
+  moderationData[guildId] = updatedConfig;
   await saveModerationData();
 
-  return config;
+  return updatedConfig;
 }
 
 // Warning system
@@ -647,6 +657,51 @@ function getRecentJoins(guildId, timeWindow = 10000) {
   return joins.filter(join => join.timestamp > cutoff);
 }
 
+// Verification message tracking (in-memory, doesn't persist)
+const verificationMessageTracking = new Map();
+
+function trackVerificationMessage(guildId, userId, messageId) {
+  const key = `${guildId}-${userId}`;
+  verificationMessageTracking.set(key, {
+    messageId,
+    timestamp: Date.now(),
+  });
+}
+
+function getVerificationMessage(guildId, userId) {
+  const key = `${guildId}-${userId}`;
+  return verificationMessageTracking.get(key);
+}
+
+function clearVerificationMessage(guildId, userId) {
+  const key = `${guildId}-${userId}`;
+  verificationMessageTracking.delete(key);
+}
+
+// Anti-dehoist utilities
+const HOIST_CHARS = /^[^a-zA-Z0-9]/;
+
+function shouldDehoist(displayName) {
+  return HOIST_CHARS.test(displayName);
+}
+
+function generateDehoistedName(originalName, prefix = 'Dehoisted') {
+  // Remove leading special characters
+  const cleaned = originalName.replace(/^[^a-zA-Z0-9]+/, '');
+
+  // If nothing left after cleaning, use the prefix
+  if (!cleaned) {
+    return prefix;
+  }
+
+  // If the cleaned name is too short, add prefix
+  if (cleaned.length < 2) {
+    return `${prefix} ${cleaned}`;
+  }
+
+  return cleaned;
+}
+
 // Birthday role management
 function addBirthdayRole(guildId, userId, roleId, expiresAt) {
   const config = getGuildConfig(guildId);
@@ -737,6 +792,24 @@ function getAllBirthdayRoles() {
   return allRoles;
 }
 
+// Anti-raid config defaults helper
+function ensureAntiRaidConfigDefaults(config) {
+  if (!config.antiRaid) {
+    config.antiRaid = {
+      accountAge: { enabled: false },
+      joinSpam: { enabled: false },
+      lockdown: { active: false, lockedChannels: [] },
+      verification: { enabled: false },
+    };
+  }
+
+  if (!config.antiRaid.lockdown) {
+    config.antiRaid.lockdown = { active: false, lockedChannels: [] };
+  }
+
+  return config;
+}
+
 // Safety check helpers
 function canModerate(guild, moderator, target) {
   // Can't moderate yourself
@@ -794,10 +867,16 @@ module.exports = {
   getAllTempbans,
   trackMemberJoin,
   getRecentJoins,
+  trackVerificationMessage,
+  getVerificationMessage,
+  clearVerificationMessage,
+  shouldDehoist,
+  generateDehoistedName,
   addBirthdayRole,
   removeBirthdayRole,
   getExpiredBirthdayRoles,
   getAllExpiredBirthdayRoles,
   getAllBirthdayRoles,
+  ensureAntiRaidConfigDefaults,
   canModerate,
 };

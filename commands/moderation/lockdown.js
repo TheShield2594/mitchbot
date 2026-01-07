@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildConfig, addLog } = require('../../utils/moderation');
+const { getGuildConfig, updateGuildConfig, addLog, ensureAntiRaidConfigDefaults } = require('../../utils/moderation');
 const { logCommandError } = require('../../utils/commandLogger');
 const logger = require('../../utils/logger');
 
@@ -33,19 +33,8 @@ module.exports = {
     const reason = interaction.options.getString('reason') || 'No reason provided';
     const config = getGuildConfig(interaction.guildId);
 
-    // Initialize antiRaid config if it doesn't exist
-    if (!config.antiRaid) {
-      config.antiRaid = {
-        accountAge: { enabled: false },
-        joinSpam: { enabled: false },
-        lockdown: { active: false, lockedChannels: [] },
-        verification: { enabled: false },
-      };
-    }
-
-    if (!config.antiRaid.lockdown) {
-      config.antiRaid.lockdown = { active: false, lockedChannels: [] };
-    }
+    // Ensure antiRaid config has proper defaults
+    ensureAntiRaidConfigDefaults(config);
 
     try {
       if (action === 'enable') {

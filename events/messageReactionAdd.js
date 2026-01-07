@@ -1,5 +1,5 @@
 const { Events } = require('discord.js');
-const { getGuildConfig, addLog } = require('../utils/moderation');
+const { getGuildConfig, addLog, getVerificationMessage, clearVerificationMessage } = require('../utils/moderation');
 const logger = require('../utils/logger');
 
 module.exports = {
@@ -54,6 +54,26 @@ module.exports = {
         return;
       }
 
+      // Check if bot has permission to manage roles
+      if (!guild.members.me.permissions.has('ManageRoles')) {
+        logger.warn('Cannot assign verification role: missing ManageRoles permission', {
+          guildId: guild.id,
+          roleId,
+        });
+        return;
+      }
+
+      // Check role hierarchy - bot's role must be higher than verification role
+      if (verificationRole.position >= guild.members.me.roles.highest.position) {
+        logger.warn('Cannot assign verification role: role hierarchy issue', {
+          guildId: guild.id,
+          roleId,
+          verificationRolePosition: verificationRole.position,
+          botRolePosition: guild.members.me.roles.highest.position,
+        });
+        return;
+      }
+
       // Add the verification role
       try {
         await member.roles.add(verificationRole, 'User verified via reaction');
@@ -74,6 +94,30 @@ module.exports = {
           moderatorTag: guild.members.me.user.username,
           reason: 'User verified via reaction',
         });
+
+        // Delete the verification message to keep the channel clean
+        const trackedMessage = getVerificationMessage(guild.id, user.id);
+        if (trackedMessage) {
+          try {
+            const message = await reaction.message.channel.messages.fetch(trackedMessage.messageId);
+            await message.delete();
+            clearVerificationMessage(guild.id, user.id);
+            logger.debug('Deleted verification message', {
+              guildId: guild.id,
+              userId: user.id,
+              messageId: trackedMessage.messageId,
+            });
+          } catch (error) {
+            logger.warn('Failed to delete verification message', {
+              guildId: guild.id,
+              userId: user.id,
+              messageId: trackedMessage.messageId,
+              error,
+            });
+            // Clear tracking even if deletion failed
+            clearVerificationMessage(guild.id, user.id);
+          }
+        }
 
         // Try to DM the user
         try {

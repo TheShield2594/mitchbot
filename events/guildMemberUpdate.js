@@ -1,30 +1,6 @@
 const { Events } = require('discord.js');
-const { getGuildConfig, addLog } = require('../utils/moderation');
+const { getGuildConfig, addLog, shouldDehoist, generateDehoistedName } = require('../utils/moderation');
 const logger = require('../utils/logger');
-
-// Characters that hoist users to the top of the member list
-const HOIST_CHARS = /^[^a-zA-Z0-9]/;
-
-function shouldDehoist(displayName) {
-  return HOIST_CHARS.test(displayName);
-}
-
-function generateDehoistedName(originalName, prefix = 'Dehoisted') {
-  // Remove leading special characters
-  const cleaned = originalName.replace(/^[^a-zA-Z0-9]+/, '');
-
-  // If nothing left after cleaning, use the prefix
-  if (!cleaned) {
-    return prefix;
-  }
-
-  // If the cleaned name is too short, add prefix
-  if (cleaned.length < 2) {
-    return `${prefix} ${cleaned}`;
-  }
-
-  return cleaned;
-}
 
 module.exports = {
   name: Events.GuildMemberUpdate,

@@ -1,6 +1,6 @@
 const { Events, PermissionFlagsBits } = require('discord.js');
 const { recordMemberChange } = require('../utils/analytics');
-const { getGuildConfig, addLog, trackMemberJoin, getRecentJoins } = require('../utils/moderation');
+const { getGuildConfig, addLog, trackMemberJoin, getRecentJoins, ensureAntiRaidConfigDefaults, trackVerificationMessage, shouldDehoist, generateDehoistedName } = require('../utils/moderation');
 const logger = require('../utils/logger');
 
 module.exports = {
@@ -16,15 +16,8 @@ module.exports = {
 
       const config = getGuildConfig(member.guild.id);
 
-      // Initialize antiRaid config if it doesn't exist
-      if (!config.antiRaid) {
-        config.antiRaid = {
-          accountAge: { enabled: false },
-          joinSpam: { enabled: false },
-          lockdown: { active: false },
-          verification: { enabled: false },
-        };
-      }
+      // Ensure antiRaid config has proper defaults
+      ensureAntiRaidConfigDefaults(config);
 
       // Track member join for spam detection
       trackMemberJoin(member.guild.id, member.id);
@@ -188,10 +181,14 @@ module.exports = {
             // Add reaction for user to click
             await message.react('✅');
 
+            // Track the message for cleanup after verification
+            trackVerificationMessage(member.guild.id, member.id, message.id);
+
             logger.info('Sent verification message', {
               guildId: member.guild.id,
               userId: member.id,
               userTag: member.user.tag,
+              messageId: message.id,
             });
           } catch (error) {
             logger.error('Failed to send verification message', {
@@ -206,15 +203,13 @@ module.exports = {
       // Anti-dehoist for new members
       if (config.antiDehoist && config.antiDehoist.enabled) {
         const displayName = member.user.username;
-        const hoistRegex = /^[^a-zA-Z0-9]/;
 
-        if (hoistRegex.test(displayName)) {
+        if (shouldDehoist(displayName)) {
           // Check if bot can manage nicknames
           if (member.guild.members.me.permissions.has(PermissionFlagsBits.ManageNicknames) && member.manageable) {
             try {
               const prefix = config.antiDehoist.prefix || 'Dehoisted';
-              const cleaned = displayName.replace(/^[^a-zA-Z0-9]+/, '');
-              const dehoistedName = cleaned.length >= 2 ? cleaned : `${prefix} ${cleaned || ''}`.trim() || prefix;
+              const dehoistedName = generateDehoistedName(displayName, prefix);
 
               await member.setNickname(dehoistedName, 'Anti-dehoist: Username contains hoisting characters');
 
