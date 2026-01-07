@@ -24,6 +24,15 @@ function getDefaultEconomyConfig() {
     workRewardMin: 50,
     workRewardMax: 150,
     workCooldownMinutes: 60,
+    begRewardMin: 10,
+    begRewardMax: 50,
+    begCooldownMinutes: 30,
+    crimeRewardMin: 100,
+    crimeRewardMax: 300,
+    crimeCooldownMinutes: 120,
+    crimeFailChance: 0.4, // 40% chance to fail and lose money
+    crimePenaltyMin: 50,
+    crimePenaltyMax: 150,
     startingBalance: 100,
   };
 }
@@ -34,6 +43,8 @@ function getDefaultGuildEconomy() {
     balances: {},
     daily: {},
     work: {},
+    beg: {},
+    crime: {},
     transactions: [],
     shop: [],
     inventory: {},
@@ -305,6 +316,125 @@ function claimWork(guildId, userId, now = new Date()) {
   };
 }
 
+function claimBeg(guildId, userId, now = new Date()) {
+  const nowMs = now.getTime();
+  const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+  const begData = guildData.beg[userId] || {};
+
+  const cooldownMs = (config.begCooldownMinutes || 30) * 60 * 1000;
+
+  if (begData.lastBegAt) {
+    const lastBegMs = new Date(begData.lastBegAt).getTime();
+    const elapsed = nowMs - lastBegMs;
+
+    if (elapsed < cooldownMs) {
+      const remainingMs = cooldownMs - elapsed;
+      return {
+        ok: false,
+        remainingMs,
+        nextBegAt: new Date(nowMs + remainingMs).toISOString(),
+        balance: getBalance(guildId, userId),
+      };
+    }
+  }
+
+  // Calculate random reward between min and max
+  const min = config.begRewardMin || 10;
+  const max = config.begRewardMax || 50;
+  const reward = Math.floor(Math.random() * (max - min + 1)) + min;
+
+  begData.lastBegAt = new Date(nowMs).toISOString();
+  begData.totalBegs = (begData.totalBegs || 0) + 1;
+  guildData.beg[userId] = begData;
+
+  const result = addBalance(guildId, userId, reward, {
+    type: "beg_reward",
+    reason: "Beg command",
+  });
+
+  return {
+    ok: true,
+    reward,
+    balance: result.balance,
+    nextBegAt: new Date(nowMs + cooldownMs).toISOString(),
+  };
+}
+
+function claimCrime(guildId, userId, now = new Date()) {
+  const nowMs = now.getTime();
+  const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+  const crimeData = guildData.crime[userId] || {};
+
+  const cooldownMs = (config.crimeCooldownMinutes || 120) * 60 * 1000;
+
+  if (crimeData.lastCrimeAt) {
+    const lastCrimeMs = new Date(crimeData.lastCrimeAt).getTime();
+    const elapsed = nowMs - lastCrimeMs;
+
+    if (elapsed < cooldownMs) {
+      const remainingMs = cooldownMs - elapsed;
+      return {
+        ok: false,
+        remainingMs,
+        nextCrimeAt: new Date(nowMs + remainingMs).toISOString(),
+        balance: getBalance(guildId, userId),
+      };
+    }
+  }
+
+  crimeData.lastCrimeAt = new Date(nowMs).toISOString();
+  crimeData.totalCrimes = (crimeData.totalCrimes || 0) + 1;
+  guildData.crime[userId] = crimeData;
+
+  // Check if crime succeeds or fails
+  const failChance = config.crimeFailChance || 0.4;
+  const success = Math.random() > failChance;
+
+  if (success) {
+    // Crime succeeded - get reward
+    const min = config.crimeRewardMin || 100;
+    const max = config.crimeRewardMax || 300;
+    const reward = Math.floor(Math.random() * (max - min + 1)) + min;
+
+    crimeData.successfulCrimes = (crimeData.successfulCrimes || 0) + 1;
+
+    const result = addBalance(guildId, userId, reward, {
+      type: "crime_reward",
+      reason: "Crime command (success)",
+    });
+
+    return {
+      ok: true,
+      success: true,
+      reward,
+      balance: result.balance,
+      nextCrimeAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  } else {
+    // Crime failed - lose money
+    const min = config.crimePenaltyMin || 50;
+    const max = config.crimePenaltyMax || 150;
+    const penalty = Math.floor(Math.random() * (max - min + 1)) + min;
+
+    crimeData.failedCrimes = (crimeData.failedCrimes || 0) + 1;
+
+    const result = addBalance(guildId, userId, -penalty, {
+      type: "crime_penalty",
+      reason: "Crime command (failed)",
+    });
+
+    return {
+      ok: true,
+      success: false,
+      penalty,
+      balance: result.balance,
+      nextCrimeAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  }
+}
+
 // Shop item management
 function addShopItem(guildId, itemData) {
   const guildData = getGuildEconomy(guildId);
@@ -500,6 +630,8 @@ module.exports = {
   addBalance,
   claimDaily,
   claimWork,
+  claimBeg,
+  claimCrime,
   formatCoins,
   getBalance,
   setBalance,
