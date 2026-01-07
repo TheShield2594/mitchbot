@@ -17,6 +17,27 @@ function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, m => map[m]);
 }
 
+// Sanitize URL to prevent javascript: protocol XSS
+function sanitizeUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+
+  try {
+    const parsed = new URL(url, window.location.origin);
+    // Only allow http, https, and data:image URLs
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return url;
+    }
+    if (parsed.protocol === 'data:' && url.startsWith('data:image/')) {
+      return url;
+    }
+  } catch (e) {
+    // Invalid URL
+    return null;
+  }
+
+  return null;
+}
+
 // Get guild ID from URL
 function getGuildIdFromUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -102,7 +123,7 @@ async function loadAnalytics() {
     updateMemberGrowthChart(data.memberGrowth);
     updateCommandCharts(data.commandAnalytics);
     updateViolationCharts(data.automodViolations);
-    updateLeaderboards(data.topUsers, data.automodViolations.topViolators);
+    updateLeaderboards(data.topUsers, data.automodViolations?.topViolators || []);
 
     showContent();
   } catch (error) {
@@ -114,28 +135,40 @@ async function loadAnalytics() {
 
 // Check if data is empty
 function isDataEmpty(data) {
+  if (!data) return true;
+
+  const memberGrowthLength = data.memberGrowth?.length || 0;
+  const totalCommands = data.commandAnalytics?.totalCommands || 0;
+  const topUsersLength = data.topUsers?.length || 0;
+  const totalViolations = data.automodViolations?.totalViolations || 0;
+
   return (
-    (!data.memberGrowth || data.memberGrowth.length === 0) &&
-    data.commandAnalytics.totalCommands === 0 &&
-    data.topUsers.length === 0 &&
-    data.automodViolations.totalViolations === 0
+    memberGrowthLength === 0 &&
+    totalCommands === 0 &&
+    topUsersLength === 0 &&
+    totalViolations === 0
   );
 }
 
 // Update stats cards
 function updateStats(data) {
+  if (!data) return;
+
   // Member count
-  const latestMemberData = data.memberGrowth[data.memberGrowth.length - 1];
-  if (latestMemberData) {
-    document.getElementById('stat-members').textContent = latestMemberData.memberCount;
+  const memberGrowth = data.memberGrowth || [];
+  const latestMemberData = memberGrowth[memberGrowth.length - 1];
+  const membersElement = document.getElementById('stat-members');
+
+  if (membersElement && latestMemberData) {
+    membersElement.textContent = latestMemberData.memberCount;
 
     // Calculate growth
-    if (data.memberGrowth.length > 1) {
-      const firstData = data.memberGrowth[0];
+    if (memberGrowth.length > 1) {
+      const firstData = memberGrowth[0];
       const growth = latestMemberData.memberCount - firstData.memberCount;
       const trendElement = document.getElementById('stat-members-trend');
 
-      if (growth !== 0) {
+      if (trendElement && growth !== 0) {
         trendElement.innerHTML = `
           <span>${growth > 0 ? '↑' : '↓'}</span>
           <span>${Math.abs(growth)} in ${currentDays} days</span>
@@ -146,13 +179,25 @@ function updateStats(data) {
   }
 
   // Total commands
-  document.getElementById('stat-commands').textContent = data.commandAnalytics.totalCommands.toLocaleString();
+  const commandsElement = document.getElementById('stat-commands');
+  if (commandsElement) {
+    const totalCommands = data.commandAnalytics?.totalCommands || 0;
+    commandsElement.textContent = totalCommands.toLocaleString();
+  }
 
   // Active users
-  document.getElementById('stat-active-users').textContent = data.topUsers.length;
+  const activeUsersElement = document.getElementById('stat-active-users');
+  if (activeUsersElement) {
+    const topUsersLength = data.topUsers?.length || 0;
+    activeUsersElement.textContent = topUsersLength;
+  }
 
   // AutoMod violations
-  document.getElementById('stat-violations').textContent = data.automodViolations.totalViolations.toLocaleString();
+  const violationsElement = document.getElementById('stat-violations');
+  if (violationsElement) {
+    const totalViolations = data.automodViolations?.totalViolations || 0;
+    violationsElement.textContent = totalViolations.toLocaleString();
+  }
 }
 
 // Update member growth chart
@@ -275,8 +320,10 @@ function updateMemberGrowthChart(memberGrowth) {
 
 // Update command charts
 function updateCommandCharts(commandAnalytics) {
-  updateCommandTrendsChart(commandAnalytics.commandTrends);
-  updateTopCommandsChart(commandAnalytics.topCommands);
+  if (!commandAnalytics) return;
+
+  updateCommandTrendsChart(commandAnalytics.commandTrends || []);
+  updateTopCommandsChart(commandAnalytics.topCommands || []);
 }
 
 // Update command trends chart
@@ -438,8 +485,10 @@ function updateTopCommandsChart(topCommands) {
 
 // Update violation charts
 function updateViolationCharts(violations) {
-  updateViolationTypeChart(violations.violationTypes);
-  updateViolationTrendsChart(violations.violationTrends);
+  if (!violations) return;
+
+  updateViolationTypeChart(violations.violationTypes || {});
+  updateViolationTrendsChart(violations.violationTrends || []);
 }
 
 // Update violation type chart
@@ -587,14 +636,15 @@ function updateTopUsersLeaderboard(topUsers) {
 
     const escapedDisplayName = escapeHtml(user.displayName || user.username || 'Unknown User');
     const escapedUsername = escapeHtml(user.username || 'Unknown User');
-    const escapedAvatar = escapeHtml(user.avatar);
+    const safeAvatar = sanitizeUrl(user.avatar);
     const lastActive = user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'Never';
+    const firstLetter = escapedUsername.charAt(0).toUpperCase();
 
     return `
       <div class="leaderboard-item">
         <div class="leaderboard-rank ${rankClass}">${rank}</div>
         <div class="leaderboard-avatar">
-          ${escapedAvatar ? `<img src="${escapedAvatar}" alt="${escapedDisplayName}">` : escapeHtml(escapedUsername.charAt(0).toUpperCase())}
+          ${safeAvatar ? `<img src="${escapeHtml(safeAvatar)}" alt="${escapedDisplayName}">` : firstLetter}
         </div>
         <div class="leaderboard-info">
           <div class="leaderboard-name">${escapedDisplayName}</div>
@@ -621,14 +671,14 @@ function updateTopViolatorsLeaderboard(topViolators) {
 
     const escapedDisplayName = escapeHtml(violator.displayName || violator.username || 'Unknown User');
     const escapedUsername = escapeHtml(violator.username || 'Unknown User');
-    const escapedAvatar = escapeHtml(violator.avatar);
+    const safeAvatar = sanitizeUrl(violator.avatar);
     const firstLetter = escapedUsername.charAt(0).toUpperCase() || '?';
 
     return `
       <div class="leaderboard-item">
         <div class="leaderboard-rank ${rankClass}">${rank}</div>
         <div class="leaderboard-avatar">
-          ${escapedAvatar ? `<img src="${escapedAvatar}" alt="${escapedDisplayName}">` : firstLetter}
+          ${safeAvatar ? `<img src="${escapeHtml(safeAvatar)}" alt="${escapedDisplayName}">` : firstLetter}
         </div>
         <div class="leaderboard-info">
           <div class="leaderboard-name">${escapedDisplayName}</div>
