@@ -526,10 +526,6 @@ async function loadGuildInfo() {
     config.roles = info.roles;
     config.channels = info.channels;
 
-    // Store for XP system
-    guildRoles = info.roles;
-    guildChannels = info.channels;
-
     // Set guild name
     document.getElementById('guild-name').textContent = info.name;
 
@@ -1219,8 +1215,6 @@ async function saveEconomySettings() {
 // ============================================
 
 let xpConfig = null;
-let guildRoles = [];
-let guildChannels = [];
 
 async function loadXPConfig() {
   try {
@@ -1240,7 +1234,7 @@ async function loadXPConfig() {
     // Populate level-up channel dropdown
     const channelSelect = document.getElementById('xp-levelup-channel');
     channelSelect.innerHTML = '<option value="">Same channel as message</option>';
-    guildChannels.filter(c => c.type === 0).forEach(channel => {
+    config.channels.filter(c => c.type === 0).forEach(channel => {
       const option = document.createElement('option');
       option.value = channel.id;
       option.textContent = `# ${channel.name}`;
@@ -1347,7 +1341,7 @@ function loadLevelRoles() {
   const sortedRoles = [...xpConfig.levelRoles].sort((a, b) => a.level - b.level);
 
   container.innerHTML = sortedRoles.map(reward => {
-    const role = guildRoles.find(r => r.id === reward.roleId);
+    const role = config.roles.find(r => r.id === reward.roleId);
     const roleName = role ? role.name : 'Unknown Role';
 
     return `
@@ -1394,8 +1388,14 @@ async function addLevelRole() {
       throw new Error(error.error || 'Failed to add level role');
     }
 
-    // Reload config and list
-    await loadXPConfig();
+    // Fetch only the updated XP config
+    const configResponse = await fetch(`/api/guild/${guildId}/xp/config`);
+    if (configResponse.ok) {
+      xpConfig = await configResponse.json();
+    }
+
+    // Refresh only the level roles UI
+    loadLevelRoles();
 
     // Clear inputs
     document.getElementById('level-role-level').value = '';
@@ -1421,8 +1421,14 @@ async function removeLevelRoleReward(level) {
       throw new Error(error.error || 'Failed to remove level role');
     }
 
-    // Reload config and list
-    await loadXPConfig();
+    // Fetch only the updated XP config
+    const configResponse = await fetch(`/api/guild/${guildId}/xp/config`);
+    if (configResponse.ok) {
+      xpConfig = await configResponse.json();
+    }
+
+    // Refresh only the level roles UI
+    loadLevelRoles();
 
     showToast('Reward Removed', `Level ${level} role reward removed`, 'success');
   } catch (error) {

@@ -349,6 +349,13 @@ router.post('/guild/:guildId/xp/level-roles', ensureServerManager, async (req, r
       return res.status(400).json({ error: 'Level must be between 1 and 1000' });
     }
 
+    // Check for duplicate level
+    const config = getXPGuildConfig(req.params.guildId);
+    const existingReward = config.levelRoles?.find(r => r.level === levelNum);
+    if (existingReward) {
+      return res.status(400).json({ error: `A role reward already exists for level ${levelNum}` });
+    }
+
     await setLevelRole(req.params.guildId, levelNum, roleId);
     res.json({ success: true });
   } catch (error) {

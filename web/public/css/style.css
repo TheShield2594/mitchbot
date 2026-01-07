@@ -12,6 +12,7 @@
   /* Brand Colors - Discord Inspired */
   --brand-primary: #5865F2;
   --brand-primary-hover: #4752C4;
+  --brand-primary-alpha: rgba(88, 101, 242, 0.1);
   --brand-secondary: #EB459E;
   --brand-accent: #00D9FF;
 
@@ -55,6 +56,7 @@
 :root[data-theme="light"] {
   --brand-primary: #5865F2;
   --brand-primary-hover: #4752C4;
+  --brand-primary-alpha: rgba(88, 101, 242, 0.1);
   --brand-secondary: #EB459E;
   --brand-accent: #00D9FF;
 
@@ -1855,13 +1857,13 @@ a:hover {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
-  background: var(--surface-2);
+  background: var(--bg-elevated);
   border-radius: var(--radius-lg);
   transition: all 0.2s ease;
 }
 
 .leaderboard-item:hover {
-  background: var(--surface-3);
+  background: var(--bg-tertiary);
   transform: translateX(4px);
 }
 
@@ -1887,9 +1889,9 @@ a:hover {
 
 .leaderboard-item__level {
   font-weight: 600;
-  color: var(--primary);
+  color: var(--brand-primary);
   padding: var(--space-1) var(--space-3);
-  background: var(--primary-alpha);
+  background: var(--brand-primary-alpha);
   border-radius: var(--radius-md);
 }
 
@@ -1907,15 +1909,15 @@ a:hover {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-3) var(--space-4);
-  background: var(--surface-2);
+  background: var(--bg-elevated);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   transition: all 0.2s ease;
 }
 
 .role-item:hover {
-  background: var(--surface-3);
-  border-color: var(--primary-alpha);
+  background: var(--bg-tertiary);
+  border-color: var(--brand-primary-alpha);
 }
 
 .role-item__content {
