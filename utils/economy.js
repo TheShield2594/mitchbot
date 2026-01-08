@@ -38,6 +38,7 @@ function getDefaultEconomyConfig() {
     robPercentageMin: 5, // Minimum % of target's balance to steal
     robPercentageMax: 15, // Maximum % of target's balance to steal
     robMinimumBalance: 100, // Target must have at least this much to be robbed
+    robInitiatorMinimumBalance: 50, // Initiator must have at least this much to attempt
     robPenaltyPercentage: 10, // % of your balance lost on failed rob
     startingBalance: 100,
   };
@@ -277,6 +278,19 @@ function formatCoins(amount, currencyName = "coins") {
   return `${Number(amount || 0).toLocaleString()} ${currencyName}`;
 }
 
+function formatRelativeTimestamp(isoString) {
+  if (!isoString) {
+    return "soon";
+  }
+
+  const timestamp = Math.floor(new Date(isoString).getTime() / 1000);
+  if (Number.isNaN(timestamp)) {
+    return "soon";
+  }
+
+  return `<t:${timestamp}:R>`;
+}
+
 // Work command functionality
 function claimWork(guildId, userId, now = new Date()) {
   const nowMs = now.getTime();
@@ -501,10 +515,12 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
   // Check if user has enough balance to pay penalty on failure
   const penaltyPercentage = config.robPenaltyPercentage || 10;
   const potentialPenalty = Math.floor(userBalance * (penaltyPercentage / 100));
-  if (userBalance < 50) {
+  const initiatorMinimum = config.robInitiatorMinimumBalance || 50;
+  if (userBalance < initiatorMinimum) {
     return {
       ok: false,
       error: "insufficient_funds",
+      minimumRequired: initiatorMinimum,
     };
   }
 
@@ -829,6 +845,7 @@ module.exports = {
   claimCrime,
   attemptRob,
   formatCoins,
+  formatRelativeTimestamp,
   getBalance,
   setBalance,
   getDailyCooldown,

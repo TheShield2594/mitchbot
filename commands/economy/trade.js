@@ -78,8 +78,11 @@ async function execute(interaction) {
         return;
     }
 
-    // Find item by ID or name (case-insensitive)
+    // Find item by ID, then exact name match, then partial name match
     let item = inventory.find(i => i.id === itemQuery);
+    if (!item) {
+        item = inventory.find(i => i.name.toLowerCase() === itemQuery);
+    }
     if (!item) {
         item = inventory.find(i => i.name.toLowerCase().includes(itemQuery));
     }

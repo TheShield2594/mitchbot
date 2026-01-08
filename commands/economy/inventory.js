@@ -9,6 +9,22 @@ const {
 
 const ITEMS_PER_PAGE = 5;
 
+function groupInventoryItems(inventory) {
+    const itemCounts = {};
+    for (const item of inventory) {
+        if (!itemCounts[item.name]) {
+            itemCounts[item.name] = {
+                count: 0,
+                description: item.description,
+                type: item.type,
+                price: item.price,
+            };
+        }
+        itemCounts[item.name].count++;
+    }
+    return itemCounts;
+}
+
 function createInventoryEmbed(inventory, itemCounts, targetUser, guildName, config, page = 0) {
     const totalPages = Math.ceil(Object.keys(itemCounts).length / ITEMS_PER_PAGE);
     const currentPage = Math.max(0, Math.min(page, totalPages - 1));
@@ -132,18 +148,7 @@ async function execute(interaction) {
     const inventory = getInventory(interaction.guildId, targetUser.id);
 
     // Group items by name and count duplicates
-    const itemCounts = {};
-    for (const item of inventory) {
-        if (!itemCounts[item.name]) {
-            itemCounts[item.name] = {
-                count: 0,
-                description: item.description,
-                type: item.type,
-                price: item.price,
-            };
-        }
-        itemCounts[item.name].count++;
-    }
+    const itemCounts = groupInventoryItems(inventory);
 
     const { embed, totalPages, currentPage } = createInventoryEmbed(
         inventory,
@@ -165,8 +170,36 @@ async function execute(interaction) {
     });
 }
 
-// Store active inventory sessions
+// Store active inventory sessions with TTL
 const activeSessions = new Map();
+const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_SESSIONS = 1000;
+
+function cleanupStaleSessions() {
+    const now = Date.now();
+    const staleKeys = [];
+
+    for (const [key, session] of activeSessions.entries()) {
+        if (now - session.timestamp > SESSION_TTL_MS) {
+            staleKeys.push(key);
+        }
+    }
+
+    for (const key of staleKeys) {
+        activeSessions.delete(key);
+    }
+
+    // If still too many sessions, remove oldest
+    if (activeSessions.size > MAX_SESSIONS) {
+        const entries = Array.from(activeSessions.entries())
+            .sort((a, b) => a[1].timestamp - b[1].timestamp);
+
+        const toRemove = entries.slice(0, activeSessions.size - MAX_SESSIONS);
+        for (const [key] of toRemove) {
+            activeSessions.delete(key);
+        }
+    }
+}
 
 async function handleInventoryButton(interaction) {
     if (!interaction.customId.startsWith("inventory_")) return false;
@@ -192,24 +225,17 @@ async function handleInventoryButton(interaction) {
     const inventory = getInventory(interaction.guildId, targetUserId);
 
     // Group items
-    const itemCounts = {};
-    for (const item of inventory) {
-        if (!itemCounts[item.name]) {
-            itemCounts[item.name] = {
-                count: 0,
-                description: item.description,
-                type: item.type,
-                price: item.price,
-            };
-        }
-        itemCounts[item.name].count++;
-    }
+    const itemCounts = groupInventoryItems(inventory);
 
     const totalPages = Math.ceil(Object.keys(itemCounts).length / ITEMS_PER_PAGE);
 
+    // Clean up stale sessions periodically
+    cleanupStaleSessions();
+
     // Get current page from session or default to 0
     const sessionKey = `${interaction.guildId}-${targetUserId}`;
-    let currentPage = activeSessions.get(sessionKey) || 0;
+    const session = activeSessions.get(sessionKey);
+    let currentPage = session ? session.page : 0;
 
     // Navigate
     switch (action) {
@@ -220,29 +246,64 @@ async function handleInventoryButton(interaction) {
             currentPage = Math.max(0, currentPage - 1);
             break;
         case "next":
-            currentPage = Math.min(totalPages - 1, currentPage + 1);
+            currentPage = Math.min(Math.max(0, totalPages - 1), currentPage + 1);
             break;
         case "last":
-            currentPage = totalPages - 1;
+            currentPage = Math.max(0, totalPages - 1);
             break;
     }
 
-    activeSessions.set(sessionKey, currentPage);
+    // Clamp current page to valid range
+    currentPage = Math.min(Math.max(0, currentPage), Math.max(0, totalPages - 1));
 
-    const targetUser = await interaction.client.users.fetch(targetUserId);
-    const { embed } = createInventoryEmbed(
-        inventory,
-        itemCounts,
-        targetUser,
-        interaction.guild?.name || "Unknown",
-        config,
-        currentPage
-    );
+    activeSessions.set(sessionKey, {
+        page: currentPage,
+        timestamp: Date.now(),
+    });
 
-    const buttons = createPaginationButtons(currentPage, totalPages, targetUserId);
-    const components = buttons ? [buttons] : [];
+    try {
+        const targetUser = await interaction.client.users.fetch(targetUserId);
+        const { embed } = createInventoryEmbed(
+            inventory,
+            itemCounts,
+            targetUser,
+            interaction.guild?.name || "Unknown",
+            config,
+            currentPage
+        );
 
-    await interaction.update({ embeds: [embed], components });
+        const buttons = createPaginationButtons(currentPage, totalPages, targetUserId);
+        const components = buttons ? [buttons] : [];
+
+        await interaction.update({ embeds: [embed], components });
+    } catch (error) {
+        const logger = require('../../utils/logger');
+        logger.error('Inventory button handler error', {
+            guildId: interaction.guildId,
+            userId: targetUserId,
+            action,
+            error,
+        });
+
+        try {
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({
+                    content: 'An error occurred while updating the inventory.',
+                    ephemeral: true,
+                });
+            } else {
+                await interaction.reply({
+                    content: 'An error occurred while updating the inventory.',
+                    ephemeral: true,
+                });
+            }
+        } catch (replyError) {
+            logger.error('Failed to send inventory error response', {
+                error: replyError,
+            });
+        }
+    }
+
     return true;
 }
 

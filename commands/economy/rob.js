@@ -3,23 +3,10 @@ const {
     attemptRob,
     ECONOMY_EMBED_COLOR,
     formatCoins,
+    formatRelativeTimestamp,
     getEconomyConfig,
     initEconomy,
-    getBalance,
 } = require("../../utils/economy");
-
-function formatRelativeTimestamp(isoString) {
-    if (!isoString) {
-        return "soon";
-    }
-
-    const timestamp = Math.floor(new Date(isoString).getTime() / 1000);
-    if (Number.isNaN(timestamp)) {
-        return "soon";
-    }
-
-    return `<t:${timestamp}:R>`;
-}
 
 const robSuccessMessages = [
     "sneaked into their house and took",
@@ -115,7 +102,7 @@ async function execute(interaction) {
                 errorTitle = "Invalid Target";
                 break;
 
-            case "cooldown":
+            case "cooldown": {
                 const embed = new EmbedBuilder()
                     .setColor(ECONOMY_EMBED_COLOR)
                     .setTitle("Rob Cooldown")
@@ -130,6 +117,7 @@ async function execute(interaction) {
 
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
+            }
 
             case "target_cooldown":
                 errorMessage = `You've already robbed <@${result.targetId}> recently. Wait 24 hours before targeting them again.`;
@@ -142,7 +130,7 @@ async function execute(interaction) {
                 break;
 
             case "insufficient_funds":
-                errorMessage = `You don't have enough ${config.currencyName} to risk a robbery. You need at least 50 ${config.currencyName}.`;
+                errorMessage = `You don't have enough ${config.currencyName} to risk a robbery. You need at least ${formatCoins(result.minimumRequired || 50, config.currencyName)}.`;
                 errorTitle = "Insufficient Funds";
                 break;
 

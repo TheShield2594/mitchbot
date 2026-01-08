@@ -3,22 +3,10 @@ const {
     claimBeg,
     ECONOMY_EMBED_COLOR,
     formatCoins,
+    formatRelativeTimestamp,
     getEconomyConfig,
     initEconomy,
 } = require("../../utils/economy");
-
-function formatRelativeTimestamp(isoString) {
-    if (!isoString) {
-        return "soon";
-    }
-
-    const timestamp = Math.floor(new Date(isoString).getTime() / 1000);
-    if (Number.isNaN(timestamp)) {
-        return "soon";
-    }
-
-    return `<t:${timestamp}:R>`;
-}
 
 const begMessages = [
     "asked for spare change and someone helped you out",
