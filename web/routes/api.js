@@ -31,6 +31,16 @@ const {
   getAutomodViolations,
   getAnalyticsSummary
 } = require('../../utils/analytics');
+const {
+  getGuildConfig: getReactionRolesConfig,
+  updateGuildConfig: updateReactionRolesConfig,
+  addReactionRoleMessage,
+  removeReactionRoleMessage,
+  addRoleToMessage,
+  removeRoleFromMessage,
+  getAllReactionRoleMessages,
+  setEnabled: setReactionRolesEnabled,
+} = require('../../utils/reactionRoles');
 
 // Get bot client ID for OAuth links
 router.get('/client-id', (req, res) => {
@@ -759,6 +769,195 @@ router.delete('/guild/:guildId/economy/shop/:itemId', ensureServerManager, async
   } catch (error) {
     console.error('Error deleting shop item:', error);
     res.status(500).json({ error: 'Failed to delete shop item' });
+  }
+});
+
+// ============================================
+// REACTION ROLES ROUTES
+// ============================================
+
+// Get reaction roles configuration
+router.get('/guild/:guildId/reactionroles', ensureServerManager, (req, res) => {
+  try {
+    const config = getReactionRolesConfig(req.params.guildId);
+    res.json(config);
+  } catch (error) {
+    console.error('Error getting reaction roles config:', error);
+    res.status(500).json({ error: 'Failed to get reaction roles configuration' });
+  }
+});
+
+// Update reaction roles enabled status
+router.post('/guild/:guildId/reactionroles/enabled', ensureServerManager, async (req, res) => {
+  try {
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+
+    await setReactionRolesEnabled(req.params.guildId, enabled);
+    res.json({ success: true, enabled });
+  } catch (error) {
+    console.error('Error updating reaction roles enabled status:', error);
+    res.status(500).json({ error: 'Failed to update reaction roles status' });
+  }
+});
+
+// Create a new reaction role message
+router.post('/guild/:guildId/reactionroles/messages', ensureServerManager, async (req, res) => {
+  try {
+    const { messageId, channelId, roles } = req.body;
+
+    if (!messageId || !channelId) {
+      return res.status(400).json({ error: 'messageId and channelId are required' });
+    }
+
+    if (roles && !Array.isArray(roles)) {
+      return res.status(400).json({ error: 'roles must be an array' });
+    }
+
+    const message = await addReactionRoleMessage(req.params.guildId, messageId, channelId, roles || []);
+    res.json({ success: true, message });
+  } catch (error) {
+    console.error('Error creating reaction role message:', error);
+    res.status(500).json({ error: 'Failed to create reaction role message' });
+  }
+});
+
+// Delete a reaction role message
+router.delete('/guild/:guildId/reactionroles/messages/:messageId', ensureServerManager, async (req, res) => {
+  try {
+    const success = await removeReactionRoleMessage(req.params.guildId, req.params.messageId);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting reaction role message:', error);
+    res.status(500).json({ error: 'Failed to delete reaction role message' });
+  }
+});
+
+// Add a role to a message
+router.post('/guild/:guildId/reactionroles/messages/:messageId/roles', ensureServerManager, async (req, res) => {
+  try {
+    const { emoji, roleId, description } = req.body;
+
+    if (!emoji || !roleId) {
+      return res.status(400).json({ error: 'emoji and roleId are required' });
+    }
+
+    const message = await addRoleToMessage(req.params.guildId, req.params.messageId, emoji, roleId, description);
+
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    res.json({ success: true, message });
+  } catch (error) {
+    console.error('Error adding role to message:', error);
+    res.status(500).json({ error: 'Failed to add role to message' });
+  }
+});
+
+// Remove a role from a message
+router.delete('/guild/:guildId/reactionroles/messages/:messageId/roles/:emoji', ensureServerManager, async (req, res) => {
+  try {
+    const emoji = decodeURIComponent(req.params.emoji);
+    const success = await removeRoleFromMessage(req.params.guildId, req.params.messageId, emoji);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Role not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error removing role from message:', error);
+    res.status(500).json({ error: 'Failed to remove role from message' });
+  }
+});
+
+// ============================================
+// WELCOME MESSAGE ROUTES
+// ============================================
+
+// Get welcome/leave message configuration
+router.get('/guild/:guildId/welcome', ensureServerManager, (req, res) => {
+  try {
+    const config = getGuildConfig(req.params.guildId);
+    res.json({
+      welcome: config.welcome || {
+        enabled: false,
+        channelId: null,
+        message: 'Welcome to the server, {user}!',
+      },
+      leave: config.leave || {
+        enabled: false,
+        channelId: null,
+        message: '{username} has left the server.',
+      },
+    });
+  } catch (error) {
+    console.error('Error getting welcome config:', error);
+    res.status(500).json({ error: 'Failed to get welcome configuration' });
+  }
+});
+
+// Update welcome message configuration
+router.post('/guild/:guildId/welcome', ensureServerManager, async (req, res) => {
+  try {
+    const config = getGuildConfig(req.params.guildId);
+    const { welcome, leave } = req.body;
+
+    // Ensure config.welcome and config.leave exist
+    if (!config.welcome) {
+      config.welcome = {
+        enabled: false,
+        channelId: null,
+        message: 'Welcome to the server, {user}!',
+      };
+    }
+
+    if (!config.leave) {
+      config.leave = {
+        enabled: false,
+        channelId: null,
+        message: '{username} has left the server.',
+      };
+    }
+
+    if (welcome) {
+      if (welcome.message && welcome.message.length > 2000) {
+        return res.status(400).json({ error: 'Welcome message must be 2000 characters or less' });
+      }
+
+      config.welcome = {
+        enabled: welcome.enabled !== undefined ? welcome.enabled : config.welcome.enabled,
+        channelId: welcome.channelId !== undefined ? welcome.channelId : config.welcome.channelId,
+        message: welcome.message !== undefined ? welcome.message : config.welcome.message,
+      };
+    }
+
+    if (leave) {
+      if (leave.message && leave.message.length > 2000) {
+        return res.status(400).json({ error: 'Leave message must be 2000 characters or less' });
+      }
+
+      config.leave = {
+        enabled: leave.enabled !== undefined ? leave.enabled : config.leave.enabled,
+        channelId: leave.channelId !== undefined ? leave.channelId : config.leave.channelId,
+        message: leave.message !== undefined ? leave.message : config.leave.message,
+      };
+    }
+
+    await updateGuildConfig(req.params.guildId, config);
+    res.json({ success: true, welcome: config.welcome, leave: config.leave });
+  } catch (error) {
+    console.error('Error updating welcome config:', error);
+    res.status(500).json({ error: 'Failed to update welcome configuration' });
   }
 });
 

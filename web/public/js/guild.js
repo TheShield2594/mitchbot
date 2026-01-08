@@ -2216,6 +2216,285 @@ async function deleteShopItem(itemId) {
 }
 
 // ============================================
+// REACTION ROLES
+// ============================================
+
+async function loadReactionRolesConfig() {
+  try {
+    const response = await fetch(`/api/guild/${guildId}/reactionroles`);
+    if (!response.ok) throw new Error('Failed to load reaction roles config');
+
+    const reactionRolesConfig = await response.json();
+
+    // Set enabled toggle
+    const enabledToggle = document.getElementById('reactionroles-enabled');
+    if (enabledToggle) {
+      enabledToggle.checked = reactionRolesConfig.enabled || false;
+      updateReactionRolesCard(reactionRolesConfig.enabled);
+    }
+
+    // Show/hide settings based on enabled state
+    toggleReactionRolesSettings();
+
+    // Render messages list
+    renderReactionRoleMessages(reactionRolesConfig.messages || {});
+  } catch (error) {
+    console.error('Error loading reaction roles config:', error);
+    showToast('Error', 'Failed to load reaction roles configuration', 'error');
+  }
+}
+
+function updateReactionRolesCard(enabled) {
+  const card = document.getElementById('card-reactionroles');
+  const badge = document.getElementById('badge-reactionroles');
+
+  if (enabled) {
+    card?.classList.remove('card--inactive');
+    card?.classList.add('card--active');
+    if (badge) {
+      badge.className = 'status-badge status-badge--active';
+      badge.innerHTML = '<span class="status-badge__dot"></span><span>Enabled</span>';
+    }
+  } else {
+    card?.classList.remove('card--active');
+    card?.classList.add('card--inactive');
+    if (badge) {
+      badge.className = 'status-badge status-badge--inactive';
+      badge.innerHTML = '<span class="status-badge__dot"></span><span>Disabled</span>';
+    }
+  }
+}
+
+function toggleReactionRolesSettings() {
+  const enabled = document.getElementById('reactionroles-enabled')?.checked;
+  const settings = document.getElementById('reactionroles-settings');
+  if (settings) {
+    settings.style.display = enabled ? 'block' : 'none';
+  }
+}
+
+function renderReactionRoleMessages(messages) {
+  const container = document.getElementById('reactionroles-messages-list');
+  if (!container) return;
+
+  const messageEntries = Object.entries(messages);
+
+  if (messageEntries.length === 0) {
+    container.innerHTML = '<div class="form-hint">No reaction role messages configured</div>';
+    return;
+  }
+
+  container.innerHTML = messageEntries.map(([messageId, data]) => `
+    <div class="card mb-3">
+      <div class="card__header">
+        <h5 class="card__title">Message ${messageId.slice(0, 8)}...</h5>
+        <button class="btn btn-danger btn-sm" onclick="deleteReactionRoleMessage('${messageId}')">Delete</button>
+      </div>
+      <div class="form-hint">Channel ID: ${data.channelId}</div>
+      <div class="mt-2">
+        ${(data.roles || []).length} role(s) configured
+      </div>
+    </div>
+  `).join('');
+}
+
+async function addReactionRoleMessage() {
+  const messageId = document.getElementById('rr-message-id')?.value?.trim();
+  const channelId = document.getElementById('rr-channel-select')?.value;
+
+  if (!messageId || !channelId) {
+    showToast('Error', 'Please provide both message ID and channel', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/reactionroles/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId, channelId, roles: [] }),
+    });
+
+    if (!response.ok) throw new Error('Failed to add reaction role message');
+
+    showToast('Success', 'Reaction role message added!', 'success');
+    document.getElementById('rr-message-id').value = '';
+    loadReactionRolesConfig();
+  } catch (error) {
+    console.error('Error adding reaction role message:', error);
+    showToast('Error', 'Failed to add reaction role message', 'error');
+  }
+}
+
+async function deleteReactionRoleMessage(messageId) {
+  if (!confirm('Are you sure you want to delete this reaction role message?')) return;
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/reactionroles/messages/${messageId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) throw new Error('Failed to delete reaction role message');
+
+    showToast('Success', 'Reaction role message deleted!', 'success');
+    loadReactionRolesConfig();
+  } catch (error) {
+    console.error('Error deleting reaction role message:', error);
+    showToast('Error', 'Failed to delete reaction role message', 'error');
+  }
+}
+
+async function saveReactionRolesSettings() {
+  const enabled = document.getElementById('reactionroles-enabled')?.checked || false;
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/reactionroles/enabled`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+
+    if (!response.ok) throw new Error('Failed to save reaction roles settings');
+
+    showToast('Success', 'Reaction roles settings saved!', 'success');
+    updateReactionRolesCard(enabled);
+  } catch (error) {
+    console.error('Error saving reaction roles settings:', error);
+    showToast('Error', 'Failed to save reaction roles settings', 'error');
+  }
+}
+
+// ============================================
+// WELCOME MESSAGES
+// ============================================
+
+async function loadWelcomeConfig() {
+  try {
+    const response = await fetch(`/api/guild/${guildId}/welcome`);
+    if (!response.ok) throw new Error('Failed to load welcome config');
+
+    const config = await response.json();
+
+    // Welcome settings
+    const welcomeEnabled = document.getElementById('welcome-enabled');
+    const welcomeChannel = document.getElementById('welcome-channel-select');
+    const welcomeMessage = document.getElementById('welcome-message');
+
+    if (welcomeEnabled) welcomeEnabled.checked = config.welcome?.enabled || false;
+    if (welcomeChannel && config.welcome?.channelId) welcomeChannel.value = config.welcome.channelId;
+    if (welcomeMessage) welcomeMessage.value = config.welcome?.message || 'Welcome to the server, {user}!';
+
+    updateWelcomeBadge(config.welcome?.enabled || false);
+    toggleWelcomeSettings();
+
+    // Leave settings
+    const leaveEnabled = document.getElementById('leave-enabled');
+    const leaveChannel = document.getElementById('leave-channel-select');
+    const leaveMessage = document.getElementById('leave-message');
+
+    if (leaveEnabled) leaveEnabled.checked = config.leave?.enabled || false;
+    if (leaveChannel && config.leave?.channelId) leaveChannel.value = config.leave.channelId;
+    if (leaveMessage) leaveMessage.value = config.leave?.message || '{username} has left the server.';
+
+    updateLeaveBadge(config.leave?.enabled || false);
+    toggleLeaveSettings();
+
+    // Update previews
+    updateWelcomePreview();
+    updateLeavePreview();
+  } catch (error) {
+    console.error('Error loading welcome config:', error);
+    showToast('Error', 'Failed to load welcome configuration', 'error');
+  }
+}
+
+function updateWelcomeBadge(enabled) {
+  const badge = document.getElementById('badge-welcome');
+  if (badge) {
+    badge.className = enabled ? 'status-badge status-badge--active' : 'status-badge status-badge--inactive';
+    badge.innerHTML = `<span class="status-badge__dot"></span><span>${enabled ? 'Enabled' : 'Disabled'}</span>`;
+  }
+}
+
+function updateLeaveBadge(enabled) {
+  const badge = document.getElementById('badge-leave');
+  if (badge) {
+    badge.className = enabled ? 'status-badge status-badge--active' : 'status-badge status-badge--inactive';
+    badge.innerHTML = `<span class="status-badge__dot"></span><span>${enabled ? 'Enabled' : 'Disabled'}</span>`;
+  }
+}
+
+function toggleWelcomeSettings() {
+  const enabled = document.getElementById('welcome-enabled')?.checked;
+  const settings = document.getElementById('welcome-settings');
+  if (settings) {
+    settings.style.display = enabled ? 'block' : 'none';
+  }
+}
+
+function toggleLeaveSettings() {
+  const enabled = document.getElementById('leave-enabled')?.checked;
+  const settings = document.getElementById('leave-settings');
+  if (settings) {
+    settings.style.display = enabled ? 'block' : 'none';
+  }
+}
+
+function updateWelcomePreview() {
+  const message = document.getElementById('welcome-message')?.value || '';
+  const preview = document.getElementById('welcome-preview');
+  if (preview) {
+    preview.textContent = message
+      .replace(/{user}/g, '@NewUser')
+      .replace(/{username}/g, 'NewUser')
+      .replace(/{server}/g, 'Your Server')
+      .replace(/{memberCount}/g, '100');
+  }
+}
+
+function updateLeavePreview() {
+  const message = document.getElementById('leave-message')?.value || '';
+  const preview = document.getElementById('leave-preview');
+  if (preview) {
+    preview.textContent = message
+      .replace(/{username}/g, 'OldUser')
+      .replace(/{server}/g, 'Your Server')
+      .replace(/{memberCount}/g, '99');
+  }
+}
+
+async function saveWelcomeSettings() {
+  const welcomeData = {
+    welcome: {
+      enabled: document.getElementById('welcome-enabled')?.checked || false,
+      channelId: document.getElementById('welcome-channel-select')?.value || null,
+      message: document.getElementById('welcome-message')?.value || 'Welcome to the server, {user}!',
+    },
+    leave: {
+      enabled: document.getElementById('leave-enabled')?.checked || false,
+      channelId: document.getElementById('leave-channel-select')?.value || null,
+      message: document.getElementById('leave-message')?.value || '{username} has left the server.',
+    },
+  };
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/welcome`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(welcomeData),
+    });
+
+    if (!response.ok) throw new Error('Failed to save welcome settings');
+
+    showToast('Success', 'Welcome settings saved!', 'success');
+    updateWelcomeBadge(welcomeData.welcome.enabled);
+    updateLeaveBadge(welcomeData.leave.enabled);
+  } catch (error) {
+    console.error('Error saving welcome settings:', error);
+    showToast('Error', 'Failed to save welcome settings', 'error');
+  }
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 
