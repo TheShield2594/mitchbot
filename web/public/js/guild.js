@@ -66,6 +66,27 @@ class FeatureHealthMonitor {
         key: 'enabled'
       },
       {
+        id: 'attachment-spam',
+        name: 'Attachment Spam',
+        type: 'toggle',
+        path: 'automod.attachmentSpam',
+        key: 'enabled'
+      },
+      {
+        id: 'emoji-spam',
+        name: 'Emoji Spam',
+        type: 'toggle',
+        path: 'automod.emojiSpam',
+        key: 'enabled'
+      },
+      {
+        id: 'anti-raid',
+        name: 'Anti-Raid',
+        type: 'toggle',
+        path: 'automod.antiRaid',
+        key: 'enabled'
+      },
+      {
         id: 'logging',
         name: 'Mod Logging',
         type: 'channel',
@@ -696,20 +717,20 @@ function loadAutomodConfig() {
   document.getElementById('emoji-spam-action').value = config.automod.emojiSpam?.action || 'delete';
 
   // Load anti-raid settings
-  if (config.antiRaid) {
-    document.getElementById('anti-raid-account-age-enabled').checked = config.antiRaid.accountAge?.enabled || false;
-    document.getElementById('anti-raid-account-age-days').value = config.antiRaid.accountAge?.minAgeDays || 7;
-    document.getElementById('anti-raid-account-age-action').value = config.antiRaid.accountAge?.action || 'kick';
+  if (config.automod.antiRaid) {
+    document.getElementById('anti-raid-account-age-enabled').checked = config.automod.antiRaid.accountAge?.enabled || false;
+    document.getElementById('anti-raid-account-age-days').value = config.automod.antiRaid.accountAge?.minAgeDays || 7;
+    document.getElementById('anti-raid-account-age-action').value = config.automod.antiRaid.accountAge?.action || 'kick';
 
-    document.getElementById('anti-raid-join-spam-enabled').checked = config.antiRaid.joinSpam?.enabled || false;
-    document.getElementById('anti-raid-join-spam-threshold').value = config.antiRaid.joinSpam?.threshold || 5;
-    document.getElementById('anti-raid-join-spam-time-window').value = (config.antiRaid.joinSpam?.timeWindow || 10000) / 1000; // Convert ms to seconds
-    document.getElementById('anti-raid-join-spam-action').value = config.antiRaid.joinSpam?.action || 'kick';
+    document.getElementById('anti-raid-join-spam-enabled').checked = config.automod.antiRaid.joinSpam?.enabled || false;
+    document.getElementById('anti-raid-join-spam-threshold').value = config.automod.antiRaid.joinSpam?.threshold || 5;
+    document.getElementById('anti-raid-join-spam-time-window').value = (config.automod.antiRaid.joinSpam?.timeWindow || 10000) / 1000; // Convert ms to seconds
+    document.getElementById('anti-raid-join-spam-action').value = config.automod.antiRaid.joinSpam?.action || 'kick';
 
-    document.getElementById('anti-raid-verification-enabled').checked = config.antiRaid.verification?.enabled || false;
-    document.getElementById('anti-raid-verification-channel').value = config.antiRaid.verification?.channelId || '';
-    document.getElementById('anti-raid-verification-role').value = config.antiRaid.verification?.roleId || '';
-    document.getElementById('anti-raid-verification-message').value = config.antiRaid.verification?.message || 'Welcome! Please verify by reacting to this message.';
+    document.getElementById('anti-raid-verification-enabled').checked = config.automod.antiRaid.verification?.enabled || false;
+    document.getElementById('anti-raid-verification-channel').value = config.automod.antiRaid.verification?.channelId || '';
+    document.getElementById('anti-raid-verification-role').value = config.automod.antiRaid.verification?.roleId || '';
+    document.getElementById('anti-raid-verification-message').value = config.automod.antiRaid.verification?.message || 'Welcome! Please verify by reacting to this message.';
   }
 
   renderWordList();
@@ -726,7 +747,10 @@ function loadAutomodConfig() {
     'linkfilter-enabled',
     'spam-enabled',
     'mention-spam-enabled',
-    'caps-spam-enabled'
+    'caps-spam-enabled',
+    'attachment-spam-enabled',
+    'emoji-spam-enabled',
+    'anti-raid-enabled'
   ];
 
   toggles.forEach(id => {
@@ -738,8 +762,26 @@ function loadAutomodConfig() {
         if (id === 'invitefilter-enabled') config.automod.inviteFilter.enabled = element.checked;
         if (id === 'linkfilter-enabled') config.automod.linkFilter.enabled = element.checked;
         if (id === 'spam-enabled') config.automod.spam.enabled = element.checked;
-        if (id === 'mention-spam-enabled') config.automod.mentionSpam.enabled = element.checked;
-        if (id === 'caps-spam-enabled') config.automod.capsSpam.enabled = element.checked;
+        if (id === 'mention-spam-enabled') {
+          if (!config.automod.mentionSpam) config.automod.mentionSpam = {};
+          config.automod.mentionSpam.enabled = element.checked;
+        }
+        if (id === 'caps-spam-enabled') {
+          if (!config.automod.capsSpam) config.automod.capsSpam = {};
+          config.automod.capsSpam.enabled = element.checked;
+        }
+        if (id === 'attachment-spam-enabled') {
+          if (!config.automod.attachmentSpam) config.automod.attachmentSpam = {};
+          config.automod.attachmentSpam.enabled = element.checked;
+        }
+        if (id === 'emoji-spam-enabled') {
+          if (!config.automod.emojiSpam) config.automod.emojiSpam = {};
+          config.automod.emojiSpam.enabled = element.checked;
+        }
+        if (id === 'anti-raid-enabled') {
+          if (!config.automod.antiRaid) config.automod.antiRaid = {};
+          config.automod.antiRaid.enabled = element.checked;
+        }
 
         if (healthMonitor) {
           healthMonitor.updateUI();
@@ -1042,6 +1084,7 @@ async function saveAutomod() {
         threshold: parseInt(document.getElementById('emoji-spam-threshold').value),
         action: document.getElementById('emoji-spam-action').value,
       },
+      antiRaid: config.automod.antiRaid || { enabled: false },
       whitelistedRoles: config.automod.whitelistedRoles || [],
       whitelistedChannels: config.automod.whitelistedChannels || [],
     };
@@ -1062,10 +1105,16 @@ async function saveAutomod() {
     config.automod.inviteFilter.enabled = updates.inviteFilter.enabled;
     config.automod.linkFilter.enabled = updates.linkFilter.enabled;
     config.automod.spam.enabled = updates.spam.enabled;
+    if (!config.automod.mentionSpam) config.automod.mentionSpam = {};
     config.automod.mentionSpam.enabled = updates.mentionSpam.enabled;
+    if (!config.automod.capsSpam) config.automod.capsSpam = {};
     config.automod.capsSpam.enabled = updates.capsSpam.enabled;
+    if (!config.automod.attachmentSpam) config.automod.attachmentSpam = {};
     config.automod.attachmentSpam.enabled = updates.attachmentSpam.enabled;
+    if (!config.automod.emojiSpam) config.automod.emojiSpam = {};
     config.automod.emojiSpam.enabled = updates.emojiSpam.enabled;
+    if (!config.automod.antiRaid) config.automod.antiRaid = {};
+    if (updates.antiRaid) config.automod.antiRaid.enabled = updates.antiRaid.enabled;
 
     if (healthMonitor) {
       healthMonitor.updateUI();
@@ -1125,7 +1174,7 @@ async function saveAntiRaid() {
         timeWindow: parseInt(document.getElementById('anti-raid-join-spam-time-window').value) * 1000, // Convert seconds to ms
         action: document.getElementById('anti-raid-join-spam-action').value,
       },
-      lockdown: config.antiRaid?.lockdown || {
+      lockdown: config.automod.antiRaid?.lockdown || {
         active: false,
         lockedChannels: [],
       },
@@ -1150,7 +1199,8 @@ async function saveAntiRaid() {
     }
 
     // Update config
-    config.antiRaid = updates;
+    if (!config.automod) config.automod = {};
+    config.automod.antiRaid = updates;
 
     if (healthMonitor) {
       healthMonitor.updateUI();
@@ -1498,14 +1548,14 @@ function loadEconomyConfig() {
   if (!config.economy) return;
 
   document.getElementById('economy-enabled').checked = config.economy.enabled;
-  document.getElementById('currency-name').value = config.economy.currencyName || 'coins';
-  document.getElementById('currency-symbol').value = config.economy.currencySymbol || '💰';
-  document.getElementById('daily-reward').value = config.economy.dailyReward || 100;
-  document.getElementById('daily-cooldown').value = config.economy.dailyCooldownHours || 24;
-  document.getElementById('work-reward-min').value = config.economy.workRewardMin || 50;
-  document.getElementById('work-reward-max').value = config.economy.workRewardMax || 150;
-  document.getElementById('work-cooldown').value = config.economy.workCooldownMinutes || 60;
-  document.getElementById('starting-balance').value = config.economy.startingBalance || 100;
+  document.getElementById('currency-name').value = config.economy.currencyName ?? 'coins';
+  document.getElementById('currency-symbol').value = config.economy.currencySymbol ?? '💰';
+  document.getElementById('daily-reward').value = config.economy.dailyReward ?? 100;
+  document.getElementById('daily-cooldown').value = config.economy.dailyCooldownHours ?? 24;
+  document.getElementById('work-reward-min').value = config.economy.workRewardMin ?? 50;
+  document.getElementById('work-reward-max').value = config.economy.workRewardMax ?? 150;
+  document.getElementById('work-cooldown').value = config.economy.workCooldownMinutes ?? 60;
+  document.getElementById('starting-balance').value = config.economy.startingBalance ?? 100;
 
   // Load advanced settings
   document.getElementById('beg-reward-min').value = config.economy.begRewardMin || 10;
@@ -1554,32 +1604,54 @@ function updateEconomyStatus() {
 
 async function saveEconomySettings() {
   try {
+    // Parse values and fallback to defaults only on NaN (not on 0)
+    const dailyReward = parseInt(document.getElementById('daily-reward').value);
+    const dailyCooldown = parseInt(document.getElementById('daily-cooldown').value);
+    const workRewardMin = parseInt(document.getElementById('work-reward-min').value);
+    const workRewardMax = parseInt(document.getElementById('work-reward-max').value);
+    const workCooldown = parseInt(document.getElementById('work-cooldown').value);
+    const startingBalance = parseInt(document.getElementById('starting-balance').value);
+
+    // Parse advanced settings
+    const begRewardMin = parseInt(document.getElementById('beg-reward-min').value);
+    const begRewardMax = parseInt(document.getElementById('beg-reward-max').value);
+    const begCooldown = parseInt(document.getElementById('beg-cooldown').value);
+    const crimeRewardMin = parseInt(document.getElementById('crime-reward-min').value);
+    const crimeRewardMax = parseInt(document.getElementById('crime-reward-max').value);
+    const crimeFailChance = parseFloat(document.getElementById('crime-fail-chance').value) / 100;
+    const crimeCooldown = parseInt(document.getElementById('crime-cooldown').value);
+    const robSuccessChance = parseFloat(document.getElementById('rob-success-chance').value) / 100;
+    const robMinBalance = parseInt(document.getElementById('rob-min-balance').value);
+    const robPercentMin = parseInt(document.getElementById('rob-percentage-min').value);
+    const robPercentMax = parseInt(document.getElementById('rob-percentage-max').value);
+    const robCooldown = parseInt(document.getElementById('rob-cooldown').value);
+
     const updates = {
       enabled: document.getElementById('economy-enabled').checked,
       currencyName: document.getElementById('currency-name').value.trim() || 'coins',
       currencySymbol: document.getElementById('currency-symbol').value.trim() || '💰',
-      dailyReward: parseInt(document.getElementById('daily-reward').value) || 100,
-      dailyCooldownHours: parseInt(document.getElementById('daily-cooldown').value) || 24,
-      workRewardMin: parseInt(document.getElementById('work-reward-min').value) || 50,
-      workRewardMax: parseInt(document.getElementById('work-reward-max').value) || 150,
-      workCooldownMinutes: parseInt(document.getElementById('work-cooldown').value) || 60,
-      startingBalance: parseInt(document.getElementById('starting-balance').value) || 100,
+      dailyReward: Number.isNaN(dailyReward) ? 100 : dailyReward,
+      dailyCooldownHours: Number.isNaN(dailyCooldown) ? 24 : dailyCooldown,
+      workRewardMin: Number.isNaN(workRewardMin) ? 50 : workRewardMin,
+      workRewardMax: Number.isNaN(workRewardMax) ? 150 : workRewardMax,
+      workCooldownMinutes: Number.isNaN(workCooldown) ? 60 : workCooldown,
+      startingBalance: Number.isNaN(startingBalance) ? 100 : startingBalance,
 
-      // Advanced settings
-      begRewardMin: parseInt(document.getElementById('beg-reward-min').value) || 10,
-      begRewardMax: parseInt(document.getElementById('beg-reward-max').value) || 50,
-      begCooldownMinutes: parseInt(document.getElementById('beg-cooldown').value) || 30,
+      // Advanced settings - preserve 0 values
+      begRewardMin: Number.isNaN(begRewardMin) ? 10 : begRewardMin,
+      begRewardMax: Number.isNaN(begRewardMax) ? 50 : begRewardMax,
+      begCooldownMinutes: Number.isNaN(begCooldown) ? 30 : begCooldown,
 
-      crimeRewardMin: parseInt(document.getElementById('crime-reward-min').value) || 100,
-      crimeRewardMax: parseInt(document.getElementById('crime-reward-max').value) || 300,
-      crimeFailChance: parseFloat(document.getElementById('crime-fail-chance').value) / 100 || 0.4, // Convert percentage to decimal
-      crimeCooldownMinutes: parseInt(document.getElementById('crime-cooldown').value) || 120,
+      crimeRewardMin: Number.isNaN(crimeRewardMin) ? 100 : crimeRewardMin,
+      crimeRewardMax: Number.isNaN(crimeRewardMax) ? 300 : crimeRewardMax,
+      crimeFailChance: Number.isNaN(crimeFailChance) ? 0.4 : crimeFailChance,
+      crimeCooldownMinutes: Number.isNaN(crimeCooldown) ? 120 : crimeCooldown,
 
-      robSuccessChance: parseFloat(document.getElementById('rob-success-chance').value) / 100 || 0.5, // Convert percentage to decimal
-      robMinimumBalance: parseInt(document.getElementById('rob-min-balance').value) || 100,
-      robPercentageMin: parseInt(document.getElementById('rob-percentage-min').value) || 5,
-      robPercentageMax: parseInt(document.getElementById('rob-percentage-max').value) || 15,
-      robCooldownMinutes: parseInt(document.getElementById('rob-cooldown').value) || 180,
+      robSuccessChance: Number.isNaN(robSuccessChance) ? 0.5 : robSuccessChance,
+      robMinimumBalance: Number.isNaN(robMinBalance) ? 100 : robMinBalance,
+      robPercentageMin: Number.isNaN(robPercentMin) ? 5 : robPercentMin,
+      robPercentageMax: Number.isNaN(robPercentMax) ? 15 : robPercentMax,
+      robCooldownMinutes: Number.isNaN(robCooldown) ? 180 : robCooldown,
     };
 
     // Validate inputs

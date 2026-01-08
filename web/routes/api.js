@@ -108,6 +108,11 @@ router.post('/guild/:guildId/automod', ensureServerManager, async (req, res) => 
       config.automod.emojiSpam = { ...config.automod.emojiSpam, ...updates.emojiSpam };
     }
 
+    if (updates.antiRaid) {
+      if (!config.automod.antiRaid) config.automod.antiRaid = {};
+      config.automod.antiRaid = { ...config.automod.antiRaid, ...updates.antiRaid };
+    }
+
     if (updates.whitelistedRoles) {
       config.automod.whitelistedRoles = updates.whitelistedRoles;
     }
@@ -149,7 +154,11 @@ router.post('/guild/:guildId/config', ensureServerManager, async (req, res) => {
 
     // Update antiRaid settings if provided
     if (updates.antiRaid) {
-      config.antiRaid = { ...config.antiRaid, ...updates.antiRaid };
+      if (!config.automod) config.automod = {};
+      if (!config.automod.antiRaid) config.automod.antiRaid = {};
+      config.automod.antiRaid = { ...config.automod.antiRaid, ...updates.antiRaid };
+      updates.automod = config.automod;
+      delete updates.antiRaid;
     }
 
     await updateGuildConfig(req.params.guildId, updates);
