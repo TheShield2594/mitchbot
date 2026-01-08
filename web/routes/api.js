@@ -109,7 +109,7 @@ router.post('/guild/:guildId/automod', ensureServerManager, async (req, res) => 
     }
 
     if (updates.antiRaid) {
-      config.automod.antiRaid = { ...config.automod.antiRaid, ...updates.antiRaid };
+      config.antiRaid = { ...config.antiRaid, ...updates.antiRaid };
     }
 
     if (updates.whitelistedRoles) {

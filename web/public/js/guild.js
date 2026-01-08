@@ -762,11 +762,26 @@ function loadAutomodConfig() {
         if (id === 'invitefilter-enabled') config.automod.inviteFilter.enabled = element.checked;
         if (id === 'linkfilter-enabled') config.automod.linkFilter.enabled = element.checked;
         if (id === 'spam-enabled') config.automod.spam.enabled = element.checked;
-        if (id === 'mention-spam-enabled') config.automod.mentionSpam.enabled = element.checked;
-        if (id === 'caps-spam-enabled') config.automod.capsSpam.enabled = element.checked;
-        if (id === 'attachment-spam-enabled') config.automod.attachmentSpam.enabled = element.checked;
-        if (id === 'emoji-spam-enabled') config.automod.emojiSpam.enabled = element.checked;
-        if (id === 'anti-raid-enabled') config.automod.antiRaid.enabled = element.checked;
+        if (id === 'mention-spam-enabled') {
+          if (!config.automod.mentionSpam) config.automod.mentionSpam = {};
+          config.automod.mentionSpam.enabled = element.checked;
+        }
+        if (id === 'caps-spam-enabled') {
+          if (!config.automod.capsSpam) config.automod.capsSpam = {};
+          config.automod.capsSpam.enabled = element.checked;
+        }
+        if (id === 'attachment-spam-enabled') {
+          if (!config.automod.attachmentSpam) config.automod.attachmentSpam = {};
+          config.automod.attachmentSpam.enabled = element.checked;
+        }
+        if (id === 'emoji-spam-enabled') {
+          if (!config.automod.emojiSpam) config.automod.emojiSpam = {};
+          config.automod.emojiSpam.enabled = element.checked;
+        }
+        if (id === 'anti-raid-enabled') {
+          if (!config.automod.antiRaid) config.automod.antiRaid = {};
+          config.automod.antiRaid.enabled = element.checked;
+        }
 
         if (healthMonitor) {
           healthMonitor.updateUI();
@@ -1090,11 +1105,16 @@ async function saveAutomod() {
     config.automod.inviteFilter.enabled = updates.inviteFilter.enabled;
     config.automod.linkFilter.enabled = updates.linkFilter.enabled;
     config.automod.spam.enabled = updates.spam.enabled;
+    if (!config.automod.mentionSpam) config.automod.mentionSpam = {};
     config.automod.mentionSpam.enabled = updates.mentionSpam.enabled;
+    if (!config.automod.capsSpam) config.automod.capsSpam = {};
     config.automod.capsSpam.enabled = updates.capsSpam.enabled;
+    if (!config.automod.attachmentSpam) config.automod.attachmentSpam = {};
     config.automod.attachmentSpam.enabled = updates.attachmentSpam.enabled;
+    if (!config.automod.emojiSpam) config.automod.emojiSpam = {};
     config.automod.emojiSpam.enabled = updates.emojiSpam.enabled;
-    config.automod.antiRaid.enabled = updates.antiRaid.enabled;
+    if (!config.automod.antiRaid) config.automod.antiRaid = {};
+    if (updates.antiRaid) config.automod.antiRaid.enabled = updates.antiRaid.enabled;
 
     if (healthMonitor) {
       healthMonitor.updateUI();
