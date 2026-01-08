@@ -5,6 +5,8 @@ const { awardCommandXP, getRolesForLevel, getGuildConfig } = require('../utils/x
 const logger = require('../utils/logger');
 const { handleCommandError } = require('../utils/commandErrors');
 const { handleBlackjackButton } = require('../commands/economy/blackjack');
+const { handleInventoryButton } = require('../commands/economy/inventory');
+const { handleTradeButton } = require('../commands/economy/trade');
 
 function getInteractionContext(interaction) {
   return {
@@ -18,12 +20,19 @@ function getInteractionContext(interaction) {
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
-    // Handle button interactions (e.g., blackjack)
+    // Handle button interactions (e.g., blackjack, inventory, trade)
     if (interaction.isButton()) {
       try {
-        const handled = await handleBlackjackButton(interaction);
-        if (handled) return;
-        // If blackjack didn't handle it, allow other button handlers to run
+        const blackjackHandled = await handleBlackjackButton(interaction);
+        if (blackjackHandled) return;
+
+        const inventoryHandled = await handleInventoryButton(interaction);
+        if (inventoryHandled) return;
+
+        const tradeHandled = await handleTradeButton(interaction);
+        if (tradeHandled) return;
+
+        // If no handler processed it, allow other button handlers to run
         // Future button handlers can be added here
       } catch (error) {
         logger.error('Button interaction error', {

@@ -24,6 +24,22 @@ function getDefaultEconomyConfig() {
     workRewardMin: 50,
     workRewardMax: 150,
     workCooldownMinutes: 60,
+    begRewardMin: 10,
+    begRewardMax: 50,
+    begCooldownMinutes: 30,
+    crimeRewardMin: 100,
+    crimeRewardMax: 300,
+    crimeCooldownMinutes: 120,
+    crimeFailChance: 0.4, // 40% chance to fail and lose money
+    crimePenaltyMin: 50,
+    crimePenaltyMax: 150,
+    robSuccessChance: 0.5, // 50% base success rate
+    robCooldownMinutes: 180, // 3 hours
+    robPercentageMin: 5, // Minimum % of target's balance to steal
+    robPercentageMax: 15, // Maximum % of target's balance to steal
+    robMinimumBalance: 100, // Target must have at least this much to be robbed
+    robInitiatorMinimumBalance: 50, // Initiator must have at least this much to attempt
+    robPenaltyPercentage: 10, // % of your balance lost on failed rob
     startingBalance: 100,
   };
 }
@@ -34,6 +50,9 @@ function getDefaultGuildEconomy() {
     balances: {},
     daily: {},
     work: {},
+    beg: {},
+    crime: {},
+    rob: {}, // { userId: { lastRobAt: ISO string, totalRobs: number, successfulRobs: number, failedRobs: number, targets: { targetId: ISO string } } }
     transactions: [],
     shop: [],
     inventory: {},
@@ -259,6 +278,19 @@ function formatCoins(amount, currencyName = "coins") {
   return `${Number(amount || 0).toLocaleString()} ${currencyName}`;
 }
 
+function formatRelativeTimestamp(isoString) {
+  if (!isoString) {
+    return "soon";
+  }
+
+  const timestamp = Math.floor(new Date(isoString).getTime() / 1000);
+  if (Number.isNaN(timestamp)) {
+    return "soon";
+  }
+
+  return `<t:${timestamp}:R>`;
+}
+
 // Work command functionality
 function claimWork(guildId, userId, now = new Date()) {
   const nowMs = now.getTime();
@@ -303,6 +335,257 @@ function claimWork(guildId, userId, now = new Date()) {
     balance: result.balance,
     nextWorkAt: new Date(nowMs + cooldownMs).toISOString(),
   };
+}
+
+function claimBeg(guildId, userId, now = new Date()) {
+  const nowMs = now.getTime();
+  const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+  const begData = guildData.beg[userId] || {};
+
+  const cooldownMs = (config.begCooldownMinutes || 30) * 60 * 1000;
+
+  if (begData.lastBegAt) {
+    const lastBegMs = new Date(begData.lastBegAt).getTime();
+    const elapsed = nowMs - lastBegMs;
+
+    if (elapsed < cooldownMs) {
+      const remainingMs = cooldownMs - elapsed;
+      return {
+        ok: false,
+        remainingMs,
+        nextBegAt: new Date(nowMs + remainingMs).toISOString(),
+        balance: getBalance(guildId, userId),
+      };
+    }
+  }
+
+  // Calculate random reward between min and max
+  const min = config.begRewardMin || 10;
+  const max = config.begRewardMax || 50;
+  const reward = Math.floor(Math.random() * (max - min + 1)) + min;
+
+  begData.lastBegAt = new Date(nowMs).toISOString();
+  begData.totalBegs = (begData.totalBegs || 0) + 1;
+  guildData.beg[userId] = begData;
+
+  const result = addBalance(guildId, userId, reward, {
+    type: "beg_reward",
+    reason: "Beg command",
+  });
+
+  return {
+    ok: true,
+    reward,
+    balance: result.balance,
+    nextBegAt: new Date(nowMs + cooldownMs).toISOString(),
+  };
+}
+
+function claimCrime(guildId, userId, now = new Date()) {
+  const nowMs = now.getTime();
+  const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+  const crimeData = guildData.crime[userId] || {};
+
+  const cooldownMs = (config.crimeCooldownMinutes || 120) * 60 * 1000;
+
+  if (crimeData.lastCrimeAt) {
+    const lastCrimeMs = new Date(crimeData.lastCrimeAt).getTime();
+    const elapsed = nowMs - lastCrimeMs;
+
+    if (elapsed < cooldownMs) {
+      const remainingMs = cooldownMs - elapsed;
+      return {
+        ok: false,
+        remainingMs,
+        nextCrimeAt: new Date(nowMs + remainingMs).toISOString(),
+        balance: getBalance(guildId, userId),
+      };
+    }
+  }
+
+  crimeData.lastCrimeAt = new Date(nowMs).toISOString();
+  crimeData.totalCrimes = (crimeData.totalCrimes || 0) + 1;
+  guildData.crime[userId] = crimeData;
+
+  // Check if crime succeeds or fails
+  const failChance = config.crimeFailChance || 0.4;
+  const success = Math.random() > failChance;
+
+  if (success) {
+    // Crime succeeded - get reward
+    const min = config.crimeRewardMin || 100;
+    const max = config.crimeRewardMax || 300;
+    const reward = Math.floor(Math.random() * (max - min + 1)) + min;
+
+    crimeData.successfulCrimes = (crimeData.successfulCrimes || 0) + 1;
+
+    const result = addBalance(guildId, userId, reward, {
+      type: "crime_reward",
+      reason: "Crime command (success)",
+    });
+
+    return {
+      ok: true,
+      success: true,
+      reward,
+      balance: result.balance,
+      nextCrimeAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  } else {
+    // Crime failed - lose money
+    const min = config.crimePenaltyMin || 50;
+    const max = config.crimePenaltyMax || 150;
+    const penalty = Math.floor(Math.random() * (max - min + 1)) + min;
+
+    crimeData.failedCrimes = (crimeData.failedCrimes || 0) + 1;
+
+    const result = addBalance(guildId, userId, -penalty, {
+      type: "crime_penalty",
+      reason: "Crime command (failed)",
+    });
+
+    return {
+      ok: true,
+      success: false,
+      penalty,
+      balance: result.balance,
+      nextCrimeAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  }
+}
+
+function attemptRob(guildId, userId, targetId, now = new Date()) {
+  const nowMs = now.getTime();
+  const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+  const robData = guildData.rob[userId] || { targets: {} };
+
+  // Can't rob yourself
+  if (userId === targetId) {
+    return { ok: false, error: "cant_rob_self" };
+  }
+
+  // Check global cooldown
+  const cooldownMs = (config.robCooldownMinutes || 180) * 60 * 1000;
+  if (robData.lastRobAt) {
+    const lastRobMs = new Date(robData.lastRobAt).getTime();
+    const elapsed = nowMs - lastRobMs;
+
+    if (elapsed < cooldownMs) {
+      const remainingMs = cooldownMs - elapsed;
+      return {
+        ok: false,
+        error: "cooldown",
+        remainingMs,
+        nextRobAt: new Date(nowMs + remainingMs).toISOString(),
+      };
+    }
+  }
+
+  // Check target-specific cooldown (can't rob same person within 24 hours)
+  const targetCooldownMs = 24 * 60 * 60 * 1000;
+  if (robData.targets && robData.targets[targetId]) {
+    const lastTargetRobMs = new Date(robData.targets[targetId]).getTime();
+    const targetElapsed = nowMs - lastTargetRobMs;
+
+    if (targetElapsed < targetCooldownMs) {
+      return {
+        ok: false,
+        error: "target_cooldown",
+        targetId,
+      };
+    }
+  }
+
+  const userBalance = getBalance(guildId, userId);
+  const targetBalance = getBalance(guildId, targetId);
+
+  // Check if target has minimum balance
+  const minimumBalance = config.robMinimumBalance || 100;
+  if (targetBalance < minimumBalance) {
+    return {
+      ok: false,
+      error: "target_too_poor",
+      minimumBalance,
+    };
+  }
+
+  // Check if user has enough balance to pay penalty on failure
+  const penaltyPercentage = config.robPenaltyPercentage || 10;
+  const potentialPenalty = Math.floor(userBalance * (penaltyPercentage / 100));
+  const initiatorMinimum = config.robInitiatorMinimumBalance || 50;
+  if (userBalance < initiatorMinimum) {
+    return {
+      ok: false,
+      error: "insufficient_funds",
+      minimumRequired: initiatorMinimum,
+    };
+  }
+
+  // Update rob data
+  robData.lastRobAt = new Date(nowMs).toISOString();
+  robData.totalRobs = (robData.totalRobs || 0) + 1;
+  if (!robData.targets) robData.targets = {};
+  robData.targets[targetId] = new Date(nowMs).toISOString();
+  guildData.rob[userId] = robData;
+
+  // Calculate success chance
+  const baseChance = config.robSuccessChance || 0.5;
+  const success = Math.random() < baseChance;
+
+  if (success) {
+    // Rob succeeded - steal percentage of target's balance
+    const percentageMin = config.robPercentageMin || 5;
+    const percentageMax = config.robPercentageMax || 15;
+    const percentage = Math.random() * (percentageMax - percentageMin) + percentageMin;
+    const stolenAmount = Math.floor(targetBalance * (percentage / 100));
+
+    robData.successfulRobs = (robData.successfulRobs || 0) + 1;
+
+    // Transfer money from target to robber
+    addBalance(guildId, targetId, -stolenAmount, {
+      type: "robbed",
+      reason: `Robbed by user ${userId}`,
+      robberId: userId,
+    });
+
+    addBalance(guildId, userId, stolenAmount, {
+      type: "rob_success",
+      reason: `Robbed user ${targetId}`,
+      victimId: targetId,
+      stolen: stolenAmount,
+    });
+
+    return {
+      ok: true,
+      success: true,
+      stolenAmount,
+      balance: getBalance(guildId, userId),
+      targetBalance: getBalance(guildId, targetId),
+      nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  } else {
+    // Rob failed - lose money as penalty
+    const penalty = potentialPenalty;
+    robData.failedRobs = (robData.failedRobs || 0) + 1;
+
+    addBalance(guildId, userId, -penalty, {
+      type: "rob_failure",
+      reason: `Failed rob attempt on user ${targetId}`,
+      targetId,
+      penalty,
+    });
+
+    return {
+      ok: true,
+      success: false,
+      penalty,
+      balance: getBalance(guildId, userId),
+      nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  }
 }
 
 // Shop item management
@@ -447,6 +730,64 @@ function removeInventoryItem(guildId, userId, inventoryItemId) {
   return true;
 }
 
+function tradeItem(guildId, fromUserId, toUserId, inventoryItemId) {
+  const guildData = getGuildEconomy(guildId);
+
+  // Check if sender has the item
+  if (!guildData.inventory[fromUserId]) {
+    return { ok: false, error: "no_inventory" };
+  }
+
+  const itemIndex = guildData.inventory[fromUserId].findIndex(item => item.id === inventoryItemId);
+
+  if (itemIndex === -1) {
+    return { ok: false, error: "item_not_found" };
+  }
+
+  const item = guildData.inventory[fromUserId][itemIndex];
+
+  // Remove from sender's inventory
+  guildData.inventory[fromUserId].splice(itemIndex, 1);
+
+  // Add to recipient's inventory
+  if (!guildData.inventory[toUserId]) {
+    guildData.inventory[toUserId] = [];
+  }
+
+  guildData.inventory[toUserId].push({
+    ...item,
+    id: randomUUID(), // Give it a new ID in recipient's inventory
+    tradedFrom: fromUserId,
+    tradedAt: new Date().toISOString(),
+  });
+
+  // Log transaction
+  logTransaction(guildId, {
+    userId: fromUserId,
+    amount: 0,
+    balanceAfter: getBalance(guildId, fromUserId),
+    type: "item_trade_sent",
+    reason: `Traded ${item.name} to user ${toUserId}`,
+    metadata: { itemId: inventoryItemId, itemName: item.name, recipientId: toUserId },
+  });
+
+  logTransaction(guildId, {
+    userId: toUserId,
+    amount: 0,
+    balanceAfter: getBalance(guildId, toUserId),
+    type: "item_trade_received",
+    reason: `Received ${item.name} from user ${fromUserId}`,
+    metadata: { itemId: inventoryItemId, itemName: item.name, senderId: fromUserId },
+  });
+
+  saveEconomyData();
+
+  return {
+    ok: true,
+    item,
+  };
+}
+
 // Leaderboard
 function getLeaderboard(guildId, limit = 10) {
   const guildData = getGuildEconomy(guildId);
@@ -500,7 +841,11 @@ module.exports = {
   addBalance,
   claimDaily,
   claimWork,
+  claimBeg,
+  claimCrime,
+  attemptRob,
   formatCoins,
+  formatRelativeTimestamp,
   getBalance,
   setBalance,
   getDailyCooldown,
@@ -518,6 +863,7 @@ module.exports = {
   purchaseItem,
   getInventory,
   removeInventoryItem,
+  tradeItem,
   getLeaderboard,
   transferCoins,
 };
