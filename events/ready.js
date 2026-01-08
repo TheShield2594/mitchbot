@@ -10,6 +10,7 @@ const { initStats, getWeeklyRecap, generateRecapMessage } = require('../utils/st
 const { initSnark } = require('../utils/snark');
 const { initAchievements } = require('../utils/achievements');
 const { initXP } = require('../utils/xp');
+const { initReactionRoles } = require('../utils/reactionRoles');
 const logger = require('../utils/logger');
 
 // Track active birthday roles for removal after 24 hours (in-memory cache, backed by persistent storage)
@@ -372,6 +373,13 @@ module.exports = {
       logger.info('XP/Leveling system initialized');
     } catch (error) {
       logger.error('Failed to initialize XP system', { error });
+    }
+
+    try {
+      await initReactionRoles();
+      logger.info('Reaction roles system initialized');
+    } catch (error) {
+      logger.error('Failed to initialize reaction roles', { error });
     }
 
     // Check for expired tempbans every minute

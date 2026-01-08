@@ -166,6 +166,23 @@
             </svg>
             <span>XP & Levels</span>
           </a>
+          <a href="#reactionroles" class="guild-sidebar__link" data-section="reactionroles">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+              <line x1="9" y1="9" x2="9.01" y2="9"/>
+              <line x1="15" y1="9" x2="15.01" y2="9"/>
+            </svg>
+            <span>Reaction Roles</span>
+          </a>
+          <a href="#welcome" class="guild-sidebar__link" data-section="welcome">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span>Welcome Messages</span>
+          </a>
         </div>
       </nav>
 
@@ -1360,6 +1377,188 @@
               <button class="btn btn-primary" onclick="saveXPSettings()">Save XP Settings</button>
               <button class="btn btn-secondary ml-2" onclick="loadXPConfig()">Reset Changes</button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reaction Roles Section -->
+      <section id="section-reactionroles" class="guild-section">
+        <div class="card card--inactive" id="card-reactionroles">
+          <div class="card__header">
+            <div>
+              <h3 class="card__title">
+                <span class="card__icon">😃</span>
+                Reaction Roles
+              </h3>
+              <p class="card__subtitle">Let users assign roles by reacting to messages</p>
+            </div>
+            <span class="status-badge status-badge--inactive" id="badge-reactionroles">
+              <span class="status-badge__dot"></span>
+              <span>Disabled</span>
+            </span>
+          </div>
+
+          <p class="card__description">
+            Reaction roles allow users to self-assign roles by reacting to specific messages with emojis.
+          </p>
+
+          <label class="toggle-container">
+            <input type="checkbox" class="toggle-input" id="reactionroles-enabled" onchange="toggleReactionRolesSettings()">
+            <span class="toggle-track">
+              <span class="toggle-knob"></span>
+            </span>
+            <span class="toggle-label">Enable Reaction Roles</span>
+          </label>
+
+          <div id="reactionroles-settings" style="display: none;">
+            <div class="divider mt-6 mb-6"></div>
+
+            <h4 class="form-section-title">Reaction Role Messages</h4>
+            <p class="form-hint mb-4">Configure messages that users can react to for role assignment</p>
+
+            <!-- Add New Message -->
+            <div class="card mb-4">
+              <div class="card__header">
+                <h4 class="card__title">Add Reaction Role Message</h4>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="rr-message-id">
+                  Message ID
+                  <span class="form-hint">Right-click a message and copy its ID (requires Developer Mode)</span>
+                </label>
+                <input type="text" class="form-input" id="rr-message-id" placeholder="1234567890123456789">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="rr-channel-select">Channel</label>
+                <select class="form-input" id="rr-channel-select">
+                  <option value="">Select a channel...</option>
+                </select>
+              </div>
+
+              <button class="btn btn-primary" onclick="addReactionRoleMessage()">Add Message</button>
+            </div>
+
+            <!-- Existing Messages List -->
+            <div id="reactionroles-messages-list">
+              <div class="form-hint">No reaction role messages configured</div>
+            </div>
+          </div>
+
+          <div class="mt-6">
+            <button class="btn btn-primary" onclick="saveReactionRolesSettings()">Save Reaction Roles Settings</button>
+            <button class="btn btn-secondary ml-2" onclick="loadReactionRolesConfig()">Reset Changes</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Welcome Messages Section -->
+      <section id="section-welcome" class="guild-section">
+        <div class="card">
+          <div class="card__header">
+            <div>
+              <h3 class="card__title">
+                <span class="card__icon">👋</span>
+                Welcome & Leave Messages
+              </h3>
+              <p class="card__subtitle">Greet new members and say goodbye to departing ones</p>
+            </div>
+          </div>
+
+          <p class="card__description">
+            Customize messages that are sent when members join or leave your server.
+          </p>
+
+          <!-- Welcome Messages -->
+          <div class="card mb-4">
+            <div class="card__header">
+              <div>
+                <h4 class="card__title">Welcome Messages</h4>
+                <p class="card__subtitle">Greet new members when they join</p>
+              </div>
+              <span class="status-badge status-badge--inactive" id="badge-welcome">
+                <span class="status-badge__dot"></span>
+                <span>Disabled</span>
+              </span>
+            </div>
+
+            <label class="toggle-container">
+              <input type="checkbox" class="toggle-input" id="welcome-enabled" onchange="toggleWelcomeSettings()">
+              <span class="toggle-track">
+                <span class="toggle-knob"></span>
+              </span>
+              <span class="toggle-label">Enable Welcome Messages</span>
+            </label>
+
+            <div id="welcome-settings" style="display: none;">
+              <div class="form-group">
+                <label class="form-label" for="welcome-channel-select">Welcome Channel</label>
+                <select class="form-input" id="welcome-channel-select">
+                  <option value="">Select a channel...</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="welcome-message">
+                  Welcome Message
+                  <span class="form-hint">Available variables: {user} (mention), {username}, {server}, {memberCount}</span>
+                </label>
+                <textarea class="form-input" id="welcome-message" rows="4" placeholder="Welcome to the server, {user}!" oninput="updateWelcomePreview()"></textarea>
+              </div>
+
+              <div class="alert alert--info">
+                <strong>Preview:</strong> <span id="welcome-preview">Welcome to the server, @NewUser!</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Leave Messages -->
+          <div class="card">
+            <div class="card__header">
+              <div>
+                <h4 class="card__title">Leave Messages</h4>
+                <p class="card__subtitle">Announce when members leave</p>
+              </div>
+              <span class="status-badge status-badge--inactive" id="badge-leave">
+                <span class="status-badge__dot"></span>
+                <span>Disabled</span>
+              </span>
+            </div>
+
+            <label class="toggle-container">
+              <input type="checkbox" class="toggle-input" id="leave-enabled" onchange="toggleLeaveSettings()">
+              <span class="toggle-track">
+                <span class="toggle-knob"></span>
+              </span>
+              <span class="toggle-label">Enable Leave Messages</span>
+            </label>
+
+            <div id="leave-settings" style="display: none;">
+              <div class="form-group">
+                <label class="form-label" for="leave-channel-select">Leave Channel</label>
+                <select class="form-input" id="leave-channel-select">
+                  <option value="">Select a channel...</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="leave-message">
+                  Leave Message
+                  <span class="form-hint">Available variables: {username}, {server}, {memberCount}</span>
+                </label>
+                <textarea class="form-input" id="leave-message" rows="4" placeholder="{username} has left the server." oninput="updateLeavePreview()"></textarea>
+              </div>
+
+              <div class="alert alert--info">
+                <strong>Preview:</strong> <span id="leave-preview">OldUser has left the server.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6">
+            <button class="btn btn-primary" onclick="saveWelcomeSettings()">Save Welcome Settings</button>
+            <button class="btn btn-secondary ml-2" onclick="loadWelcomeConfig()">Reset Changes</button>
           </div>
         </div>
       </section>
