@@ -42,6 +42,53 @@ const {
   setEnabled: setReactionRolesEnabled,
 } = require('../../utils/reactionRoles');
 
+// Get current user
+router.get('/user', (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  // Return user data from session
+  res.json(req.user);
+});
+
+// Refresh user's guilds from Discord API
+router.post('/user/refresh-guilds', async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const { fetch } = require('undici');
+    const accessToken = req.user.accessToken;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'No access token available' });
+    }
+
+    // Fetch fresh guilds from Discord
+    const response = await fetch('https://discord.com/api/v10/users/@me/guilds', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch guilds from Discord' });
+    }
+
+    const guilds = await response.json();
+
+    // Update user session
+    req.user.guilds = guilds;
+
+    res.json(req.user);
+  } catch (error) {
+    console.error('Error refreshing guilds:', error);
+    res.status(500).json({ error: 'Failed to refresh guilds' });
+  }
+});
+
 // Get bot client ID for OAuth links
 router.get('/client-id', (req, res) => {
   const clientId = process.env.CLIENT_ID;
