@@ -157,8 +157,7 @@ router.post('/guild/:guildId/config', ensureServerManager, async (req, res) => {
       if (!config.automod) config.automod = {};
       if (!config.automod.antiRaid) config.automod.antiRaid = {};
       config.automod.antiRaid = { ...config.automod.antiRaid, ...updates.antiRaid };
-      await updateGuildConfig(req.params.guildId, { automod: config.automod });
-      // Remove antiRaid from updates to avoid duplicate save
+      updates.automod = config.automod;
       delete updates.antiRaid;
     }
 

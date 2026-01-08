@@ -1199,7 +1199,7 @@ async function saveAntiRaid() {
     }
 
     // Update config
-    if (!config.automod.antiRaid) config.automod.antiRaid = {};
+    if (!config.automod) config.automod = {};
     config.automod.antiRaid = updates;
 
     if (healthMonitor) {
