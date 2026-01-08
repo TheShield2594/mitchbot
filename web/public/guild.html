@@ -1367,6 +1367,119 @@
               </div>
             </div>
 
+            <!-- Advanced Economy Settings -->
+            <div class="divider mt-6 mb-6"></div>
+            <h4 class="form-section-title">Advanced Commands</h4>
+
+            <!-- Beg Settings -->
+            <div class="card card--nested mb-4">
+              <h5 class="card__subtitle">Beg Command</h5>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="beg-reward-min">
+                    Beg Reward (Min)
+                    <span class="form-hint">Minimum payout for /beg</span>
+                  </label>
+                  <input type="number" class="form-input" id="beg-reward-min" min="1" max="10000" placeholder="10">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="beg-reward-max">
+                    Beg Reward (Max)
+                    <span class="form-hint">Maximum payout for /beg</span>
+                  </label>
+                  <input type="number" class="form-input" id="beg-reward-max" min="1" max="10000" placeholder="50">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="beg-cooldown">
+                  Beg Cooldown (minutes)
+                  <span class="form-hint">Time between /beg uses</span>
+                </label>
+                <input type="number" class="form-input" id="beg-cooldown" min="1" max="1440" placeholder="30">
+              </div>
+            </div>
+
+            <!-- Crime Settings -->
+            <div class="card card--nested mb-4">
+              <h5 class="card__subtitle">Crime Command</h5>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="crime-reward-min">
+                    Crime Reward (Min)
+                    <span class="form-hint">Minimum payout on success</span>
+                  </label>
+                  <input type="number" class="form-input" id="crime-reward-min" min="1" max="10000" placeholder="100">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="crime-reward-max">
+                    Crime Reward (Max)
+                    <span class="form-hint">Maximum payout on success</span>
+                  </label>
+                  <input type="number" class="form-input" id="crime-reward-max" min="1" max="10000" placeholder="300">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="crime-fail-chance">
+                    Fail Chance (%)
+                    <span class="form-hint">Probability of failing (0-100%)</span>
+                  </label>
+                  <input type="number" class="form-input" id="crime-fail-chance" min="0" max="100" placeholder="40">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="crime-cooldown">
+                    Crime Cooldown (minutes)
+                    <span class="form-hint">Time between /crime uses</span>
+                  </label>
+                  <input type="number" class="form-input" id="crime-cooldown" min="1" max="1440" placeholder="120">
+                </div>
+              </div>
+            </div>
+
+            <!-- Rob Settings -->
+            <div class="card card--nested mb-4">
+              <h5 class="card__subtitle">Rob Command</h5>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="rob-success-chance">
+                    Success Chance (%)
+                    <span class="form-hint">Probability of successful rob (0-100%)</span>
+                  </label>
+                  <input type="number" class="form-input" id="rob-success-chance" min="0" max="100" placeholder="50">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="rob-min-balance">
+                    Minimum Target Balance
+                    <span class="form-hint">Users below this balance can't be robbed</span>
+                  </label>
+                  <input type="number" class="form-input" id="rob-min-balance" min="0" max="100000" placeholder="100">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="rob-percentage-min">
+                    Rob Percentage (Min %)
+                    <span class="form-hint">Minimum % of balance stolen</span>
+                  </label>
+                  <input type="number" class="form-input" id="rob-percentage-min" min="1" max="100" placeholder="5">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="rob-percentage-max">
+                    Rob Percentage (Max %)
+                    <span class="form-hint">Maximum % of balance stolen</span>
+                  </label>
+                  <input type="number" class="form-input" id="rob-percentage-max" min="1" max="100" placeholder="15">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="rob-cooldown">
+                  Rob Cooldown (minutes)
+                  <span class="form-hint">Time between /rob uses</span>
+                </label>
+                <input type="number" class="form-input" id="rob-cooldown" min="1" max="1440" placeholder="180">
+              </div>
+            </div>
+
             <div class="mt-6">
               <button class="btn btn-primary" onclick="saveEconomySettings()">Save Economy Settings</button>
             </div>
@@ -1690,6 +1803,70 @@
               </div>
             </div>
 
+            <!-- Advanced XP Settings -->
+            <div class="divider mt-6 mb-6"></div>
+            <h4 class="form-section-title">Advanced Settings</h4>
+
+            <div class="form-group">
+              <label class="form-label" for="xp-per-command">
+                XP Per Command
+                <span class="form-hint">XP awarded for using commands (0-100)</span>
+              </label>
+              <input type="number" class="form-input" id="xp-per-command" min="0" max="100" placeholder="25">
+            </div>
+
+            <!-- Channel Multipliers -->
+            <div class="card card--nested mb-4">
+              <h5 class="card__subtitle">Channel XP Multipliers</h5>
+              <p class="form-hint mb-3">Increase or decrease XP gain in specific channels</p>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Channel</label>
+                  <select class="form-input" id="channel-multiplier-channel">
+                    <option value="">Select a channel...</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Multiplier</label>
+                  <input type="number" class="form-input" id="channel-multiplier-value" step="0.1" min="0" max="10" placeholder="1.5">
+                </div>
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                  <button class="btn btn-secondary" onclick="addChannelMultiplier()">Add</button>
+                </div>
+              </div>
+
+              <div id="channel-multipliers-list" class="mt-2">
+                <div class="form-hint">No channel multipliers configured</div>
+              </div>
+            </div>
+
+            <!-- Role Multipliers -->
+            <div class="card card--nested mb-4">
+              <h5 class="card__subtitle">Role XP Multipliers</h5>
+              <p class="form-hint mb-3">Boost XP gain for users with specific roles</p>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Role</label>
+                  <select class="form-input" id="role-multiplier-role">
+                    <option value="">Select a role...</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Multiplier</label>
+                  <input type="number" class="form-input" id="role-multiplier-value" step="0.1" min="0" max="10" placeholder="2.0">
+                </div>
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                  <button class="btn btn-secondary" onclick="addRoleMultiplier()">Add</button>
+                </div>
+              </div>
+
+              <div id="role-multipliers-list" class="mt-2">
+                <div class="form-hint">No role multipliers configured</div>
+              </div>
+            </div>
+
             <!-- Save Button -->
             <div class="mt-6">
               <button class="btn btn-primary" onclick="saveXPSettings()">Save XP Settings</button>
@@ -1760,13 +1937,8 @@
 
             <!-- Existing Messages List -->
             <div id="reactionroles-messages-list">
-              <div class="form-hint">No reaction role messages configured</div>
+              <!-- Messages will be dynamically loaded here -->
             </div>
-          </div>
-
-          <div class="mt-6">
-            <button class="btn btn-primary" onclick="saveReactionRolesSettings()">Save Reaction Roles Settings</button>
-            <button class="btn btn-secondary ml-2" onclick="loadReactionRolesConfig()">Reset Changes</button>
           </div>
         </div>
       </section>
