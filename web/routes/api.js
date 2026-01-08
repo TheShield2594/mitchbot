@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { fetch } = require('undici');
 const { ensureServerManager } = require('../middleware/auth');
 const { getGuildConfig, updateGuildConfig, getLogs, getWarnings, clearWarnings } = require('../../utils/moderation');
 const { getBirthdays, addBirthday, removeBirthday } = require('../../utils/birthdays');
@@ -41,6 +42,213 @@ const {
   getAllReactionRoleMessages,
   setEnabled: setReactionRolesEnabled,
 } = require('../../utils/reactionRoles');
+
+// Helper function to sanitize user data before sending to client
+function sanitizeUser(user) {
+  if (!user) return null;
+
+  const { accessToken, refreshToken, ...sanitizedUser } = user;
+  return sanitizedUser;
+}
+
+// Get current user
+router.get('/user', (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  // Return sanitized user data (exclude sensitive tokens)
+  res.json(sanitizeUser(req.user));
+});
+
+// Helper function to refresh Discord access token
+async function refreshDiscordToken(refreshToken) {
+  // Set up abort controller for timeout (5 seconds for token refresh)
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch('https://discord.com/api/v10/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: process.env.CLIENT_ID,
+        client_secret: process.env.CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.error(`Token refresh failed with status ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+    };
+  } catch (error) {
+    clearTimeout(timeout);
+
+    if (error.name === 'AbortError') {
+      console.error('Token refresh request timed out');
+      return null;
+    }
+
+    console.error('Error refreshing Discord token:', error);
+    return null;
+  }
+}
+
+// Refresh user's guilds from Discord API
+router.post('/user/refresh-guilds', async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    let accessToken = req.user.accessToken;
+    const refreshToken = req.user.refreshToken;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'No access token available' });
+    }
+
+    // Set up abort controller for timeout (10 seconds)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      // Fetch fresh guilds from Discord
+      let response = await fetch('https://discord.com/api/v10/users/@me/guilds', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      // Handle 401 Unauthorized - token expired, try to refresh
+      if (response.status === 401 && refreshToken) {
+        console.log('Access token expired, attempting refresh...');
+        const newTokens = await refreshDiscordToken(refreshToken);
+
+        if (newTokens) {
+          // Update session with new tokens
+          req.user.accessToken = newTokens.accessToken;
+          req.user.refreshToken = newTokens.refreshToken;
+          accessToken = newTokens.accessToken;
+
+          // Retry guilds fetch with new token (with timeout)
+          const retryController = new AbortController();
+          const retryTimeout = setTimeout(() => retryController.abort(), 10000);
+
+          try {
+            response = await fetch('https://discord.com/api/v10/users/@me/guilds', {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+              signal: retryController.signal,
+            });
+
+            clearTimeout(retryTimeout);
+
+            if (!response.ok && response.status !== 429) {
+              console.error(`Discord API returned status ${response.status} after token refresh`);
+              return res.status(502).json({
+                error: 'Failed to fetch guilds from Discord',
+                discordStatus: response.status
+              });
+            }
+          } catch (retryError) {
+            clearTimeout(retryTimeout);
+
+            if (retryError.name === 'AbortError') {
+              console.error('Discord API retry request timed out after token refresh');
+              return res.status(504).json({ error: 'Request to Discord API timed out after token refresh' });
+            }
+
+            throw retryError;
+          }
+        } else {
+          // Token refresh failed - user needs to re-authenticate
+          return res.status(401).json({ error: 'Session expired. Please log in again.' });
+        }
+      }
+
+      // Handle 429 Rate Limit
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After') || response.headers.get('X-RateLimit-Reset-After') || '60';
+        const rateLimitScope = response.headers.get('X-RateLimit-Scope') || 'unknown';
+
+        console.warn(`Discord API rate limit hit. Retry after ${retryAfter}s, scope: ${rateLimitScope}`);
+
+        return res.status(429).json({
+          error: 'Rate limited by Discord API',
+          retryAfter: parseInt(retryAfter, 10),
+          message: `Please wait ${retryAfter} seconds before trying again`,
+        });
+      }
+
+      // Handle 5xx Server Errors
+      if (response.status >= 500) {
+        console.error(`Discord API upstream error: ${response.status}`);
+        return res.status(502).json({
+          error: 'Discord API is experiencing issues',
+          discordStatus: response.status,
+          message: 'Please try again later',
+        });
+      }
+
+      // Handle other non-OK responses
+      if (!response.ok) {
+        console.error(`Discord API returned status ${response.status}`);
+        return res.status(502).json({
+          error: 'Failed to fetch guilds from Discord',
+          discordStatus: response.status
+        });
+      }
+
+      const guilds = await response.json();
+
+      // Update user session with new guilds
+      req.user.guilds = guilds;
+
+      // Save session after mutation
+      req.session.save((err) => {
+        if (err) {
+          console.error('Error saving session:', err);
+          return res.status(500).json({ error: 'Failed to save session' });
+        }
+
+        // Return sanitized user data (exclude sensitive tokens)
+        res.json(sanitizeUser(req.user));
+      });
+    } catch (fetchError) {
+      clearTimeout(timeout);
+
+      // Handle timeout
+      if (fetchError.name === 'AbortError') {
+        console.error('Discord API request timed out');
+        return res.status(504).json({ error: 'Request to Discord API timed out' });
+      }
+
+      throw fetchError;
+    }
+  } catch (error) {
+    console.error('Error refreshing guilds:', error);
+    res.status(500).json({ error: 'Failed to refresh guilds' });
+  }
+});
 
 // Get bot client ID for OAuth links
 router.get('/client-id', (req, res) => {
