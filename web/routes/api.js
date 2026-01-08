@@ -100,6 +100,14 @@ router.post('/guild/:guildId/automod', ensureServerManager, async (req, res) => 
       config.automod.capsSpam = { ...config.automod.capsSpam, ...updates.capsSpam };
     }
 
+    if (updates.attachmentSpam) {
+      config.automod.attachmentSpam = { ...config.automod.attachmentSpam, ...updates.attachmentSpam };
+    }
+
+    if (updates.emojiSpam) {
+      config.automod.emojiSpam = { ...config.automod.emojiSpam, ...updates.emojiSpam };
+    }
+
     if (updates.whitelistedRoles) {
       config.automod.whitelistedRoles = updates.whitelistedRoles;
     }
@@ -130,6 +138,26 @@ router.post('/guild/:guildId/logging', ensureServerManager, async (req, res) => 
   } catch (error) {
     console.error('Error updating logging config:', error);
     res.status(500).json({ error: 'Failed to update logging configuration' });
+  }
+});
+
+// Update general guild configuration (for antiRaid and other settings)
+router.post('/guild/:guildId/config', ensureServerManager, async (req, res) => {
+  try {
+    const config = getGuildConfig(req.params.guildId);
+    const updates = req.body;
+
+    // Update antiRaid settings if provided
+    if (updates.antiRaid) {
+      config.antiRaid = { ...config.antiRaid, ...updates.antiRaid };
+    }
+
+    await updateGuildConfig(req.params.guildId, updates);
+
+    res.json({ success: true, config: getGuildConfig(req.params.guildId) });
+  } catch (error) {
+    console.error('Error updating guild config:', error);
+    res.status(500).json({ error: 'Failed to update configuration' });
   }
 });
 

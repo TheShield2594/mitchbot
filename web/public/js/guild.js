@@ -566,6 +566,30 @@ async function loadGuildInfo() {
       });
     }
 
+    // Populate anti-raid verification channel dropdown
+    const antiRaidVerificationChannelSelect = document.getElementById('anti-raid-verification-channel');
+    if (antiRaidVerificationChannelSelect) {
+      antiRaidVerificationChannelSelect.innerHTML = '<option value="">Select a channel...</option>';
+      info.channels.filter(c => c.type === 0).forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `#${channel.name}`;
+        antiRaidVerificationChannelSelect.appendChild(option);
+      });
+    }
+
+    // Populate anti-raid verification role dropdown
+    const antiRaidVerificationRoleSelect = document.getElementById('anti-raid-verification-role');
+    if (antiRaidVerificationRoleSelect) {
+      antiRaidVerificationRoleSelect.innerHTML = '<option value="">Select a role...</option>';
+      info.roles.filter(r => r.id !== info.id).forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        antiRaidVerificationRoleSelect.appendChild(option);
+      });
+    }
+
     // Load automod config
     loadAutomodConfig();
 
@@ -643,6 +667,35 @@ function loadAutomodConfig() {
   document.getElementById('caps-spam-percentage').value = config.automod.capsSpam?.percentage || 70;
   document.getElementById('caps-spam-min-length').value = config.automod.capsSpam?.minLength || 10;
   document.getElementById('caps-spam-action').value = config.automod.capsSpam?.action || 'delete';
+
+  // Load attachment spam settings
+  document.getElementById('attachment-spam-enabled').checked = config.automod.attachmentSpam?.enabled || false;
+  document.getElementById('attachment-spam-threshold').value = config.automod.attachmentSpam?.threshold || 5;
+  document.getElementById('attachment-spam-time-window').value = (config.automod.attachmentSpam?.timeWindow || 10000) / 1000; // Convert ms to seconds
+  document.getElementById('attachment-spam-action').value = config.automod.attachmentSpam?.action || 'warn';
+  document.getElementById('attachment-spam-warn-threshold').value = config.automod.attachmentSpam?.warnThreshold || 2;
+
+  // Load emoji spam settings
+  document.getElementById('emoji-spam-enabled').checked = config.automod.emojiSpam?.enabled || false;
+  document.getElementById('emoji-spam-threshold').value = config.automod.emojiSpam?.threshold || 10;
+  document.getElementById('emoji-spam-action').value = config.automod.emojiSpam?.action || 'delete';
+
+  // Load anti-raid settings
+  if (config.antiRaid) {
+    document.getElementById('anti-raid-account-age-enabled').checked = config.antiRaid.accountAge?.enabled || false;
+    document.getElementById('anti-raid-account-age-days').value = config.antiRaid.accountAge?.minAgeDays || 7;
+    document.getElementById('anti-raid-account-age-action').value = config.antiRaid.accountAge?.action || 'kick';
+
+    document.getElementById('anti-raid-join-spam-enabled').checked = config.antiRaid.joinSpam?.enabled || false;
+    document.getElementById('anti-raid-join-spam-threshold').value = config.antiRaid.joinSpam?.threshold || 5;
+    document.getElementById('anti-raid-join-spam-time-window').value = (config.antiRaid.joinSpam?.timeWindow || 10000) / 1000; // Convert ms to seconds
+    document.getElementById('anti-raid-join-spam-action').value = config.antiRaid.joinSpam?.action || 'kick';
+
+    document.getElementById('anti-raid-verification-enabled').checked = config.antiRaid.verification?.enabled || false;
+    document.getElementById('anti-raid-verification-channel').value = config.antiRaid.verification?.channelId || '';
+    document.getElementById('anti-raid-verification-role').value = config.antiRaid.verification?.roleId || '';
+    document.getElementById('anti-raid-verification-message').value = config.antiRaid.verification?.message || 'Welcome! Please verify by reacting to this message.';
+  }
 
   renderWordList();
   renderWhitelist();
@@ -962,6 +1015,18 @@ async function saveAutomod() {
         minLength: parseInt(document.getElementById('caps-spam-min-length').value),
         action: document.getElementById('caps-spam-action').value,
       },
+      attachmentSpam: {
+        enabled: document.getElementById('attachment-spam-enabled').checked,
+        threshold: parseInt(document.getElementById('attachment-spam-threshold').value),
+        timeWindow: parseInt(document.getElementById('attachment-spam-time-window').value) * 1000, // Convert seconds to ms
+        action: document.getElementById('attachment-spam-action').value,
+        warnThreshold: parseInt(document.getElementById('attachment-spam-warn-threshold').value),
+      },
+      emojiSpam: {
+        enabled: document.getElementById('emoji-spam-enabled').checked,
+        threshold: parseInt(document.getElementById('emoji-spam-threshold').value),
+        action: document.getElementById('emoji-spam-action').value,
+      },
       whitelistedRoles: config.automod.whitelistedRoles || [],
       whitelistedChannels: config.automod.whitelistedChannels || [],
     };
@@ -984,6 +1049,8 @@ async function saveAutomod() {
     config.automod.spam.enabled = updates.spam.enabled;
     config.automod.mentionSpam.enabled = updates.mentionSpam.enabled;
     config.automod.capsSpam.enabled = updates.capsSpam.enabled;
+    config.automod.attachmentSpam.enabled = updates.attachmentSpam.enabled;
+    config.automod.emojiSpam.enabled = updates.emojiSpam.enabled;
 
     if (healthMonitor) {
       healthMonitor.updateUI();
@@ -1025,6 +1092,59 @@ async function saveSettings() {
   } catch (error) {
     console.error('Error saving settings:', error);
     showToast('Save Failed', 'Could not save logging settings', 'error');
+    throw error;
+  }
+}
+
+async function saveAntiRaid() {
+  try {
+    const updates = {
+      accountAge: {
+        enabled: document.getElementById('anti-raid-account-age-enabled').checked,
+        minAgeDays: parseInt(document.getElementById('anti-raid-account-age-days').value),
+        action: document.getElementById('anti-raid-account-age-action').value,
+      },
+      joinSpam: {
+        enabled: document.getElementById('anti-raid-join-spam-enabled').checked,
+        threshold: parseInt(document.getElementById('anti-raid-join-spam-threshold').value),
+        timeWindow: parseInt(document.getElementById('anti-raid-join-spam-time-window').value) * 1000, // Convert seconds to ms
+        action: document.getElementById('anti-raid-join-spam-action').value,
+      },
+      lockdown: config.antiRaid?.lockdown || {
+        active: false,
+        lockedChannels: [],
+      },
+      verification: {
+        enabled: document.getElementById('anti-raid-verification-enabled').checked,
+        roleId: document.getElementById('anti-raid-verification-role').value || null,
+        channelId: document.getElementById('anti-raid-verification-channel').value || null,
+        message: document.getElementById('anti-raid-verification-message').value || 'Welcome! Please verify by reacting to this message.',
+      },
+    };
+
+    const response = await fetch(`/api/guild/${guildId}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        antiRaid: updates,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save anti-raid settings');
+    }
+
+    // Update config
+    config.antiRaid = updates;
+
+    if (healthMonitor) {
+      healthMonitor.updateUI();
+    }
+
+    showToast('Settings Saved', 'Anti-raid configuration updated successfully', 'success');
+  } catch (error) {
+    console.error('Error saving anti-raid settings:', error);
+    showToast('Save Failed', 'Could not save anti-raid settings', 'error');
     throw error;
   }
 }
