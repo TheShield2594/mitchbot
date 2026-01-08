@@ -717,20 +717,20 @@ function loadAutomodConfig() {
   document.getElementById('emoji-spam-action').value = config.automod.emojiSpam?.action || 'delete';
 
   // Load anti-raid settings
-  if (config.antiRaid) {
-    document.getElementById('anti-raid-account-age-enabled').checked = config.antiRaid.accountAge?.enabled || false;
-    document.getElementById('anti-raid-account-age-days').value = config.antiRaid.accountAge?.minAgeDays || 7;
-    document.getElementById('anti-raid-account-age-action').value = config.antiRaid.accountAge?.action || 'kick';
+  if (config.automod.antiRaid) {
+    document.getElementById('anti-raid-account-age-enabled').checked = config.automod.antiRaid.accountAge?.enabled || false;
+    document.getElementById('anti-raid-account-age-days').value = config.automod.antiRaid.accountAge?.minAgeDays || 7;
+    document.getElementById('anti-raid-account-age-action').value = config.automod.antiRaid.accountAge?.action || 'kick';
 
-    document.getElementById('anti-raid-join-spam-enabled').checked = config.antiRaid.joinSpam?.enabled || false;
-    document.getElementById('anti-raid-join-spam-threshold').value = config.antiRaid.joinSpam?.threshold || 5;
-    document.getElementById('anti-raid-join-spam-time-window').value = (config.antiRaid.joinSpam?.timeWindow || 10000) / 1000; // Convert ms to seconds
-    document.getElementById('anti-raid-join-spam-action').value = config.antiRaid.joinSpam?.action || 'kick';
+    document.getElementById('anti-raid-join-spam-enabled').checked = config.automod.antiRaid.joinSpam?.enabled || false;
+    document.getElementById('anti-raid-join-spam-threshold').value = config.automod.antiRaid.joinSpam?.threshold || 5;
+    document.getElementById('anti-raid-join-spam-time-window').value = (config.automod.antiRaid.joinSpam?.timeWindow || 10000) / 1000; // Convert ms to seconds
+    document.getElementById('anti-raid-join-spam-action').value = config.automod.antiRaid.joinSpam?.action || 'kick';
 
-    document.getElementById('anti-raid-verification-enabled').checked = config.antiRaid.verification?.enabled || false;
-    document.getElementById('anti-raid-verification-channel').value = config.antiRaid.verification?.channelId || '';
-    document.getElementById('anti-raid-verification-role').value = config.antiRaid.verification?.roleId || '';
-    document.getElementById('anti-raid-verification-message').value = config.antiRaid.verification?.message || 'Welcome! Please verify by reacting to this message.';
+    document.getElementById('anti-raid-verification-enabled').checked = config.automod.antiRaid.verification?.enabled || false;
+    document.getElementById('anti-raid-verification-channel').value = config.automod.antiRaid.verification?.channelId || '';
+    document.getElementById('anti-raid-verification-role').value = config.automod.antiRaid.verification?.roleId || '';
+    document.getElementById('anti-raid-verification-message').value = config.automod.antiRaid.verification?.message || 'Welcome! Please verify by reacting to this message.';
   }
 
   renderWordList();
@@ -1174,7 +1174,7 @@ async function saveAntiRaid() {
         timeWindow: parseInt(document.getElementById('anti-raid-join-spam-time-window').value) * 1000, // Convert seconds to ms
         action: document.getElementById('anti-raid-join-spam-action').value,
       },
-      lockdown: config.antiRaid?.lockdown || {
+      lockdown: config.automod.antiRaid?.lockdown || {
         active: false,
         lockedChannels: [],
       },
@@ -1199,7 +1199,8 @@ async function saveAntiRaid() {
     }
 
     // Update config
-    config.antiRaid = updates;
+    if (!config.automod.antiRaid) config.automod.antiRaid = {};
+    config.automod.antiRaid = updates;
 
     if (healthMonitor) {
       healthMonitor.updateUI();

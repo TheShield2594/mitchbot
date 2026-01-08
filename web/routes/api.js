@@ -109,7 +109,8 @@ router.post('/guild/:guildId/automod', ensureServerManager, async (req, res) => 
     }
 
     if (updates.antiRaid) {
-      config.antiRaid = { ...config.antiRaid, ...updates.antiRaid };
+      if (!config.automod.antiRaid) config.automod.antiRaid = {};
+      config.automod.antiRaid = { ...config.automod.antiRaid, ...updates.antiRaid };
     }
 
     if (updates.whitelistedRoles) {
@@ -153,7 +154,12 @@ router.post('/guild/:guildId/config', ensureServerManager, async (req, res) => {
 
     // Update antiRaid settings if provided
     if (updates.antiRaid) {
-      config.antiRaid = { ...config.antiRaid, ...updates.antiRaid };
+      if (!config.automod) config.automod = {};
+      if (!config.automod.antiRaid) config.automod.antiRaid = {};
+      config.automod.antiRaid = { ...config.automod.antiRaid, ...updates.antiRaid };
+      await updateGuildConfig(req.params.guildId, { automod: config.automod });
+      // Remove antiRaid from updates to avoid duplicate save
+      delete updates.antiRaid;
     }
 
     await updateGuildConfig(req.params.guildId, updates);
