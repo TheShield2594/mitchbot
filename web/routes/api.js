@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { fetch } = require('undici');
 const { ensureServerManager } = require('../middleware/auth');
 const { getGuildConfig, updateGuildConfig, getLogs, getWarnings, clearWarnings } = require('../../utils/moderation');
 const { getBirthdays, addBirthday, removeBirthday } = require('../../utils/birthdays');
@@ -42,14 +43,22 @@ const {
   setEnabled: setReactionRolesEnabled,
 } = require('../../utils/reactionRoles');
 
+// Helper function to sanitize user data before sending to client
+function sanitizeUser(user) {
+  if (!user) return null;
+
+  const { accessToken, refreshToken, ...sanitizedUser } = user;
+  return sanitizedUser;
+}
+
 // Get current user
 router.get('/user', (req, res) => {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  // Return user data from session
-  res.json(req.user);
+  // Return sanitized user data (exclude sensitive tokens)
+  res.json(sanitizeUser(req.user));
 });
 
 // Refresh user's guilds from Discord API
@@ -59,7 +68,6 @@ router.post('/user/refresh-guilds', async (req, res) => {
   }
 
   try {
-    const { fetch } = require('undici');
     const accessToken = req.user.accessToken;
 
     if (!accessToken) {
@@ -74,15 +82,26 @@ router.post('/user/refresh-guilds', async (req, res) => {
     });
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: 'Failed to fetch guilds from Discord' });
+      // Map Discord API errors to 502 Bad Gateway (upstream service failure)
+      console.error(`Discord API returned status ${response.status}`);
+      return res.status(502).json({ error: 'Failed to fetch guilds from Discord' });
     }
 
     const guilds = await response.json();
 
-    // Update user session
+    // Update user session with new guilds
     req.user.guilds = guilds;
 
-    res.json(req.user);
+    // Save session after mutation
+    req.session.save((err) => {
+      if (err) {
+        console.error('Error saving session:', err);
+        return res.status(500).json({ error: 'Failed to save session' });
+      }
+
+      // Return sanitized user data (exclude sensitive tokens)
+      res.json(sanitizeUser(req.user));
+    });
   } catch (error) {
     console.error('Error refreshing guilds:', error);
     res.status(500).json({ error: 'Failed to refresh guilds' });

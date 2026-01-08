@@ -2,10 +2,10 @@
 export interface User {
   id: string
   username: string
-  discriminator: string
+  discriminator?: string
+  global_name?: string
   avatar: string | null
   guilds: Guild[]
-  accessToken?: string
 }
 
 // Guild types

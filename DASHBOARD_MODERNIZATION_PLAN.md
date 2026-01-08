@@ -12,7 +12,7 @@ This plan outlines the complete modernization of the Mitchbot dashboard from van
 - Manual DOM manipulation
 
 **Target State:**
-- React 18 with TypeScript
+- React 19 with TypeScript
 - Vite for blazing-fast builds
 - Tailwind CSS for utility-first styling
 - Shadcn/ui component library
@@ -24,7 +24,7 @@ This plan outlines the complete modernization of the Mitchbot dashboard from van
 
 ## Tech Stack Decision
 
-### Frontend Framework: **React 18**
+### Frontend Framework: **React 19**
 **Why React?**
 - You're already familiar with it (your other project uses Vite)
 - Largest ecosystem and community
@@ -234,7 +234,7 @@ web-dashboard/
    npm create vite@latest web-dashboard -- --template react-ts
    cd web-dashboard
    npm install
-   npm install -D tailwindcss postcss autoprefixer
+   npm install -D @tailwindcss/postcss tailwindcss postcss autoprefixer
    npm install @tanstack/react-query @tanstack/react-router
    npm install zustand axios react-hook-form zod @hookform/resolvers
    npm install recharts lucide-react
@@ -643,30 +643,31 @@ export default defineConfig({
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.22.0",
-    "@tanstack/react-query": "^5.28.0",
-    "zustand": "^4.5.2",
-    "axios": "^1.6.7",
-    "react-hook-form": "^7.51.0",
-    "zod": "^3.22.4",
-    "@hookform/resolvers": "^3.3.4",
-    "recharts": "^2.12.2",
-    "lucide-react": "^0.356.0",
-    "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.1",
-    "date-fns": "^3.3.1"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.12.0",
+    "@tanstack/react-query": "^5.90.16",
+    "zustand": "^5.0.9",
+    "axios": "^1.13.2",
+    "react-hook-form": "^7.70.0",
+    "zod": "^4.3.5",
+    "@hookform/resolvers": "^5.2.2",
+    "recharts": "^3.6.0",
+    "lucide-react": "^0.562.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.4.0",
+    "date-fns": "^4.1.0"
   },
   "devDependencies": {
-    "@types/react": "^18.3.1",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.4.2",
-    "vite": "^5.2.0",
-    "tailwindcss": "^3.4.1",
-    "autoprefixer": "^10.4.18",
-    "postcss": "^8.4.35",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "@tailwindcss/postcss": "^4.1.18",
+    "tailwindcss": "^4.1.18",
+    "autoprefixer": "^10.4.23",
+    "postcss": "^8.5.6",
     "eslint": "^8.57.0",
     "prettier": "^3.2.5"
   }
