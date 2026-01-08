@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const { randomUUID } = require('node:crypto');
 
 const fsp = fs.promises;
 
@@ -85,7 +84,6 @@ async function initReactionRoles() {
 function getGuildConfig(guildId) {
   if (!reactionRolesData[guildId]) {
     reactionRolesData[guildId] = getDefaultGuildConfig();
-    saveReactionRolesData().catch(console.error);
   }
   return reactionRolesData[guildId];
 }

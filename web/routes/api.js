@@ -866,7 +866,8 @@ router.post('/guild/:guildId/reactionroles/messages/:messageId/roles', ensureSer
 // Remove a role from a message
 router.delete('/guild/:guildId/reactionroles/messages/:messageId/roles/:emoji', ensureServerManager, async (req, res) => {
   try {
-    const success = await removeRoleFromMessage(req.params.guildId, req.params.messageId, req.params.emoji);
+    const emoji = decodeURIComponent(req.params.emoji);
+    const success = await removeRoleFromMessage(req.params.guildId, req.params.messageId, emoji);
 
     if (!success) {
       return res.status(404).json({ error: 'Role not found' });
@@ -910,6 +911,23 @@ router.post('/guild/:guildId/welcome', ensureServerManager, async (req, res) => 
   try {
     const config = getGuildConfig(req.params.guildId);
     const { welcome, leave } = req.body;
+
+    // Ensure config.welcome and config.leave exist
+    if (!config.welcome) {
+      config.welcome = {
+        enabled: false,
+        channelId: null,
+        message: 'Welcome to the server, {user}!',
+      };
+    }
+
+    if (!config.leave) {
+      config.leave = {
+        enabled: false,
+        channelId: null,
+        message: '{username} has left the server.',
+      };
+    }
 
     if (welcome) {
       if (welcome.message && welcome.message.length > 2000) {

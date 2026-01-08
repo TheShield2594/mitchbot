@@ -2224,20 +2224,20 @@ async function loadReactionRolesConfig() {
     const response = await fetch(`/api/guild/${guildId}/reactionroles`);
     if (!response.ok) throw new Error('Failed to load reaction roles config');
 
-    const config = await response.json();
+    const reactionRolesConfig = await response.json();
 
     // Set enabled toggle
     const enabledToggle = document.getElementById('reactionroles-enabled');
     if (enabledToggle) {
-      enabledToggle.checked = config.enabled || false;
-      updateReactionRolesCard(config.enabled);
+      enabledToggle.checked = reactionRolesConfig.enabled || false;
+      updateReactionRolesCard(reactionRolesConfig.enabled);
     }
 
     // Show/hide settings based on enabled state
     toggleReactionRolesSettings();
 
     // Render messages list
-    renderReactionRoleMessages(config.messages || {});
+    renderReactionRoleMessages(reactionRolesConfig.messages || {});
   } catch (error) {
     console.error('Error loading reaction roles config:', error);
     showToast('Error', 'Failed to load reaction roles configuration', 'error');

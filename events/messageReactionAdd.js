@@ -25,71 +25,64 @@ module.exports = {
       const guild = reaction.message.guild;
       if (!guild) return;
 
-      // Handle reaction roles
+      // Handle reaction roles (don't return early - let verification also process)
       if (isEnabled(guild.id)) {
         const emojiIdentifier = reaction.emoji.id || reaction.emoji.name;
         const roleId = getRoleForEmoji(guild.id, reaction.message.id, emojiIdentifier);
 
         if (roleId) {
           const member = await guild.members.fetch(user.id).catch(() => null);
-          if (!member) return;
 
-          // Check if member already has the role
-          if (member.roles.cache.has(roleId)) return;
+          if (member && !member.roles.cache.has(roleId)) {
+            // Get the role
+            const role = guild.roles.cache.get(roleId);
 
-          // Get the role
-          const role = guild.roles.cache.get(roleId);
-          if (!role) {
-            logger.warn('Reaction role not found', {
-              guildId: guild.id,
-              roleId,
-              messageId: reaction.message.id,
-              emoji: emojiIdentifier,
-            });
-            return;
+            if (role &&
+                guild.members.me.permissions.has('ManageRoles') &&
+                role.position < guild.members.me.roles.highest.position) {
+              // Add the role
+              try {
+                await member.roles.add(role, 'Reaction role assignment');
+
+                logger.info('Assigned reaction role', {
+                  guildId: guild.id,
+                  userId: user.id,
+                  userTag: user.tag,
+                  roleId,
+                  roleName: role.name,
+                });
+              } catch (error) {
+                logger.error('Failed to assign reaction role', {
+                  guildId: guild.id,
+                  userId: user.id,
+                  roleId,
+                  error,
+                });
+              }
+            } else {
+              // Log warnings for why role assignment was skipped
+              if (!role) {
+                logger.warn('Reaction role not found', {
+                  guildId: guild.id,
+                  roleId,
+                  messageId: reaction.message.id,
+                  emoji: emojiIdentifier,
+                });
+              } else if (!guild.members.me.permissions.has('ManageRoles')) {
+                logger.warn('Cannot assign reaction role: missing ManageRoles permission', {
+                  guildId: guild.id,
+                  roleId,
+                });
+              } else if (role.position >= guild.members.me.roles.highest.position) {
+                logger.warn('Cannot assign reaction role: role hierarchy issue', {
+                  guildId: guild.id,
+                  roleId,
+                  rolePosition: role.position,
+                  botRolePosition: guild.members.me.roles.highest.position,
+                });
+              }
+            }
           }
-
-          // Check if bot has permission to manage roles
-          if (!guild.members.me.permissions.has('ManageRoles')) {
-            logger.warn('Cannot assign reaction role: missing ManageRoles permission', {
-              guildId: guild.id,
-              roleId,
-            });
-            return;
-          }
-
-          // Check role hierarchy
-          if (role.position >= guild.members.me.roles.highest.position) {
-            logger.warn('Cannot assign reaction role: role hierarchy issue', {
-              guildId: guild.id,
-              roleId,
-              rolePosition: role.position,
-              botRolePosition: guild.members.me.roles.highest.position,
-            });
-            return;
-          }
-
-          // Add the role
-          try {
-            await member.roles.add(role, 'Reaction role assignment');
-
-            logger.info('Assigned reaction role', {
-              guildId: guild.id,
-              userId: user.id,
-              userTag: user.tag,
-              roleId,
-              roleName: role.name,
-            });
-          } catch (error) {
-            logger.error('Failed to assign reaction role', {
-              guildId: guild.id,
-              userId: user.id,
-              roleId,
-              error,
-            });
-          }
-
-          // Don't return here - allow verification to also process
         }
       }
 
