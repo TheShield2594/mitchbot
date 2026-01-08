@@ -145,6 +145,26 @@ router.post('/guild/:guildId/logging', ensureServerManager, async (req, res) => 
   }
 });
 
+// Update general guild configuration (for antiRaid and other settings)
+router.post('/guild/:guildId/config', ensureServerManager, async (req, res) => {
+  try {
+    const config = getGuildConfig(req.params.guildId);
+    const updates = req.body;
+
+    // Update antiRaid settings if provided
+    if (updates.antiRaid) {
+      config.antiRaid = { ...config.antiRaid, ...updates.antiRaid };
+    }
+
+    await updateGuildConfig(req.params.guildId, updates);
+
+    res.json({ success: true, config: getGuildConfig(req.params.guildId) });
+  } catch (error) {
+    console.error('Error updating guild config:', error);
+    res.status(500).json({ error: 'Failed to update configuration' });
+  }
+});
+
 // Get moderation logs
 router.get('/guild/:guildId/logs', ensureServerManager, (req, res) => {
   try {
