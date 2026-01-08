@@ -114,6 +114,28 @@
             </svg>
             <span>Spam Detection</span>
           </a>
+          <a href="#attachment-spam" class="guild-sidebar__link" data-section="attachment-spam">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+            <span>Attachment Spam</span>
+          </a>
+          <a href="#emoji-spam" class="guild-sidebar__link" data-section="emoji-spam">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+              <line x1="9" y1="9" x2="9.01" y2="9"/>
+              <line x1="15" y1="9" x2="15.01" y2="9"/>
+            </svg>
+            <span>Emoji Spam</span>
+          </a>
+          <a href="#anti-raid" class="guild-sidebar__link" data-section="anti-raid">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="M12 8v4l2 2"/>
+            </svg>
+            <span>Anti-Raid</span>
+          </a>
         </div>
 
         <div class="guild-sidebar__section">
@@ -745,6 +767,302 @@
         </div>
       </section>
 
+      <!-- Attachment Spam Section -->
+      <section id="section-attachment-spam" class="guild-section">
+        <div class="card card--inactive" id="card-attachment-spam">
+          <div class="card__header">
+            <div>
+              <h3 class="card__title">
+                <span class="card__icon">📎</span>
+                Attachment Spam Detection
+              </h3>
+              <p class="card__subtitle">Prevent excessive attachments</p>
+            </div>
+            <span class="status-badge status-badge--inactive" id="badge-attachment-spam">
+              <span class="status-badge__dot"></span>
+              <span>Disabled</span>
+            </span>
+          </div>
+
+          <p class="card__description">
+            Automatically detects and takes action against users posting too many attachments in a short time period.
+          </p>
+
+          <label class="toggle-container">
+            <input type="checkbox" class="toggle-input" id="attachment-spam-enabled">
+            <span class="toggle-track">
+              <span class="toggle-knob"></span>
+            </span>
+            <span class="toggle-label">Enable Attachment Spam Detection</span>
+          </label>
+
+          <div class="form-group">
+            <label class="form-label">Attachment Threshold</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Number of attachments in the time window to trigger spam detection.
+            </p>
+            <input type="number" class="form-input" id="attachment-spam-threshold" min="2" max="20" value="5">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Time Window (seconds)</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Time period to count attachments for spam detection.
+            </p>
+            <input type="number" class="form-input" id="attachment-spam-time-window" min="1" max="60" value="10">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Action</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Choose what happens when attachment spam is detected.
+            </p>
+            <select class="form-input" id="attachment-spam-action">
+              <option value="warn">Warn user</option>
+              <option value="delete">Delete messages</option>
+              <option value="timeout">Timeout user</option>
+              <option value="kick">Kick user</option>
+              <option value="ban">Ban user</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Warning Threshold</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Number of warnings before taking escalated action.
+            </p>
+            <input type="number" class="form-input" id="attachment-spam-warn-threshold" min="1" max="10" value="2">
+          </div>
+
+          <div class="mt-6">
+            <button class="btn btn-primary" onclick="saveAutomod()">Save Changes</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Emoji Spam Section -->
+      <section id="section-emoji-spam" class="guild-section">
+        <div class="card card--inactive" id="card-emoji-spam">
+          <div class="card__header">
+            <div>
+              <h3 class="card__title">
+                <span class="card__icon">😀</span>
+                Emoji Spam Detection
+              </h3>
+              <p class="card__subtitle">Prevent excessive emojis</p>
+            </div>
+            <span class="status-badge status-badge--inactive" id="badge-emoji-spam">
+              <span class="status-badge__dot"></span>
+              <span>Disabled</span>
+            </span>
+          </div>
+
+          <p class="card__description">
+            Automatically detects and takes action against messages with excessive emojis.
+          </p>
+
+          <label class="toggle-container">
+            <input type="checkbox" class="toggle-input" id="emoji-spam-enabled">
+            <span class="toggle-track">
+              <span class="toggle-knob"></span>
+            </span>
+            <span class="toggle-label">Enable Emoji Spam Detection</span>
+          </label>
+
+          <div class="form-group">
+            <label class="form-label">Emoji Threshold</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Maximum number of emojis allowed per message.
+            </p>
+            <input type="number" class="form-input" id="emoji-spam-threshold" min="3" max="50" value="10">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Action</label>
+            <p class="helper-text">
+              <span class="helper-text__icon">ℹ️</span>
+              Choose what happens when emoji spam is detected.
+            </p>
+            <select class="form-input" id="emoji-spam-action">
+              <option value="delete">Delete message</option>
+              <option value="warn">Warn user</option>
+              <option value="timeout">Timeout user</option>
+              <option value="kick">Kick user</option>
+              <option value="ban">Ban user</option>
+            </select>
+          </div>
+
+          <div class="mt-6">
+            <button class="btn btn-primary" onclick="saveAutomod()">Save Changes</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Anti-Raid Section -->
+      <section id="section-anti-raid" class="guild-section">
+        <div class="card card--inactive" id="card-anti-raid">
+          <div class="card__header">
+            <div>
+              <h3 class="card__title">
+                <span class="card__icon">🛡️</span>
+                Anti-Raid Protection
+              </h3>
+              <p class="card__subtitle">Protect your server from raids</p>
+            </div>
+            <span class="status-badge status-badge--inactive" id="badge-anti-raid">
+              <span class="status-badge__dot"></span>
+              <span>Disabled</span>
+            </span>
+          </div>
+
+          <p class="card__description">
+            Advanced protection against server raids including account age filtering, join spam detection, and emergency lockdown.
+          </p>
+
+          <!-- Account Age Filter -->
+          <div class="card card--nested mt-4">
+            <h4 class="card__subtitle">Account Age Filter</h4>
+            <p class="helper-text mb-4">
+              <span class="helper-text__icon">ℹ️</span>
+              Automatically remove newly created accounts that join your server.
+            </p>
+
+            <label class="toggle-container">
+              <input type="checkbox" class="toggle-input" id="anti-raid-account-age-enabled">
+              <span class="toggle-track">
+                <span class="toggle-knob"></span>
+              </span>
+              <span class="toggle-label">Enable Account Age Filter</span>
+            </label>
+
+            <div class="form-group">
+              <label class="form-label">Minimum Account Age (days)</label>
+              <p class="helper-text">
+                <span class="helper-text__icon">ℹ️</span>
+                Accounts younger than this will be removed.
+              </p>
+              <input type="number" class="form-input" id="anti-raid-account-age-days" min="1" max="365" value="7">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Action</label>
+              <p class="helper-text">
+                <span class="helper-text__icon">ℹ️</span>
+                What to do with accounts that don't meet the age requirement.
+              </p>
+              <select class="form-input" id="anti-raid-account-age-action">
+                <option value="kick">Kick user</option>
+                <option value="ban">Ban user</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Join Spam Detection -->
+          <div class="card card--nested mt-4">
+            <h4 class="card__subtitle">Join Spam Detection</h4>
+            <p class="helper-text mb-4">
+              <span class="helper-text__icon">ℹ️</span>
+              Detect and mitigate raid attempts by monitoring join patterns.
+            </p>
+
+            <label class="toggle-container">
+              <input type="checkbox" class="toggle-input" id="anti-raid-join-spam-enabled">
+              <span class="toggle-track">
+                <span class="toggle-knob"></span>
+              </span>
+              <span class="toggle-label">Enable Join Spam Detection</span>
+            </label>
+
+            <div class="form-group">
+              <label class="form-label">Join Threshold</label>
+              <p class="helper-text">
+                <span class="helper-text__icon">ℹ️</span>
+                Number of joins in the time window to trigger raid detection.
+              </p>
+              <input type="number" class="form-input" id="anti-raid-join-spam-threshold" min="3" max="50" value="5">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Time Window (seconds)</label>
+              <p class="helper-text">
+                <span class="helper-text__icon">ℹ️</span>
+                Time period to monitor for suspicious join activity.
+              </p>
+              <input type="number" class="form-input" id="anti-raid-join-spam-time-window" min="1" max="60" value="10">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Action</label>
+              <p class="helper-text">
+                <span class="helper-text__icon">ℹ️</span>
+                What to do with users detected as part of a raid.
+              </p>
+              <select class="form-input" id="anti-raid-join-spam-action">
+                <option value="kick">Kick users</option>
+                <option value="ban">Ban users</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Verification System -->
+          <div class="card card--nested mt-4">
+            <h4 class="card__subtitle">Verification System</h4>
+            <p class="helper-text mb-4">
+              <span class="helper-text__icon">ℹ️</span>
+              Require new members to verify before accessing your server.
+            </p>
+
+            <label class="toggle-container">
+              <input type="checkbox" class="toggle-input" id="anti-raid-verification-enabled">
+              <span class="toggle-track">
+                <span class="toggle-knob"></span>
+              </span>
+              <span class="toggle-label">Enable Verification System</span>
+            </label>
+
+            <div class="form-group">
+              <label class="form-label">Verification Channel</label>
+              <p class="helper-text">
+                <span class="helper-text__icon">ℹ️</span>
+                Channel where users will verify themselves.
+              </p>
+              <select class="form-input" id="anti-raid-verification-channel">
+                <option value="">Select a channel...</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Verified Role</label>
+              <p class="helper-text">
+                <span class="helper-text__icon">ℹ️</span>
+                Role to give users after they verify.
+              </p>
+              <select class="form-input" id="anti-raid-verification-role">
+                <option value="">Select a role...</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Verification Message</label>
+              <p class="helper-text">
+                <span class="helper-text__icon">ℹ️</span>
+                Message shown to new members in the verification channel.
+              </p>
+              <textarea class="form-input" id="anti-raid-verification-message" rows="3" placeholder="Welcome! Please verify by reacting to this message."></textarea>
+            </div>
+          </div>
+
+          <div class="mt-6">
+            <button class="btn btn-primary" onclick="saveAntiRaid()">Save Anti-Raid Settings</button>
+          </div>
+        </div>
+      </section>
+
       <section id="section-automod-whitelist" class="guild-section">
         <div class="card card--inactive" id="card-automod-whitelist">
           <div class="card__header">
@@ -1046,6 +1364,119 @@
                   <span class="form-hint">Initial currency for new members</span>
                 </label>
                 <input type="number" class="form-input" id="starting-balance" min="0" max="100000" placeholder="100">
+              </div>
+            </div>
+
+            <!-- Advanced Economy Settings -->
+            <div class="divider mt-6 mb-6"></div>
+            <h4 class="form-section-title">Advanced Commands</h4>
+
+            <!-- Beg Settings -->
+            <div class="card card--nested mb-4">
+              <h5 class="card__subtitle">Beg Command</h5>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="beg-reward-min">
+                    Beg Reward (Min)
+                    <span class="form-hint">Minimum payout for /beg</span>
+                  </label>
+                  <input type="number" class="form-input" id="beg-reward-min" min="1" max="10000" placeholder="10">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="beg-reward-max">
+                    Beg Reward (Max)
+                    <span class="form-hint">Maximum payout for /beg</span>
+                  </label>
+                  <input type="number" class="form-input" id="beg-reward-max" min="1" max="10000" placeholder="50">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="beg-cooldown">
+                  Beg Cooldown (minutes)
+                  <span class="form-hint">Time between /beg uses</span>
+                </label>
+                <input type="number" class="form-input" id="beg-cooldown" min="1" max="1440" placeholder="30">
+              </div>
+            </div>
+
+            <!-- Crime Settings -->
+            <div class="card card--nested mb-4">
+              <h5 class="card__subtitle">Crime Command</h5>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="crime-reward-min">
+                    Crime Reward (Min)
+                    <span class="form-hint">Minimum payout on success</span>
+                  </label>
+                  <input type="number" class="form-input" id="crime-reward-min" min="1" max="10000" placeholder="100">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="crime-reward-max">
+                    Crime Reward (Max)
+                    <span class="form-hint">Maximum payout on success</span>
+                  </label>
+                  <input type="number" class="form-input" id="crime-reward-max" min="1" max="10000" placeholder="300">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="crime-fail-chance">
+                    Fail Chance (%)
+                    <span class="form-hint">Probability of failing (0-100%)</span>
+                  </label>
+                  <input type="number" class="form-input" id="crime-fail-chance" min="0" max="100" placeholder="40">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="crime-cooldown">
+                    Crime Cooldown (minutes)
+                    <span class="form-hint">Time between /crime uses</span>
+                  </label>
+                  <input type="number" class="form-input" id="crime-cooldown" min="1" max="1440" placeholder="120">
+                </div>
+              </div>
+            </div>
+
+            <!-- Rob Settings -->
+            <div class="card card--nested mb-4">
+              <h5 class="card__subtitle">Rob Command</h5>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="rob-success-chance">
+                    Success Chance (%)
+                    <span class="form-hint">Probability of successful rob (0-100%)</span>
+                  </label>
+                  <input type="number" class="form-input" id="rob-success-chance" min="0" max="100" placeholder="50">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="rob-min-balance">
+                    Minimum Target Balance
+                    <span class="form-hint">Users below this balance can't be robbed</span>
+                  </label>
+                  <input type="number" class="form-input" id="rob-min-balance" min="0" max="100000" placeholder="100">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="rob-percentage-min">
+                    Rob Percentage (Min %)
+                    <span class="form-hint">Minimum % of balance stolen</span>
+                  </label>
+                  <input type="number" class="form-input" id="rob-percentage-min" min="1" max="100" placeholder="5">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="rob-percentage-max">
+                    Rob Percentage (Max %)
+                    <span class="form-hint">Maximum % of balance stolen</span>
+                  </label>
+                  <input type="number" class="form-input" id="rob-percentage-max" min="1" max="100" placeholder="15">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="rob-cooldown">
+                  Rob Cooldown (minutes)
+                  <span class="form-hint">Time between /rob uses</span>
+                </label>
+                <input type="number" class="form-input" id="rob-cooldown" min="1" max="1440" placeholder="180">
               </div>
             </div>
 
@@ -1372,6 +1803,70 @@
               </div>
             </div>
 
+            <!-- Advanced XP Settings -->
+            <div class="divider mt-6 mb-6"></div>
+            <h4 class="form-section-title">Advanced Settings</h4>
+
+            <div class="form-group">
+              <label class="form-label" for="xp-per-command">
+                XP Per Command
+                <span class="form-hint">XP awarded for using commands (0-100)</span>
+              </label>
+              <input type="number" class="form-input" id="xp-per-command" min="0" max="100" placeholder="25">
+            </div>
+
+            <!-- Channel Multipliers -->
+            <div class="card card--nested mb-4">
+              <h5 class="card__subtitle">Channel XP Multipliers</h5>
+              <p class="form-hint mb-3">Increase or decrease XP gain in specific channels</p>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Channel</label>
+                  <select class="form-input" id="channel-multiplier-channel">
+                    <option value="">Select a channel...</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Multiplier</label>
+                  <input type="number" class="form-input" id="channel-multiplier-value" step="0.1" min="0" max="10" placeholder="1.5">
+                </div>
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                  <button class="btn btn-secondary" onclick="addChannelMultiplier()">Add</button>
+                </div>
+              </div>
+
+              <div id="channel-multipliers-list" class="mt-2">
+                <div class="form-hint">No channel multipliers configured</div>
+              </div>
+            </div>
+
+            <!-- Role Multipliers -->
+            <div class="card card--nested mb-4">
+              <h5 class="card__subtitle">Role XP Multipliers</h5>
+              <p class="form-hint mb-3">Boost XP gain for users with specific roles</p>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Role</label>
+                  <select class="form-input" id="role-multiplier-role">
+                    <option value="">Select a role...</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Multiplier</label>
+                  <input type="number" class="form-input" id="role-multiplier-value" step="0.1" min="0" max="10" placeholder="2.0">
+                </div>
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                  <button class="btn btn-secondary" onclick="addRoleMultiplier()">Add</button>
+                </div>
+              </div>
+
+              <div id="role-multipliers-list" class="mt-2">
+                <div class="form-hint">No role multipliers configured</div>
+              </div>
+            </div>
+
             <!-- Save Button -->
             <div class="mt-6">
               <button class="btn btn-primary" onclick="saveXPSettings()">Save XP Settings</button>
@@ -1442,13 +1937,8 @@
 
             <!-- Existing Messages List -->
             <div id="reactionroles-messages-list">
-              <div class="form-hint">No reaction role messages configured</div>
+              <!-- Messages will be dynamically loaded here -->
             </div>
-          </div>
-
-          <div class="mt-6">
-            <button class="btn btn-primary" onclick="saveReactionRolesSettings()">Save Reaction Roles Settings</button>
-            <button class="btn btn-secondary ml-2" onclick="loadReactionRolesConfig()">Reset Changes</button>
           </div>
         </div>
       </section>

@@ -566,11 +566,50 @@ async function loadGuildInfo() {
       });
     }
 
+    // Populate anti-raid verification channel dropdown
+    const antiRaidVerificationChannelSelect = document.getElementById('anti-raid-verification-channel');
+    if (antiRaidVerificationChannelSelect) {
+      antiRaidVerificationChannelSelect.innerHTML = '<option value="">Select a channel...</option>';
+      info.channels.filter(c => c.type === 0).forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `#${channel.name}`;
+        antiRaidVerificationChannelSelect.appendChild(option);
+      });
+    }
+
+    // Populate anti-raid verification role dropdown
+    const antiRaidVerificationRoleSelect = document.getElementById('anti-raid-verification-role');
+    if (antiRaidVerificationRoleSelect) {
+      antiRaidVerificationRoleSelect.innerHTML = '<option value="">Select a role...</option>';
+      info.roles.filter(r => r.id !== info.id).forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        antiRaidVerificationRoleSelect.appendChild(option);
+      });
+    }
+
+    // Populate reaction roles channel dropdown
+    const rrChannelSelect = document.getElementById('rr-channel-select');
+    if (rrChannelSelect) {
+      rrChannelSelect.innerHTML = '<option value="">Select a channel...</option>';
+      info.channels.filter(c => c.type === 0).forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `#${channel.name}`;
+        rrChannelSelect.appendChild(option);
+      });
+    }
+
     // Load automod config
     loadAutomodConfig();
 
     // Load economy config
     loadEconomyConfig();
+
+    // Load reaction roles config
+    loadReactionRolesConfig();
 
     // Populate level role dropdown
     const levelRoleSelect = document.getElementById('level-role-role');
@@ -643,6 +682,35 @@ function loadAutomodConfig() {
   document.getElementById('caps-spam-percentage').value = config.automod.capsSpam?.percentage || 70;
   document.getElementById('caps-spam-min-length').value = config.automod.capsSpam?.minLength || 10;
   document.getElementById('caps-spam-action').value = config.automod.capsSpam?.action || 'delete';
+
+  // Load attachment spam settings
+  document.getElementById('attachment-spam-enabled').checked = config.automod.attachmentSpam?.enabled || false;
+  document.getElementById('attachment-spam-threshold').value = config.automod.attachmentSpam?.threshold || 5;
+  document.getElementById('attachment-spam-time-window').value = (config.automod.attachmentSpam?.timeWindow || 10000) / 1000; // Convert ms to seconds
+  document.getElementById('attachment-spam-action').value = config.automod.attachmentSpam?.action || 'warn';
+  document.getElementById('attachment-spam-warn-threshold').value = config.automod.attachmentSpam?.warnThreshold || 2;
+
+  // Load emoji spam settings
+  document.getElementById('emoji-spam-enabled').checked = config.automod.emojiSpam?.enabled || false;
+  document.getElementById('emoji-spam-threshold').value = config.automod.emojiSpam?.threshold || 10;
+  document.getElementById('emoji-spam-action').value = config.automod.emojiSpam?.action || 'delete';
+
+  // Load anti-raid settings
+  if (config.antiRaid) {
+    document.getElementById('anti-raid-account-age-enabled').checked = config.antiRaid.accountAge?.enabled || false;
+    document.getElementById('anti-raid-account-age-days').value = config.antiRaid.accountAge?.minAgeDays || 7;
+    document.getElementById('anti-raid-account-age-action').value = config.antiRaid.accountAge?.action || 'kick';
+
+    document.getElementById('anti-raid-join-spam-enabled').checked = config.antiRaid.joinSpam?.enabled || false;
+    document.getElementById('anti-raid-join-spam-threshold').value = config.antiRaid.joinSpam?.threshold || 5;
+    document.getElementById('anti-raid-join-spam-time-window').value = (config.antiRaid.joinSpam?.timeWindow || 10000) / 1000; // Convert ms to seconds
+    document.getElementById('anti-raid-join-spam-action').value = config.antiRaid.joinSpam?.action || 'kick';
+
+    document.getElementById('anti-raid-verification-enabled').checked = config.antiRaid.verification?.enabled || false;
+    document.getElementById('anti-raid-verification-channel').value = config.antiRaid.verification?.channelId || '';
+    document.getElementById('anti-raid-verification-role').value = config.antiRaid.verification?.roleId || '';
+    document.getElementById('anti-raid-verification-message').value = config.antiRaid.verification?.message || 'Welcome! Please verify by reacting to this message.';
+  }
 
   renderWordList();
   renderWhitelist();
@@ -962,6 +1030,18 @@ async function saveAutomod() {
         minLength: parseInt(document.getElementById('caps-spam-min-length').value),
         action: document.getElementById('caps-spam-action').value,
       },
+      attachmentSpam: {
+        enabled: document.getElementById('attachment-spam-enabled').checked,
+        threshold: parseInt(document.getElementById('attachment-spam-threshold').value),
+        timeWindow: parseInt(document.getElementById('attachment-spam-time-window').value) * 1000, // Convert seconds to ms
+        action: document.getElementById('attachment-spam-action').value,
+        warnThreshold: parseInt(document.getElementById('attachment-spam-warn-threshold').value),
+      },
+      emojiSpam: {
+        enabled: document.getElementById('emoji-spam-enabled').checked,
+        threshold: parseInt(document.getElementById('emoji-spam-threshold').value),
+        action: document.getElementById('emoji-spam-action').value,
+      },
       whitelistedRoles: config.automod.whitelistedRoles || [],
       whitelistedChannels: config.automod.whitelistedChannels || [],
     };
@@ -984,6 +1064,8 @@ async function saveAutomod() {
     config.automod.spam.enabled = updates.spam.enabled;
     config.automod.mentionSpam.enabled = updates.mentionSpam.enabled;
     config.automod.capsSpam.enabled = updates.capsSpam.enabled;
+    config.automod.attachmentSpam.enabled = updates.attachmentSpam.enabled;
+    config.automod.emojiSpam.enabled = updates.emojiSpam.enabled;
 
     if (healthMonitor) {
       healthMonitor.updateUI();
@@ -1025,6 +1107,59 @@ async function saveSettings() {
   } catch (error) {
     console.error('Error saving settings:', error);
     showToast('Save Failed', 'Could not save logging settings', 'error');
+    throw error;
+  }
+}
+
+async function saveAntiRaid() {
+  try {
+    const updates = {
+      accountAge: {
+        enabled: document.getElementById('anti-raid-account-age-enabled').checked,
+        minAgeDays: parseInt(document.getElementById('anti-raid-account-age-days').value),
+        action: document.getElementById('anti-raid-account-age-action').value,
+      },
+      joinSpam: {
+        enabled: document.getElementById('anti-raid-join-spam-enabled').checked,
+        threshold: parseInt(document.getElementById('anti-raid-join-spam-threshold').value),
+        timeWindow: parseInt(document.getElementById('anti-raid-join-spam-time-window').value) * 1000, // Convert seconds to ms
+        action: document.getElementById('anti-raid-join-spam-action').value,
+      },
+      lockdown: config.antiRaid?.lockdown || {
+        active: false,
+        lockedChannels: [],
+      },
+      verification: {
+        enabled: document.getElementById('anti-raid-verification-enabled').checked,
+        roleId: document.getElementById('anti-raid-verification-role').value || null,
+        channelId: document.getElementById('anti-raid-verification-channel').value || null,
+        message: document.getElementById('anti-raid-verification-message').value || 'Welcome! Please verify by reacting to this message.',
+      },
+    };
+
+    const response = await fetch(`/api/guild/${guildId}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        antiRaid: updates,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save anti-raid settings');
+    }
+
+    // Update config
+    config.antiRaid = updates;
+
+    if (healthMonitor) {
+      healthMonitor.updateUI();
+    }
+
+    showToast('Settings Saved', 'Anti-raid configuration updated successfully', 'success');
+  } catch (error) {
+    console.error('Error saving anti-raid settings:', error);
+    showToast('Save Failed', 'Could not save anti-raid settings', 'error');
     throw error;
   }
 }
@@ -1372,6 +1507,22 @@ function loadEconomyConfig() {
   document.getElementById('work-cooldown').value = config.economy.workCooldownMinutes || 60;
   document.getElementById('starting-balance').value = config.economy.startingBalance || 100;
 
+  // Load advanced settings
+  document.getElementById('beg-reward-min').value = config.economy.begRewardMin || 10;
+  document.getElementById('beg-reward-max').value = config.economy.begRewardMax || 50;
+  document.getElementById('beg-cooldown').value = config.economy.begCooldownMinutes || 30;
+
+  document.getElementById('crime-reward-min').value = config.economy.crimeRewardMin || 100;
+  document.getElementById('crime-reward-max').value = config.economy.crimeRewardMax || 300;
+  document.getElementById('crime-fail-chance').value = (config.economy.crimeFailChance || 0.4) * 100; // Convert to percentage
+  document.getElementById('crime-cooldown').value = config.economy.crimeCooldownMinutes || 120;
+
+  document.getElementById('rob-success-chance').value = (config.economy.robSuccessChance || 0.5) * 100; // Convert to percentage
+  document.getElementById('rob-min-balance').value = config.economy.robMinimumBalance || 100;
+  document.getElementById('rob-percentage-min').value = config.economy.robPercentageMin || 5;
+  document.getElementById('rob-percentage-max').value = config.economy.robPercentageMax || 15;
+  document.getElementById('rob-cooldown').value = config.economy.robCooldownMinutes || 180;
+
   updateEconomyStatus();
 }
 
@@ -1413,6 +1564,22 @@ async function saveEconomySettings() {
       workRewardMax: parseInt(document.getElementById('work-reward-max').value) || 150,
       workCooldownMinutes: parseInt(document.getElementById('work-cooldown').value) || 60,
       startingBalance: parseInt(document.getElementById('starting-balance').value) || 100,
+
+      // Advanced settings
+      begRewardMin: parseInt(document.getElementById('beg-reward-min').value) || 10,
+      begRewardMax: parseInt(document.getElementById('beg-reward-max').value) || 50,
+      begCooldownMinutes: parseInt(document.getElementById('beg-cooldown').value) || 30,
+
+      crimeRewardMin: parseInt(document.getElementById('crime-reward-min').value) || 100,
+      crimeRewardMax: parseInt(document.getElementById('crime-reward-max').value) || 300,
+      crimeFailChance: parseFloat(document.getElementById('crime-fail-chance').value) / 100 || 0.4, // Convert percentage to decimal
+      crimeCooldownMinutes: parseInt(document.getElementById('crime-cooldown').value) || 120,
+
+      robSuccessChance: parseFloat(document.getElementById('rob-success-chance').value) / 100 || 0.5, // Convert percentage to decimal
+      robMinimumBalance: parseInt(document.getElementById('rob-min-balance').value) || 100,
+      robPercentageMin: parseInt(document.getElementById('rob-percentage-min').value) || 5,
+      robPercentageMax: parseInt(document.getElementById('rob-percentage-max').value) || 15,
+      robCooldownMinutes: parseInt(document.getElementById('rob-cooldown').value) || 180,
     };
 
     // Validate inputs
@@ -2271,6 +2438,8 @@ function toggleReactionRolesSettings() {
   if (settings) {
     settings.style.display = enabled ? 'block' : 'none';
   }
+  // Auto-save when toggled
+  saveReactionRolesSettings();
 }
 
 function renderReactionRoleMessages(messages) {
@@ -2284,18 +2453,65 @@ function renderReactionRoleMessages(messages) {
     return;
   }
 
-  container.innerHTML = messageEntries.map(([messageId, data]) => `
-    <div class="card mb-3">
-      <div class="card__header">
-        <h5 class="card__title">Message ${messageId.slice(0, 8)}...</h5>
-        <button class="btn btn-danger btn-sm" onclick="deleteReactionRoleMessage('${messageId}')">Delete</button>
+  container.innerHTML = messageEntries.map(([messageId, data]) => {
+    const roles = data.roles || [];
+    const channelName = config.channels?.find(c => c.id === data.channelId)?.name || data.channelId;
+
+    return `
+      <div class="card mb-4">
+        <div class="card__header">
+          <div>
+            <h5 class="card__title">Message ID: ${messageId}</h5>
+            <p class="card__subtitle">Channel: #${escapeHtml(channelName)}</p>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="deleteReactionRoleMessage('${messageId}')">Delete Message</button>
+        </div>
+
+        <!-- Existing Roles -->
+        <div class="mt-3">
+          <h6 class="form-label">Emoji → Role Mappings</h6>
+          ${roles.length === 0 ? '<div class="form-hint mb-3">No roles configured for this message</div>' : ''}
+          <div class="mb-3">
+            ${roles.map(role => {
+              const roleName = config.roles?.find(r => r.id === role.roleId)?.name || role.roleId;
+              return `
+                <div class="tag" style="display: inline-flex; align-items: center; margin: 4px;">
+                  <span style="margin-right: 8px;">${escapeHtml(role.emoji)}</span>
+                  <span>→ ${escapeHtml(roleName)}</span>
+                  ${role.description ? `<span style="opacity: 0.7; margin-left: 4px;">(${escapeHtml(role.description)})</span>` : ''}
+                  <button class="tag__remove" onclick="removeReactionRole('${messageId}', '${escapeHtml(role.emoji).replace(/'/g, "\\'")}')">×</button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Add Role Form -->
+        <div class="card card--nested">
+          <h6 class="form-label">Add Emoji → Role Mapping</h6>
+          <div class="form-group">
+            <label class="form-label">Emoji</label>
+            <input type="text" class="form-input" id="emoji-${messageId}" placeholder="👍 or :thumbsup: or custom emoji">
+            <p class="form-hint">Enter a unicode emoji (👍), emoji name (:thumbsup:), or custom emoji ID</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role</label>
+            <select class="form-input" id="role-${messageId}">
+              <option value="">Select a role...</option>
+              ${(config.roles || []).filter(r => r.id !== config.id).map(role =>
+                `<option value="${role.id}">${escapeHtml(role.name)}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description (Optional)</label>
+            <input type="text" class="form-input" id="desc-${messageId}" placeholder="Optional description">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addReactionRole('${messageId}')">Add Mapping</button>
+        </div>
       </div>
-      <div class="form-hint">Channel ID: ${data.channelId}</div>
-      <div class="mt-2">
-        ${(data.roles || []).length} role(s) configured
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 async function addReactionRoleMessage() {
@@ -2360,6 +2576,58 @@ async function saveReactionRolesSettings() {
   } catch (error) {
     console.error('Error saving reaction roles settings:', error);
     showToast('Error', 'Failed to save reaction roles settings', 'error');
+  }
+}
+
+async function addReactionRole(messageId) {
+  const emoji = document.getElementById(`emoji-${messageId}`)?.value?.trim();
+  const roleId = document.getElementById(`role-${messageId}`)?.value;
+  const description = document.getElementById(`desc-${messageId}`)?.value?.trim();
+
+  if (!emoji || !roleId) {
+    showToast('Error', 'Please provide both emoji and role', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/reactionroles/messages/${messageId}/roles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emoji, roleId, description: description || undefined }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to add reaction role');
+    }
+
+    showToast('Success', 'Emoji → Role mapping added!', 'success');
+    document.getElementById(`emoji-${messageId}`).value = '';
+    document.getElementById(`role-${messageId}`).value = '';
+    document.getElementById(`desc-${messageId}`).value = '';
+    loadReactionRolesConfig();
+  } catch (error) {
+    console.error('Error adding reaction role:', error);
+    showToast('Error', error.message || 'Failed to add reaction role', 'error');
+  }
+}
+
+async function removeReactionRole(messageId, emoji) {
+  if (!confirm(`Remove emoji "${emoji}" from this message?`)) return;
+
+  try {
+    const encodedEmoji = encodeURIComponent(emoji);
+    const response = await fetch(`/api/guild/${guildId}/reactionroles/messages/${messageId}/roles/${encodedEmoji}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) throw new Error('Failed to remove reaction role');
+
+    showToast('Success', 'Emoji → Role mapping removed!', 'success');
+    loadReactionRolesConfig();
+  } catch (error) {
+    console.error('Error removing reaction role:', error);
+    showToast('Error', 'Failed to remove reaction role', 'error');
   }
 }
 
