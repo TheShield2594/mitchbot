@@ -63,6 +63,10 @@ router.get('/user', (req, res) => {
 
 // Helper function to refresh Discord access token
 async function refreshDiscordToken(refreshToken) {
+  // Set up abort controller for timeout (5 seconds for token refresh)
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
   try {
     const response = await fetch('https://discord.com/api/v10/oauth2/token', {
       method: 'POST',
@@ -75,7 +79,10 @@ async function refreshDiscordToken(refreshToken) {
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
       }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     if (!response.ok) {
       console.error(`Token refresh failed with status ${response.status}`);
@@ -89,6 +96,13 @@ async function refreshDiscordToken(refreshToken) {
       expiresIn: data.expires_in,
     };
   } catch (error) {
+    clearTimeout(timeout);
+
+    if (error.name === 'AbortError') {
+      console.error('Token refresh request timed out');
+      return null;
+    }
+
     console.error('Error refreshing Discord token:', error);
     return null;
   }
@@ -134,19 +148,36 @@ router.post('/user/refresh-guilds', async (req, res) => {
           req.user.refreshToken = newTokens.refreshToken;
           accessToken = newTokens.accessToken;
 
-          // Retry guilds fetch with new token
-          response = await fetch('https://discord.com/api/v10/users/@me/guilds', {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          });
+          // Retry guilds fetch with new token (with timeout)
+          const retryController = new AbortController();
+          const retryTimeout = setTimeout(() => retryController.abort(), 10000);
 
-          if (!response.ok && response.status !== 429) {
-            console.error(`Discord API returned status ${response.status} after token refresh`);
-            return res.status(502).json({
-              error: 'Failed to fetch guilds from Discord',
-              discordStatus: response.status
+          try {
+            response = await fetch('https://discord.com/api/v10/users/@me/guilds', {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+              signal: retryController.signal,
             });
+
+            clearTimeout(retryTimeout);
+
+            if (!response.ok && response.status !== 429) {
+              console.error(`Discord API returned status ${response.status} after token refresh`);
+              return res.status(502).json({
+                error: 'Failed to fetch guilds from Discord',
+                discordStatus: response.status
+              });
+            }
+          } catch (retryError) {
+            clearTimeout(retryTimeout);
+
+            if (retryError.name === 'AbortError') {
+              console.error('Discord API retry request timed out after token refresh');
+              return res.status(504).json({ error: 'Request to Discord API timed out after token refresh' });
+            }
+
+            throw retryError;
           }
         } else {
           // Token refresh failed - user needs to re-authenticate
@@ -195,7 +226,7 @@ router.post('/user/refresh-guilds', async (req, res) => {
       // Save session after mutation
       req.session.save((err) => {
         if (err) {
-          console.error('Error saving session:', error);
+          console.error('Error saving session:', err);
           return res.status(500).json({ error: 'Failed to save session' });
         }
 
