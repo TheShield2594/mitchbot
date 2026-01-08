@@ -66,6 +66,27 @@ class FeatureHealthMonitor {
         key: 'enabled'
       },
       {
+        id: 'attachment-spam',
+        name: 'Attachment Spam',
+        type: 'toggle',
+        path: 'automod.attachmentSpam',
+        key: 'enabled'
+      },
+      {
+        id: 'emoji-spam',
+        name: 'Emoji Spam',
+        type: 'toggle',
+        path: 'automod.emojiSpam',
+        key: 'enabled'
+      },
+      {
+        id: 'anti-raid',
+        name: 'Anti-Raid',
+        type: 'toggle',
+        path: 'automod.antiRaid',
+        key: 'enabled'
+      },
+      {
         id: 'logging',
         name: 'Mod Logging',
         type: 'channel',
@@ -644,6 +665,22 @@ function loadAutomodConfig() {
   document.getElementById('caps-spam-min-length').value = config.automod.capsSpam?.minLength || 10;
   document.getElementById('caps-spam-action').value = config.automod.capsSpam?.action || 'delete';
 
+  // Load attachment/emoji/anti-raid spam settings (if UI elements exist)
+  const attachmentSpamToggle = document.getElementById('attachment-spam-enabled');
+  if (attachmentSpamToggle) {
+    attachmentSpamToggle.checked = config.automod.attachmentSpam?.enabled || false;
+  }
+
+  const emojiSpamToggle = document.getElementById('emoji-spam-enabled');
+  if (emojiSpamToggle) {
+    emojiSpamToggle.checked = config.automod.emojiSpam?.enabled || false;
+  }
+
+  const antiRaidToggle = document.getElementById('anti-raid-enabled');
+  if (antiRaidToggle) {
+    antiRaidToggle.checked = config.automod.antiRaid?.enabled || false;
+  }
+
   renderWordList();
   renderWhitelist();
   renderBlacklist();
@@ -658,7 +695,10 @@ function loadAutomodConfig() {
     'linkfilter-enabled',
     'spam-enabled',
     'mention-spam-enabled',
-    'caps-spam-enabled'
+    'caps-spam-enabled',
+    'attachment-spam-enabled',
+    'emoji-spam-enabled',
+    'anti-raid-enabled'
   ];
 
   toggles.forEach(id => {
@@ -672,6 +712,9 @@ function loadAutomodConfig() {
         if (id === 'spam-enabled') config.automod.spam.enabled = element.checked;
         if (id === 'mention-spam-enabled') config.automod.mentionSpam.enabled = element.checked;
         if (id === 'caps-spam-enabled') config.automod.capsSpam.enabled = element.checked;
+        if (id === 'attachment-spam-enabled') config.automod.attachmentSpam.enabled = element.checked;
+        if (id === 'emoji-spam-enabled') config.automod.emojiSpam.enabled = element.checked;
+        if (id === 'anti-raid-enabled') config.automod.antiRaid.enabled = element.checked;
 
         if (healthMonitor) {
           healthMonitor.updateUI();
@@ -962,6 +1005,9 @@ async function saveAutomod() {
         minLength: parseInt(document.getElementById('caps-spam-min-length').value),
         action: document.getElementById('caps-spam-action').value,
       },
+      attachmentSpam: config.automod.attachmentSpam || { enabled: false },
+      emojiSpam: config.automod.emojiSpam || { enabled: false },
+      antiRaid: config.automod.antiRaid || { enabled: false },
       whitelistedRoles: config.automod.whitelistedRoles || [],
       whitelistedChannels: config.automod.whitelistedChannels || [],
     };
@@ -984,6 +1030,9 @@ async function saveAutomod() {
     config.automod.spam.enabled = updates.spam.enabled;
     config.automod.mentionSpam.enabled = updates.mentionSpam.enabled;
     config.automod.capsSpam.enabled = updates.capsSpam.enabled;
+    config.automod.attachmentSpam.enabled = updates.attachmentSpam.enabled;
+    config.automod.emojiSpam.enabled = updates.emojiSpam.enabled;
+    config.automod.antiRaid.enabled = updates.antiRaid.enabled;
 
     if (healthMonitor) {
       healthMonitor.updateUI();
@@ -1363,14 +1412,14 @@ function loadEconomyConfig() {
   if (!config.economy) return;
 
   document.getElementById('economy-enabled').checked = config.economy.enabled;
-  document.getElementById('currency-name').value = config.economy.currencyName || 'coins';
-  document.getElementById('currency-symbol').value = config.economy.currencySymbol || '💰';
-  document.getElementById('daily-reward').value = config.economy.dailyReward || 100;
-  document.getElementById('daily-cooldown').value = config.economy.dailyCooldownHours || 24;
-  document.getElementById('work-reward-min').value = config.economy.workRewardMin || 50;
-  document.getElementById('work-reward-max').value = config.economy.workRewardMax || 150;
-  document.getElementById('work-cooldown').value = config.economy.workCooldownMinutes || 60;
-  document.getElementById('starting-balance').value = config.economy.startingBalance || 100;
+  document.getElementById('currency-name').value = config.economy.currencyName ?? 'coins';
+  document.getElementById('currency-symbol').value = config.economy.currencySymbol ?? '💰';
+  document.getElementById('daily-reward').value = config.economy.dailyReward ?? 100;
+  document.getElementById('daily-cooldown').value = config.economy.dailyCooldownHours ?? 24;
+  document.getElementById('work-reward-min').value = config.economy.workRewardMin ?? 50;
+  document.getElementById('work-reward-max').value = config.economy.workRewardMax ?? 150;
+  document.getElementById('work-cooldown').value = config.economy.workCooldownMinutes ?? 60;
+  document.getElementById('starting-balance').value = config.economy.startingBalance ?? 100;
 
   updateEconomyStatus();
 }
@@ -1403,16 +1452,24 @@ function updateEconomyStatus() {
 
 async function saveEconomySettings() {
   try {
+    // Parse values and fallback to defaults only on NaN (not on 0)
+    const dailyReward = parseInt(document.getElementById('daily-reward').value);
+    const dailyCooldown = parseInt(document.getElementById('daily-cooldown').value);
+    const workRewardMin = parseInt(document.getElementById('work-reward-min').value);
+    const workRewardMax = parseInt(document.getElementById('work-reward-max').value);
+    const workCooldown = parseInt(document.getElementById('work-cooldown').value);
+    const startingBalance = parseInt(document.getElementById('starting-balance').value);
+
     const updates = {
       enabled: document.getElementById('economy-enabled').checked,
       currencyName: document.getElementById('currency-name').value.trim() || 'coins',
       currencySymbol: document.getElementById('currency-symbol').value.trim() || '💰',
-      dailyReward: parseInt(document.getElementById('daily-reward').value) || 100,
-      dailyCooldownHours: parseInt(document.getElementById('daily-cooldown').value) || 24,
-      workRewardMin: parseInt(document.getElementById('work-reward-min').value) || 50,
-      workRewardMax: parseInt(document.getElementById('work-reward-max').value) || 150,
-      workCooldownMinutes: parseInt(document.getElementById('work-cooldown').value) || 60,
-      startingBalance: parseInt(document.getElementById('starting-balance').value) || 100,
+      dailyReward: Number.isNaN(dailyReward) ? 100 : dailyReward,
+      dailyCooldownHours: Number.isNaN(dailyCooldown) ? 24 : dailyCooldown,
+      workRewardMin: Number.isNaN(workRewardMin) ? 50 : workRewardMin,
+      workRewardMax: Number.isNaN(workRewardMax) ? 150 : workRewardMax,
+      workCooldownMinutes: Number.isNaN(workCooldown) ? 60 : workCooldown,
+      startingBalance: Number.isNaN(startingBalance) ? 100 : startingBalance,
     };
 
     // Validate inputs

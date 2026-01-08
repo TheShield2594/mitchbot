@@ -100,6 +100,18 @@ router.post('/guild/:guildId/automod', ensureServerManager, async (req, res) => 
       config.automod.capsSpam = { ...config.automod.capsSpam, ...updates.capsSpam };
     }
 
+    if (updates.attachmentSpam) {
+      config.automod.attachmentSpam = { ...config.automod.attachmentSpam, ...updates.attachmentSpam };
+    }
+
+    if (updates.emojiSpam) {
+      config.automod.emojiSpam = { ...config.automod.emojiSpam, ...updates.emojiSpam };
+    }
+
+    if (updates.antiRaid) {
+      config.automod.antiRaid = { ...config.automod.antiRaid, ...updates.antiRaid };
+    }
+
     if (updates.whitelistedRoles) {
       config.automod.whitelistedRoles = updates.whitelistedRoles;
     }
