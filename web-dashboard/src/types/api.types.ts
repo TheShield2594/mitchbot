@@ -161,8 +161,20 @@ export interface XPConfig {
   levelUpChannel: string | null
   levelUpMessage: string
   levelRoles: LevelRole[]
+  /**
+   * Whitelist of channel IDs where XP can be gained. If empty, XP is earned in all channels (unless excluded by noXpChannels/noXpRoles).
+   * When populated, ONLY channels in this list can earn XP (subject to exclusion rules).
+   */
   xpGainChannels: string[]
+  /**
+   * Exclusion list of channel IDs where XP cannot be gained. Takes precedence over xpGainChannels.
+   * If a channel appears in both xpGainChannels and noXpChannels, noXpChannels wins (no XP earned).
+   */
   noXpChannels: string[]
+  /**
+   * Exclusion list of role IDs that prevent XP gain. Users with any role in this list cannot earn XP.
+   * Takes precedence over xpGainChannels. If a user has a noXpRole, they earn no XP regardless of channel.
+   */
   noXpRoles: string[]
   channelMultipliers: Record<string, number>
   roleMultipliers: Record<string, number>
@@ -205,11 +217,19 @@ export interface WelcomeConfig {
 export type ModAction = 'delete' | 'warn' | 'timeout' | 'kick' | 'ban'
 
 // API Response types
-export interface ApiResponse<T = unknown> {
-  data?: T
-  error?: string
+export interface SuccessResponse<T> {
+  success: true
+  data: T
   message?: string
 }
+
+export interface ErrorResponse {
+  success: false
+  error: string
+  message?: string
+}
+
+export type ApiResponse<T> = SuccessResponse<T> | ErrorResponse
 
 export interface PaginatedResponse<T> {
   data: T[]

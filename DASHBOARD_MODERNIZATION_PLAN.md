@@ -77,6 +77,14 @@ This plan outlines the complete modernization of the Mitchbot dashboard from van
   - DevTools support
   - TypeScript-first
 
+**Auth Persistence Strategy:**
+- **Backend session approach** (recommended): Express sessions with httpOnly cookies issued by Passport.js
+- **Frontend**: No explicit token storage - relies on `credentials: 'include'` (Axios `withCredentials: true`)
+- **Session refresh**: Frontend calls `GET /api/user` on mount; 401 responses redirect to `/auth/login`
+- **Token refresh**: Backend handles Discord OAuth token refresh transparently when accessToken expires
+- **No localStorage/sessionStorage tokens**: Sensitive tokens (accessToken, refreshToken) never exposed to client
+- **CSRF protection**: Use `express-session` with secure cookie settings + CSRF tokens if needed
+
 ### Routing: **React Router v6**
 - Industry standard
 - Type-safe routes
@@ -105,7 +113,7 @@ This plan outlines the complete modernization of the Mitchbot dashboard from van
 
 ## Project Structure
 
-```
+```text
 web-dashboard/
 ├── package.json
 ├── vite.config.ts
@@ -230,6 +238,7 @@ web-dashboard/
 1. Create new `web-dashboard/` directory
 2. Initialize Vite + React + TypeScript project
 3. Install dependencies:
+
    ```bash
    npm create vite@latest web-dashboard -- --template react-ts
    cd web-dashboard
@@ -240,6 +249,7 @@ web-dashboard/
    npm install recharts lucide-react
    npm install clsx tailwind-merge
    ```
+
 4. Configure Tailwind CSS
 5. Set up Shadcn/ui
 6. Configure Vite to proxy API requests to Express backend
@@ -556,6 +566,14 @@ web-dashboard/
    - Option B: Beta flag (allow users to opt-in)
    - Option C: Gradual rollout (% of users)
 
+5. **Rollback Plan**
+   - **Health checks**: Monitor error rates, API response times, client-side errors (Sentry/LogRocket)
+   - **Quick revert**: Keep previous static build in `dist-backup/`; swap symlinks or redeploy old build within minutes
+   - **Feature flags**: Add `ENABLE_NEW_DASHBOARD` env var; serve old `/web/public` files if disabled
+   - **Gradual rollout toggle**: Use session flag or user ID % hash to A/B test; disable for all users instantly if critical issues
+   - **Database rollback**: Not required (no schema changes); API remains backward-compatible
+   - **Monitoring thresholds**: Auto-rollback if error rate >5%, API latency >2s, or >10 user reports in 5 minutes
+
 **Deliverable:** New dashboard live in production
 
 ---
@@ -609,6 +627,15 @@ export default defineConfig({
 - Build React: `npm run build`
 - Express serves built files from `dist/`
 - Single-origin deployment (no CORS issues)
+
+**Backend Compatibility:**
+- **Existing API endpoints** (`/api/*`) remain fully compatible - no breaking changes required
+- **Auth tokens/sessions**: Backend continues using Express sessions with Passport.js; access/refresh tokens stay server-side only
+- **Response schemas**: All existing API response formats are preserved; frontend types match current backend contracts
+- **Required backend changes**:
+  - Add `sanitizeUser()` helper to remove sensitive tokens from API responses (already implemented)
+  - Ensure session persistence with `req.session.save()` after mutations (already implemented)
+  - No database schema changes or migration scripts required
 
 ### Option 2: Separate Deployment
 **Approach:** Deploy React separately (Vercel/Netlify)
