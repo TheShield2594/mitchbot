@@ -99,17 +99,16 @@ function migrateToPerGuild(guildIds) {
 /**
  * Get all birthdays for a specific guild (read-only)
  * @param {string} guildId - Guild ID
- * @returns {Object} - Object with userId as key and date as value
+ * @returns {Object} - Object with userId as key and date as value (shallow copy)
  */
 function getBirthdays(guildId) {
   if (!guildId) {
-    // Return empty object if no guildId provided
     console.warn('[Birthdays] getBirthdays called without guildId');
     return {};
   }
 
-  // Return guild birthdays or empty object without modifying state
-  return birthdays[guildId] || {};
+  // Return shallow copy of guild birthdays to prevent external mutation
+  return birthdays[guildId] ? { ...birthdays[guildId] } : {};
 }
 
 /**
@@ -133,6 +132,32 @@ function addBirthday(guildId, userId, date) {
     return;
   }
 
+  // Validate userId
+  if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+    console.error('[Birthdays] addBirthday called with invalid userId');
+    return;
+  }
+
+  // Validate date format (MM-DD)
+  if (!date || typeof date !== 'string') {
+    console.error('[Birthdays] addBirthday called with invalid date type');
+    return;
+  }
+
+  const datePattern = /^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/;
+  if (!datePattern.test(date)) {
+    console.error('[Birthdays] addBirthday called with invalid date format (expected MM-DD)');
+    return;
+  }
+
+  // Validate it's a real date (e.g., not 02-30)
+  const [month, day] = date.split('-').map(Number);
+  const testDate = new Date(2024, month - 1, day); // Use leap year for Feb 29
+  if (testDate.getMonth() !== month - 1 || testDate.getDate() !== day) {
+    console.error('[Birthdays] addBirthday called with invalid calendar date');
+    return;
+  }
+
   if (!birthdays[guildId]) {
     birthdays[guildId] = {};
   }
@@ -149,6 +174,12 @@ function addBirthday(guildId, userId, date) {
 function removeBirthday(guildId, userId) {
   if (!guildId) {
     console.error('[Birthdays] removeBirthday called without guildId');
+    return;
+  }
+
+  // Validate userId
+  if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+    console.error('[Birthdays] removeBirthday called with invalid userId');
     return;
   }
 

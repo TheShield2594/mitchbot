@@ -42,6 +42,12 @@ export default function Economy() {
       const response = await fetch(`/api/guild/${guildId}/economy/shop`, {
         credentials: 'include',
       })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status} ${response.statusText}: ${errorText}`)
+      }
+
       const data = await response.json()
       setShopItems(data.items || [])
     } catch (error) {
@@ -57,6 +63,12 @@ export default function Economy() {
       const response = await fetch(`/api/guild/${guildId}/info`, {
         credentials: 'include',
       })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status} ${response.statusText}: ${errorText}`)
+      }
+
       const data = await response.json()
       setRoles(data.roles?.filter((r: GuildRole) => r.id !== guildId) || [])
     } catch (error) {
@@ -201,6 +213,7 @@ export default function Economy() {
       <div className="mb-8 border-b border-border">
         <div className="flex gap-4">
           <button
+            type="button"
             onClick={() => setActiveTab('config')}
             className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium ${
               activeTab === 'config'
@@ -212,6 +225,7 @@ export default function Economy() {
             Configuration
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('shop')}
             className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium ${
               activeTab === 'shop'
@@ -237,7 +251,7 @@ export default function Economy() {
                   Allow members to earn and spend virtual currency
                 </p>
               </div>
-              <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-muted">
+              <button type="button" className="relative inline-flex h-6 w-11 items-center rounded-full bg-muted">
                 <span className="inline-block h-4 w-4 translate-x-1 transform rounded-full bg-background" />
               </button>
             </div>
@@ -306,7 +320,7 @@ export default function Economy() {
 
           {/* Save button */}
           <div className="flex justify-end">
-            <button className="rounded-lg bg-primary px-6 py-2 font-semibold text-primary-foreground hover:bg-primary/90">
+            <button type="button" className="rounded-lg bg-primary px-6 py-2 font-semibold text-primary-foreground hover:bg-primary/90">
               Save Changes
             </button>
           </div>
@@ -322,6 +336,7 @@ export default function Economy() {
               Manage shop items that users can purchase with currency
             </p>
             <button
+              type="button"
               onClick={() => {
                 resetForm()
                 setShowAddModal(true)
@@ -353,12 +368,14 @@ export default function Economy() {
                     </div>
                     <div className="flex gap-1">
                       <button
+                        type="button"
                         onClick={() => openEditModal(item)}
                         className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleDeleteItem(item.id)}
                         className="rounded-lg p-2 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground"
                       >
@@ -406,6 +423,7 @@ export default function Economy() {
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Add Shop Item</h3>
               <button
+                type="button"
                 onClick={() => setShowAddModal(false)}
                 className="rounded-lg p-2 hover:bg-accent"
               >
@@ -442,7 +460,10 @@ export default function Economy() {
                     id="add-item-price"
                     type="number"
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value ? parseInt(e.target.value) : 0 })}
+                    onChange={(e) => {
+                      const num = Number(e.target.value)
+                      setFormData({ ...formData, price: Number.isFinite(num) ? num : 0 })
+                    }}
                     placeholder="100"
                     className="w-full rounded-lg border border-border bg-background px-4 py-2"
                   />
@@ -455,7 +476,10 @@ export default function Economy() {
                     id="add-item-stock"
                     type="number"
                     value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value ? parseInt(e.target.value) : 0 })}
+                    onChange={(e) => {
+                      const num = Number(e.target.value)
+                      setFormData({ ...formData, stock: Number.isFinite(num) ? num : 0 })
+                    }}
                     placeholder="-1"
                     className="w-full rounded-lg border border-border bg-background px-4 py-2"
                   />
@@ -496,12 +520,14 @@ export default function Economy() {
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button
+                type="button"
                 onClick={() => setShowAddModal(false)}
                 className="rounded-lg border border-border px-4 py-2 font-medium hover:bg-accent"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleAddItem}
                 className="rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-primary/90"
               >
@@ -519,6 +545,7 @@ export default function Economy() {
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Edit Shop Item</h3>
               <button
+                type="button"
                 onClick={() => setShowEditModal(false)}
                 className="rounded-lg p-2 hover:bg-accent"
               >
@@ -553,7 +580,10 @@ export default function Economy() {
                     id="edit-item-price"
                     type="number"
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value ? parseInt(e.target.value) : 0 })}
+                    onChange={(e) => {
+                      const num = Number(e.target.value)
+                      setFormData({ ...formData, price: Number.isFinite(num) ? num : 0 })
+                    }}
                     className="w-full rounded-lg border border-border bg-background px-4 py-2"
                   />
                 </div>
@@ -565,7 +595,10 @@ export default function Economy() {
                     id="edit-item-stock"
                     type="number"
                     value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value ? parseInt(e.target.value) : 0 })}
+                    onChange={(e) => {
+                      const num = Number(e.target.value)
+                      setFormData({ ...formData, stock: Number.isFinite(num) ? num : 0 })
+                    }}
                     className="w-full rounded-lg border border-border bg-background px-4 py-2"
                   />
                 </div>
@@ -605,12 +638,14 @@ export default function Economy() {
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button
+                type="button"
                 onClick={() => setShowEditModal(false)}
                 className="rounded-lg border border-border px-4 py-2 font-medium hover:bg-accent"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleEditItem}
                 className="rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-primary/90"
               >
