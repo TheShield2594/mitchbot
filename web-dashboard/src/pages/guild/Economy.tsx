@@ -36,8 +36,12 @@ export default function Economy() {
 
   // Load shop items
   const loadShopItems = async () => {
+    if (!guildId) return
+
     try {
-      const response = await fetch(`/api/guild/${guildId}/economy/shop`)
+      const response = await fetch(`/api/guild/${guildId}/economy/shop`, {
+        credentials: 'include',
+      })
       const data = await response.json()
       setShopItems(data.items || [])
     } catch (error) {
@@ -47,8 +51,12 @@ export default function Economy() {
 
   // Load guild roles
   const loadRoles = async () => {
+    if (!guildId) return
+
     try {
-      const response = await fetch(`/api/guild/${guildId}/info`)
+      const response = await fetch(`/api/guild/${guildId}/info`, {
+        credentials: 'include',
+      })
       const data = await response.json()
       setRoles(data.roles?.filter((r: GuildRole) => r.id !== guildId) || [])
     } catch (error) {
@@ -75,10 +83,33 @@ export default function Economy() {
   }
 
   const handleAddItem = async () => {
+    if (!guildId) {
+      alert('Missing guild ID')
+      return
+    }
+
+    // Client-side validation
+    const trimmedName = formData.name.trim()
+    if (!trimmedName) {
+      alert('Item name is required')
+      return
+    }
+
+    if (formData.price < 0) {
+      alert('Price must be 0 or greater')
+      return
+    }
+
+    if (formData.type === 'role' && !formData.roleId) {
+      alert('Please select a role for role-type items')
+      return
+    }
+
     try {
       const response = await fetch(`/api/guild/${guildId}/economy/shop`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(formData),
       })
 
@@ -95,11 +126,16 @@ export default function Economy() {
 
   const handleEditItem = async () => {
     if (!editingItem) return
+    if (!guildId) {
+      alert('Missing guild ID')
+      return
+    }
 
     try {
       const response = await fetch(`/api/guild/${guildId}/economy/shop/${editingItem.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(formData),
       })
 
@@ -116,11 +152,17 @@ export default function Economy() {
   }
 
   const handleDeleteItem = async (itemId: string) => {
+    if (!guildId) {
+      alert('Missing guild ID')
+      return
+    }
+
     if (!confirm('Are you sure you want to delete this shop item?')) return
 
     try {
       const response = await fetch(`/api/guild/${guildId}/economy/shop/${itemId}`, {
         method: 'DELETE',
+        credentials: 'include',
       })
 
       if (!response.ok) throw new Error('Failed to delete shop item')

@@ -114,10 +114,11 @@ function getBirthdays(guildId) {
 
 /**
  * Get all birthdays across all guilds (for dashboard overview)
- * @returns {Object} - Object with guildId as key and birthdays object as value
+ * @returns {Object} - Object with guildId as key and birthdays object as value (copy)
  */
 function getAllBirthdays() {
-  return birthdays;
+  // Return a deep copy to prevent external mutation of internal state
+  return JSON.parse(JSON.stringify(birthdays));
 }
 
 /**

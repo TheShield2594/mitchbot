@@ -27,7 +27,7 @@ module.exports = {
     const guildBirthdays = getBirthdays(interaction.guildId);
     if (!user || !guildBirthdays[user.id]) {
       await interaction.editReply({
-        content: 'Usage: /remove_birthday @user',
+        content: `No birthday found for ${user?.username || 'that user'}. Make sure they have a birthday set first.`,
       });
       return;
     }
