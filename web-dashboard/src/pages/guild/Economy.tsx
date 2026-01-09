@@ -206,24 +206,27 @@ export default function Economy() {
             <h3 className="mb-4 text-lg font-semibold">Currency Settings</h3>
             <div className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium">Currency Name</label>
+                <label htmlFor="currency-name" className="mb-2 block text-sm font-medium">Currency Name</label>
                 <input
+                  id="currency-name"
                   type="text"
                   placeholder="Coins"
                   className="w-full rounded-lg border border-border bg-background px-4 py-2"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium">Currency Symbol</label>
+                <label htmlFor="currency-symbol" className="mb-2 block text-sm font-medium">Currency Symbol</label>
                 <input
+                  id="currency-symbol"
                   type="text"
                   placeholder="💰"
                   className="w-full rounded-lg border border-border bg-background px-4 py-2"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium">Starting Balance</label>
+                <label htmlFor="starting-balance" className="mb-2 block text-sm font-medium">Starting Balance</label>
                 <input
+                  id="starting-balance"
                   type="number"
                   placeholder="100"
                   className="w-full rounded-lg border border-border bg-background px-4 py-2"
@@ -237,8 +240,9 @@ export default function Economy() {
             <h3 className="mb-4 text-lg font-semibold">Rewards</h3>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-medium">Daily Reward</label>
+                <label htmlFor="daily-reward" className="mb-2 block text-sm font-medium">Daily Reward</label>
                 <input
+                  id="daily-reward"
                   type="number"
                   placeholder="100"
                   className="w-full rounded-lg border border-border bg-background px-4 py-2"
@@ -246,8 +250,9 @@ export default function Economy() {
                 <p className="mt-1 text-xs text-muted-foreground">Amount users receive daily</p>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium">Daily Cooldown (hours)</label>
+                <label htmlFor="daily-cooldown" className="mb-2 block text-sm font-medium">Daily Cooldown (hours)</label>
                 <input
+                  id="daily-cooldown"
                   type="number"
                   placeholder="24"
                   className="w-full rounded-lg border border-border bg-background px-4 py-2"
@@ -367,8 +372,9 @@ export default function Economy() {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium">Item Name</label>
+                <label htmlFor="add-item-name" className="mb-2 block text-sm font-medium">Item Name</label>
                 <input
+                  id="add-item-name"
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -377,8 +383,9 @@ export default function Economy() {
                 />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium">Description</label>
+                <label htmlFor="add-item-description" className="mb-2 block text-sm font-medium">Description</label>
                 <textarea
+                  id="add-item-description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="A cool item that does something"
@@ -388,31 +395,34 @@ export default function Economy() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Price</label>
+                  <label htmlFor="add-item-price" className="mb-2 block text-sm font-medium">Price</label>
                   <input
+                    id="add-item-price"
                     type="number"
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value ? parseInt(e.target.value) : 0 })}
                     placeholder="100"
                     className="w-full rounded-lg border border-border bg-background px-4 py-2"
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium">
+                  <label htmlFor="add-item-stock" className="mb-2 block text-sm font-medium">
                     Stock <span className="text-xs text-muted-foreground">(-1 = unlimited)</span>
                   </label>
                   <input
+                    id="add-item-stock"
                     type="number"
                     value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value ? parseInt(e.target.value) : 0 })}
                     placeholder="-1"
                     className="w-full rounded-lg border border-border bg-background px-4 py-2"
                   />
                 </div>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium">Item Type</label>
+                <label htmlFor="add-item-type" className="mb-2 block text-sm font-medium">Item Type</label>
                 <select
+                  id="add-item-type"
                   value={formData.type}
                   onChange={(e) =>
                     setFormData({ ...formData, type: e.target.value as 'item' | 'role' })
@@ -425,8 +435,9 @@ export default function Economy() {
               </div>
               {formData.type === 'role' && (
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Role to Assign</label>
+                  <label htmlFor="add-item-role" className="mb-2 block text-sm font-medium">Role to Assign</label>
                   <select
+                    id="add-item-role"
                     value={formData.roleId}
                     onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
                     className="w-full rounded-lg border border-border bg-background px-4 py-2"
@@ -474,8 +485,9 @@ export default function Economy() {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium">Item Name</label>
+                <label htmlFor="edit-item-name" className="mb-2 block text-sm font-medium">Item Name</label>
                 <input
+                  id="edit-item-name"
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -483,8 +495,9 @@ export default function Economy() {
                 />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium">Description</label>
+                <label htmlFor="edit-item-description" className="mb-2 block text-sm font-medium">Description</label>
                 <textarea
+                  id="edit-item-description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
@@ -493,29 +506,32 @@ export default function Economy() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Price</label>
+                  <label htmlFor="edit-item-price" className="mb-2 block text-sm font-medium">Price</label>
                   <input
+                    id="edit-item-price"
                     type="number"
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value ? parseInt(e.target.value) : 0 })}
                     className="w-full rounded-lg border border-border bg-background px-4 py-2"
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium">
+                  <label htmlFor="edit-item-stock" className="mb-2 block text-sm font-medium">
                     Stock <span className="text-xs text-muted-foreground">(-1 = unlimited)</span>
                   </label>
                   <input
+                    id="edit-item-stock"
                     type="number"
                     value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value ? parseInt(e.target.value) : 0 })}
                     className="w-full rounded-lg border border-border bg-background px-4 py-2"
                   />
                 </div>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium">Item Type</label>
+                <label htmlFor="edit-item-type" className="mb-2 block text-sm font-medium">Item Type</label>
                 <select
+                  id="edit-item-type"
                   value={formData.type}
                   onChange={(e) =>
                     setFormData({ ...formData, type: e.target.value as 'item' | 'role' })
@@ -528,8 +544,9 @@ export default function Economy() {
               </div>
               {formData.type === 'role' && (
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Role to Assign</label>
+                  <label htmlFor="edit-item-role" className="mb-2 block text-sm font-medium">Role to Assign</label>
                   <select
+                    id="edit-item-role"
                     value={formData.roleId}
                     onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
                     className="w-full rounded-lg border border-border bg-background px-4 py-2"

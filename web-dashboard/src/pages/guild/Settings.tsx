@@ -61,19 +61,19 @@ export default function Settings() {
       const response = await fetch(`/api/guild/${guildId}/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
-          settings: {
-            prefix: trimmedPrefix,
-            language,
-            timezone,
-            autoDeleteMessages,
-            dmOnModAction,
-          },
+          prefix: trimmedPrefix,
+          language,
+          timezone,
+          autoDeleteMessages,
+          dmOnModAction,
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to save settings')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to save settings')
       }
 
       setSaveStatus('success')

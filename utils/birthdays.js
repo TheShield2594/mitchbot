@@ -45,22 +45,38 @@ let birthdays = loadBirthdays();
  * @returns {boolean} - True if migration was performed, false if already migrated
  */
 function migrateToPerGuild(guildIds) {
-  // Check if already in new format
-  // New format has guild IDs as top-level keys (snowflakes are 17-19 digit strings)
-  // Old format has user IDs as top-level keys
-  // We can detect by checking if any value is an object (new format) or string (old format)
+  // Validate guildIds parameter
+  if (!guildIds || !Array.isArray(guildIds) || guildIds.length === 0) {
+    console.log('[Birthdays] No guilds provided for migration');
+    return false;
+  }
+
+  // Filter out any empty/invalid guild IDs
+  const validGuildIds = guildIds.filter(id => id && typeof id === 'string' && id.trim().length > 0);
+  if (validGuildIds.length === 0) {
+    console.log('[Birthdays] No valid guild IDs provided for migration');
+    return false;
+  }
 
   const keys = Object.keys(birthdays);
   if (keys.length === 0) {
     return false; // No data to migrate
   }
 
-  // Check if first key's value is an object (new format) or string (old format)
-  const firstValue = birthdays[keys[0]];
-  const isOldFormat = typeof firstValue === 'string';
+  // Check if ALL values are strings (old format) or ANY value is an object (new format)
+  // Old format: all values should be strings (date format "MM-DD")
+  // New format: all values should be objects (nested guild data)
+  const values = Object.values(birthdays);
+  const allValuesAreStrings = values.every(v => typeof v === 'string');
+  const anyValueIsObject = values.some(v => typeof v === 'object' && v !== null);
 
-  if (!isOldFormat) {
+  if (anyValueIsObject) {
     console.log('[Birthdays] Already in new per-guild format');
+    return false;
+  }
+
+  if (!allValuesAreStrings) {
+    console.error('[Birthdays] Unexpected data format - not all values are strings or objects');
     return false;
   }
 
@@ -68,20 +84,20 @@ function migrateToPerGuild(guildIds) {
   const oldBirthdays = { ...birthdays };
   const newBirthdays = {};
 
-  // Copy all existing birthdays to each guild
-  for (const guildId of guildIds) {
+  // Copy all existing birthdays to each valid guild
+  for (const guildId of validGuildIds) {
     newBirthdays[guildId] = { ...oldBirthdays };
   }
 
   birthdays = newBirthdays;
   saveBirthdays(birthdays);
 
-  console.log(`[Birthdays] Migration complete. Copied ${Object.keys(oldBirthdays).length} birthdays to ${guildIds.length} guilds`);
+  console.log(`[Birthdays] Migration complete. Copied ${Object.keys(oldBirthdays).length} birthdays to ${validGuildIds.length} guilds`);
   return true;
 }
 
 /**
- * Get all birthdays for a specific guild
+ * Get all birthdays for a specific guild (read-only)
  * @param {string} guildId - Guild ID
  * @returns {Object} - Object with userId as key and date as value
  */
@@ -92,11 +108,8 @@ function getBirthdays(guildId) {
     return {};
   }
 
-  if (!birthdays[guildId]) {
-    birthdays[guildId] = {};
-  }
-
-  return birthdays[guildId];
+  // Return guild birthdays or empty object without modifying state
+  return birthdays[guildId] || {};
 }
 
 /**
