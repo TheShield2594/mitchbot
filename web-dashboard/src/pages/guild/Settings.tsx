@@ -1,6 +1,51 @@
-import { Save, AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import { Save, AlertTriangle, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 
 export default function Settings() {
+  // Form state
+  const [botPrefix, setBotPrefix] = useState('!')
+  const [language, setLanguage] = useState('en')
+  const [timezone, setTimezone] = useState('UTC')
+  const [autoDeleteMessages, setAutoDeleteMessages] = useState(false)
+  const [dmOnModAction, setDmOnModAction] = useState(false)
+
+  // Save state
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [saveMessage, setSaveMessage] = useState('')
+
+  // Handle save
+  const handleSave = async () => {
+    setIsSaving(true)
+    setSaveStatus('idle')
+    setSaveMessage('')
+
+    try {
+      // Simulate API call - replace with actual API call
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // TODO: Implement actual API call
+      // await api.post(`/api/guild/${guildId}/settings`, {
+      //   prefix: botPrefix,
+      //   language,
+      //   timezone,
+      //   autoDeleteMessages,
+      //   dmOnModAction,
+      // })
+
+      setSaveStatus('success')
+      setSaveMessage('Settings saved successfully!')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    } catch (error: any) {
+      console.error('Failed to save settings:', error)
+      setSaveStatus('error')
+      setSaveMessage('Failed to save settings. Please try again.')
+      setTimeout(() => setSaveStatus('idle'), 5000)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -24,6 +69,8 @@ export default function Settings() {
               <input
                 id="botPrefix"
                 type="text"
+                value={botPrefix}
+                onChange={(e) => setBotPrefix(e.target.value)}
                 placeholder="!"
                 maxLength={5}
                 className="w-full max-w-xs rounded-lg border border-border bg-background px-4 py-2"
@@ -45,6 +92,8 @@ export default function Settings() {
               </label>
               <select
                 id="language"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
                 className="w-full max-w-xs rounded-lg border border-border bg-background px-4 py-2"
               >
                 <option value="en">English</option>
@@ -64,6 +113,8 @@ export default function Settings() {
               </label>
               <select
                 id="timezone"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
                 className="w-full max-w-xs rounded-lg border border-border bg-background px-4 py-2"
               >
                 <option value="UTC">UTC (GMT+0)</option>
@@ -95,10 +146,17 @@ export default function Settings() {
               <button
                 type="button"
                 role="switch"
-                aria-checked={false}
-                className="relative inline-flex h-6 w-11 items-center rounded-full bg-muted transition-colors"
+                aria-checked={autoDeleteMessages}
+                onClick={() => setAutoDeleteMessages(!autoDeleteMessages)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  autoDeleteMessages ? 'bg-primary' : 'bg-muted'
+                }`}
               >
-                <span className="inline-block h-4 w-4 translate-x-1 transform rounded-full bg-background transition-transform" />
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
+                    autoDeleteMessages ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
               </button>
             </div>
 
@@ -112,10 +170,17 @@ export default function Settings() {
               <button
                 type="button"
                 role="switch"
-                aria-checked={false}
-                className="relative inline-flex h-6 w-11 items-center rounded-full bg-muted transition-colors"
+                aria-checked={dmOnModAction}
+                onClick={() => setDmOnModAction(!dmOnModAction)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  dmOnModAction ? 'bg-primary' : 'bg-muted'
+                }`}
               >
-                <span className="inline-block h-4 w-4 translate-x-1 transform rounded-full bg-background transition-transform" />
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
+                    dmOnModAction ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
               </button>
             </div>
           </div>
@@ -156,14 +221,32 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Save button */}
-        <div className="flex justify-end">
+        {/* Save button and status */}
+        <div className="flex flex-col items-end gap-3">
+          {saveStatus !== 'idle' && (
+            <div
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm ${
+                saveStatus === 'success'
+                  ? 'bg-green-500/10 text-green-500'
+                  : 'bg-destructive/10 text-destructive'
+              }`}
+            >
+              {saveStatus === 'success' ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <AlertCircle className="h-4 w-4" />
+              )}
+              <span>{saveMessage}</span>
+            </div>
+          )}
           <button
             type="button"
-            className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2 font-semibold text-primary-foreground hover:bg-primary/90"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Save className="h-4 w-4" />
-            Save Changes
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isSaving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </div>

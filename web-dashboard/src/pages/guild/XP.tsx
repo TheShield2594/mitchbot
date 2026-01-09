@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { TrendingUp, Award, Settings, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import api from '@/lib/api'
@@ -27,6 +27,63 @@ export default function XP() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string>('')
+
+  // Loading state
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string>('')
+
+  // Refs for cleanup
+  const timeoutRefs = useRef<number[]>([])
+
+  // Helper to schedule timeout with cleanup tracking
+  const scheduleTimeout = (callback: () => void, delay: number) => {
+    const timeoutId = setTimeout(callback, delay)
+    timeoutRefs.current.push(timeoutId)
+    return timeoutId
+  }
+
+  // Load guild XP config on mount
+  useEffect(() => {
+    if (!guildId) {
+      setIsLoading(false)
+      setLoadError('Guild ID is missing')
+      return
+    }
+
+    const fetchConfig = async () => {
+      setIsLoading(true)
+      setLoadError('')
+
+      try {
+        const response = await api.get(`/api/guild/${guildId}/xp/config`)
+        const config = response.data
+
+        // Populate form with loaded data
+        setXpEnabled(config.enabled ?? false)
+        setMinXpPerMessage(config.xpMin ?? 15)
+        setMaxXpPerMessage(config.xpMax ?? 25)
+        setXpCooldown(config.cooldown ?? 60)
+        setAnnouncementsEnabled(config.announcements ?? false)
+        setAnnouncementChannel(config.announcementChannel ?? 'same')
+        setLevelUpMessage(config.levelUpMessage ?? 'Congratulations {user}, you reached level {level}!')
+      } catch (error: any) {
+        console.error('Failed to load XP config:', error)
+        setLoadError(error.response?.data?.message || 'Failed to load XP configuration')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchConfig()
+  }, [guildId])
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach(clearTimeout)
+      timeoutRefs.current = []
+    }
+  }, [])
 
   // Validate inputs
   const validateInputs = () => {
@@ -58,14 +115,14 @@ export default function XP() {
     if (!validateInputs()) {
       setSaveStatus('error')
       setSaveMessage('Please fix validation errors before saving')
-      setTimeout(() => setSaveStatus('idle'), 3000)
+      scheduleTimeout(() => setSaveStatus('idle'), 3000)
       return
     }
 
     if (!guildId) {
       setSaveStatus('error')
       setSaveMessage('Guild ID is missing')
-      setTimeout(() => setSaveStatus('idle'), 3000)
+      scheduleTimeout(() => setSaveStatus('idle'), 3000)
       return
     }
 
@@ -94,14 +151,14 @@ export default function XP() {
 
       setSaveStatus('success')
       setSaveMessage('XP configuration saved successfully!')
-      setTimeout(() => setSaveStatus('idle'), 3000)
+      scheduleTimeout(() => setSaveStatus('idle'), 3000)
     } catch (error: any) {
       console.error('Failed to save XP config:', error)
       setSaveStatus('error')
       setSaveMessage(
         error.response?.data?.message || 'Failed to save XP configuration. Please try again.'
       )
-      setTimeout(() => setSaveStatus('idle'), 5000)
+      scheduleTimeout(() => setSaveStatus('idle'), 5000)
     } finally {
       setIsSaving(false)
     }
@@ -116,6 +173,27 @@ export default function XP() {
           Reward active members with experience points and levels
         </p>
       </div>
+
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )}
+
+      {/* Error state */}
+      {!isLoading && loadError && (
+        <div className="rounded-lg border border-destructive bg-destructive/5 p-6">
+          <div className="flex items-center gap-3 text-destructive">
+            <AlertCircle className="h-5 w-5" />
+            <p>{loadError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Main content */}
+      {!isLoading && !loadError && (
+        <>
 
       {/* Tabs */}
       <div className="mb-8 border-b border-border">
@@ -379,6 +457,8 @@ export default function XP() {
             </p>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   )

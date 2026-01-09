@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { MessageCircle, Send } from 'lucide-react'
 
 export default function Welcome() {
+  const [isWelcomeEnabled, setIsWelcomeEnabled] = useState(false)
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -25,10 +28,17 @@ export default function Welcome() {
             <button
               type="button"
               role="switch"
-              aria-checked={false}
-              className="relative inline-flex h-6 w-11 items-center rounded-full bg-muted transition-colors"
+              aria-checked={isWelcomeEnabled}
+              onClick={() => setIsWelcomeEnabled(!isWelcomeEnabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                isWelcomeEnabled ? 'bg-primary' : 'bg-muted'
+              }`}
             >
-              <span className="inline-block h-4 w-4 translate-x-1 transform rounded-full bg-background transition-transform" />
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
+                  isWelcomeEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
             </button>
           </div>
         </div>
