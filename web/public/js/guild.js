@@ -2844,6 +2844,36 @@ async function saveWelcomeSettings() {
 }
 
 // ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+function scrollToSection(sectionId) {
+  const section = document.getElementById(`section-${sectionId}`);
+  const sidebarLinks = document.querySelectorAll('.guild-sidebar__link');
+
+  if (section) {
+    // Update active link in sidebar
+    sidebarLinks.forEach(link => {
+      link.classList.remove('guild-sidebar__link--active');
+      if (link.getAttribute('data-section') === sectionId) {
+        link.classList.add('guild-sidebar__link--active');
+      }
+    });
+
+    // Hide all sections
+    document.querySelectorAll('.guild-section').forEach(s => {
+      s.classList.remove('guild-section--active');
+    });
+
+    // Show target section
+    section.classList.add('guild-section--active');
+
+    // Scroll to top smoothly
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 
@@ -2858,5 +2888,211 @@ document.addEventListener('DOMContentLoaded', () => {
   if (analyticsLink) {
     const baseHref = analyticsLink.dataset.guildHref || '/analytics.html?guild=';
     analyticsLink.href = `${baseHref}${guildId}`;
+  }
+
+  // ============================================
+  // EVENT LISTENERS - Replacing inline handlers
+  // ============================================
+
+  // Quick action buttons (scrollToSection)
+  const quickActionBtns = document.querySelectorAll('.quick-action-btn');
+  quickActionBtns.forEach((btn, index) => {
+    const sections = ['automod', 'logging', 'wordfilter', 'birthdays'];
+    if (sections[index]) {
+      btn.addEventListener('click', () => scrollToSection(sections[index]));
+    }
+  });
+
+  // Save buttons - Automod
+  document.querySelectorAll('button').forEach(btn => {
+    const text = btn.textContent.trim();
+
+    if (text === 'Save Automod Settings' || text === 'Save Changes') {
+      // Check parent section to determine which save function
+      const section = btn.closest('.guild-section');
+      if (section) {
+        const sectionId = section.id;
+        if (sectionId === 'section-automod' ||
+            sectionId === 'section-wordfilter' ||
+            sectionId === 'section-invitefilter' ||
+            sectionId === 'section-linkfilter' ||
+            sectionId === 'section-spam' ||
+            sectionId === 'section-mention-spam' ||
+            sectionId === 'section-caps-spam' ||
+            sectionId === 'section-attachment-spam' ||
+            sectionId === 'section-emoji-spam' ||
+            sectionId === 'section-automod-whitelist') {
+          btn.addEventListener('click', saveAutomod);
+        }
+      }
+    }
+
+    if (text === 'Save Anti-Raid Settings') {
+      btn.addEventListener('click', saveAntiRaid);
+    }
+
+    if (text === 'Save Logging Settings') {
+      btn.addEventListener('click', saveSettings);
+    }
+
+    if (text === 'Save Economy Settings') {
+      btn.addEventListener('click', saveEconomySettings);
+    }
+
+    if (text === 'Save Welcome Settings') {
+      btn.addEventListener('click', saveWelcomeSettings);
+    }
+
+    if (text === 'Reset Changes' && btn.closest('#section-welcome')) {
+      btn.addEventListener('click', loadWelcomeConfig);
+    }
+
+    if (text === 'Add Word') {
+      btn.addEventListener('click', addWord);
+    }
+
+    if (text === 'Add Domain') {
+      const parentGroup = btn.closest('.form-group');
+      if (parentGroup) {
+        const label = parentGroup.querySelector('.form-label');
+        if (label && label.textContent.includes('Whitelisted')) {
+          btn.addEventListener('click', addWhitelist);
+        } else if (label && label.textContent.includes('Blacklisted')) {
+          btn.addEventListener('click', addBlacklist);
+        }
+      }
+    }
+
+    if (text === 'Add Role') {
+      const parentSection = btn.closest('.guild-section');
+      if (parentSection && parentSection.id === 'section-automod-whitelist') {
+        btn.addEventListener('click', addWhitelistedRole);
+      }
+    }
+
+    if (text === 'Add Channel') {
+      btn.addEventListener('click', addWhitelistedChannel);
+    }
+
+    if (text === 'Add Shop Item' || text === 'Add Item') {
+      const modal = btn.closest('#add-shop-item-modal');
+      if (modal) {
+        btn.addEventListener('click', saveShopItem);
+      } else {
+        btn.addEventListener('click', openAddShopItemModal);
+      }
+    }
+
+    if (text === 'Cancel') {
+      const addModal = btn.closest('#add-shop-item-modal');
+      const editModal = btn.closest('#edit-shop-item-modal');
+      if (addModal) {
+        btn.addEventListener('click', closeAddShopItemModal);
+      } else if (editModal) {
+        btn.addEventListener('click', closeEditShopItemModal);
+      }
+    }
+
+    if (text === 'Update Item') {
+      btn.addEventListener('click', updateShopItem);
+    }
+
+    if (text === 'Add Reward') {
+      btn.addEventListener('click', addLevelRole);
+    }
+
+    if (text === 'Add' && btn.closest('#section-xp')) {
+      const parentGroup = btn.closest('.form-group');
+      if (parentGroup) {
+        const label = parentGroup.querySelector('.form-label');
+        if (label) {
+          const labelText = label.textContent;
+          if (labelText.includes('XP Gain Channels')) {
+            btn.addEventListener('click', addXPGainChannel);
+          } else if (labelText.includes('No XP Channels')) {
+            btn.addEventListener('click', addNoXPChannel);
+          } else if (labelText.includes('No XP Roles')) {
+            btn.addEventListener('click', addNoXPRole);
+          } else if (labelText.includes('Channel Multiplier')) {
+            btn.addEventListener('click', addChannelMultiplier);
+          } else if (labelText.includes('Role') && labelText.includes('Multiplier')) {
+            btn.addEventListener('click', addRoleMultiplier);
+          }
+        }
+      }
+    }
+
+    if (text === 'Save XP Settings') {
+      btn.addEventListener('click', saveXPSettings);
+    }
+
+    if (text === 'Reset Changes' && btn.closest('#section-xp')) {
+      btn.addEventListener('click', loadXPConfig);
+    }
+
+    if (text === 'Add Message') {
+      btn.addEventListener('click', addReactionRoleMessage);
+    }
+  });
+
+  // Modal close buttons (×)
+  document.querySelectorAll('.modal-close').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const modal = this.closest('.modal');
+      if (modal) {
+        if (modal.id === 'add-shop-item-modal') {
+          closeAddShopItemModal();
+        } else if (modal.id === 'edit-shop-item-modal') {
+          closeEditShopItemModal();
+        }
+      }
+    });
+  });
+
+  // onchange event listeners
+  const economyEnabledCheckbox = document.getElementById('economy-enabled');
+  if (economyEnabledCheckbox) {
+    economyEnabledCheckbox.addEventListener('change', updateEconomyStatus);
+  }
+
+  const shopItemTypeSelect = document.getElementById('shop-item-type');
+  if (shopItemTypeSelect) {
+    shopItemTypeSelect.addEventListener('change', toggleRoleSelect);
+  }
+
+  const editShopItemTypeSelect = document.getElementById('edit-shop-item-type');
+  if (editShopItemTypeSelect) {
+    editShopItemTypeSelect.addEventListener('change', toggleEditShopItemRoleSelect);
+  }
+
+  const xpEnabledCheckbox = document.getElementById('xp-enabled');
+  if (xpEnabledCheckbox) {
+    xpEnabledCheckbox.addEventListener('change', updateXPStatus);
+  }
+
+  const reactionRolesEnabledCheckbox = document.getElementById('reactionroles-enabled');
+  if (reactionRolesEnabledCheckbox) {
+    reactionRolesEnabledCheckbox.addEventListener('change', toggleReactionRolesSettings);
+  }
+
+  const welcomeEnabledCheckbox = document.getElementById('welcome-enabled');
+  if (welcomeEnabledCheckbox) {
+    welcomeEnabledCheckbox.addEventListener('change', toggleWelcomeSettings);
+  }
+
+  const leaveEnabledCheckbox = document.getElementById('leave-enabled');
+  if (leaveEnabledCheckbox) {
+    leaveEnabledCheckbox.addEventListener('change', toggleLeaveSettings);
+  }
+
+  // oninput event listeners
+  const welcomeMessageTextarea = document.getElementById('welcome-message');
+  if (welcomeMessageTextarea) {
+    welcomeMessageTextarea.addEventListener('input', updateWelcomePreview);
+  }
+
+  const leaveMessageTextarea = document.getElementById('leave-message');
+  if (leaveMessageTextarea) {
+    leaveMessageTextarea.addEventListener('input', updateLeavePreview);
   }
 });
