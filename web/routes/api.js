@@ -148,6 +148,17 @@ router.post('/user/refresh-guilds', async (req, res) => {
           req.user.refreshToken = newTokens.refreshToken;
           accessToken = newTokens.accessToken;
 
+          // Persist new tokens to session immediately before retry
+          await new Promise((resolve, reject) => {
+            req.session.save((err) => {
+              if (err) {
+                console.error('Error saving refreshed tokens to session:', err);
+                // Log but continue - attempt retry anyway
+              }
+              resolve();
+            });
+          });
+
           // Retry guilds fetch with new token (with timeout)
           const retryController = new AbortController();
           const retryTimeout = setTimeout(() => retryController.abort(), 10000);
@@ -187,14 +198,20 @@ router.post('/user/refresh-guilds', async (req, res) => {
 
       // Handle 429 Rate Limit
       if (response.status === 429) {
-        const retryAfter = response.headers.get('Retry-After') || response.headers.get('X-RateLimit-Reset-After') || '60';
+        const retryAfterHeader = response.headers.get('Retry-After') || response.headers.get('X-RateLimit-Reset-After') || '60';
         const rateLimitScope = response.headers.get('X-RateLimit-Scope') || 'unknown';
+
+        // Parse and validate retryAfter to ensure it's a finite number
+        let retryAfter = parseInt(retryAfterHeader, 10);
+        if (!Number.isFinite(retryAfter) || retryAfter < 0) {
+          retryAfter = 60; // Default to 60 seconds if invalid
+        }
 
         console.warn(`Discord API rate limit hit. Retry after ${retryAfter}s, scope: ${rateLimitScope}`);
 
         return res.status(429).json({
           error: 'Rate limited by Discord API',
-          retryAfter: parseInt(retryAfter, 10),
+          retryAfter: retryAfter,
           message: `Please wait ${retryAfter} seconds before trying again`,
         });
       }
