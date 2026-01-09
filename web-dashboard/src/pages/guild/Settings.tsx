@@ -58,17 +58,23 @@ export default function Settings() {
     setSaveMessage('')
 
     try {
-      // Simulate API call - replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const response = await fetch(`/api/guild/${guildId}/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          settings: {
+            prefix: trimmedPrefix,
+            language,
+            timezone,
+            autoDeleteMessages,
+            dmOnModAction,
+          },
+        }),
+      })
 
-      // TODO: Implement actual API call
-      // await api.post(`/api/guild/${guildId}/settings`, {
-      //   prefix: trimmedPrefix,
-      //   language,
-      //   timezone,
-      //   autoDeleteMessages,
-      //   dmOnModAction,
-      // })
+      if (!response.ok) {
+        throw new Error('Failed to save settings')
+      }
 
       setSaveStatus('success')
       setSaveMessage('Settings saved successfully!')
