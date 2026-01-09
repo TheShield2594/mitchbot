@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useParams } from 'react-router-dom'
 import { Save, AlertTriangle, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 
 export default function Settings() {
+  const { guildId } = useParams<{ guildId: string }>()
+
   // Form state
   const [botPrefix, setBotPrefix] = useState('!')
   const [language, setLanguage] = useState('en')
@@ -14,8 +17,42 @@ export default function Settings() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState('')
 
+  // Refs for cleanup
+  const timeoutRefs = useRef<number[]>([])
+
+  // Helper to schedule timeout with cleanup tracking
+  const scheduleTimeout = (callback: () => void, delay: number) => {
+    const timeoutId = setTimeout(callback, delay)
+    timeoutRefs.current.push(timeoutId)
+    return timeoutId
+  }
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach(clearTimeout)
+      timeoutRefs.current = []
+    }
+  }, [])
+
   // Handle save
   const handleSave = async () => {
+    // Validate botPrefix
+    const trimmedPrefix = botPrefix.trim()
+    if (!trimmedPrefix) {
+      setSaveStatus('error')
+      setSaveMessage('Bot prefix cannot be empty')
+      scheduleTimeout(() => setSaveStatus('idle'), 3000)
+      return
+    }
+
+    if (!guildId) {
+      setSaveStatus('error')
+      setSaveMessage('Guild ID is missing')
+      scheduleTimeout(() => setSaveStatus('idle'), 3000)
+      return
+    }
+
     setIsSaving(true)
     setSaveStatus('idle')
     setSaveMessage('')
@@ -26,7 +63,7 @@ export default function Settings() {
 
       // TODO: Implement actual API call
       // await api.post(`/api/guild/${guildId}/settings`, {
-      //   prefix: botPrefix,
+      //   prefix: trimmedPrefix,
       //   language,
       //   timezone,
       //   autoDeleteMessages,
@@ -35,12 +72,12 @@ export default function Settings() {
 
       setSaveStatus('success')
       setSaveMessage('Settings saved successfully!')
-      setTimeout(() => setSaveStatus('idle'), 3000)
-    } catch (error: any) {
+      scheduleTimeout(() => setSaveStatus('idle'), 3000)
+    } catch (error) {
       console.error('Failed to save settings:', error)
       setSaveStatus('error')
       setSaveMessage('Failed to save settings. Please try again.')
-      setTimeout(() => setSaveStatus('idle'), 5000)
+      scheduleTimeout(() => setSaveStatus('idle'), 5000)
     } finally {
       setIsSaving(false)
     }
@@ -117,13 +154,13 @@ export default function Settings() {
                 onChange={(e) => setTimezone(e.target.value)}
                 className="w-full max-w-xs rounded-lg border border-border bg-background px-4 py-2"
               >
-                <option value="UTC">UTC (GMT+0)</option>
-                <option value="America/New_York">Eastern Time (GMT-5)</option>
-                <option value="America/Chicago">Central Time (GMT-6)</option>
-                <option value="America/Los_Angeles">Pacific Time (GMT-8)</option>
-                <option value="Europe/London">London (GMT+0)</option>
-                <option value="Europe/Paris">Paris (GMT+1)</option>
-                <option value="Asia/Tokyo">Tokyo (GMT+9)</option>
+                <option value="UTC">UTC</option>
+                <option value="America/New_York">Eastern Time</option>
+                <option value="America/Chicago">Central Time</option>
+                <option value="America/Los_Angeles">Pacific Time</option>
+                <option value="Europe/London">London</option>
+                <option value="Europe/Paris">Paris</option>
+                <option value="Asia/Tokyo">Tokyo</option>
               </select>
               <p className="mt-1 text-xs text-muted-foreground">
                 Used for timestamps and scheduled events
@@ -146,6 +183,7 @@ export default function Settings() {
               <button
                 type="button"
                 role="switch"
+                aria-label={`Auto-delete bot messages, ${autoDeleteMessages ? 'enabled' : 'disabled'}`}
                 aria-checked={autoDeleteMessages}
                 onClick={() => setAutoDeleteMessages(!autoDeleteMessages)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -170,6 +208,7 @@ export default function Settings() {
               <button
                 type="button"
                 role="switch"
+                aria-label={`DM on moderation action, ${dmOnModAction ? 'enabled' : 'disabled'}`}
                 aria-checked={dmOnModAction}
                 onClick={() => setDmOnModAction(!dmOnModAction)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${

@@ -50,13 +50,20 @@ export default function XP() {
       return
     }
 
+    const controller = new AbortController()
+
     const fetchConfig = async () => {
       setIsLoading(true)
       setLoadError('')
 
       try {
-        const response = await api.get(`/api/guild/${guildId}/xp/config`)
+        const response = await api.get(`/api/guild/${guildId}/xp/config`, {
+          signal: controller.signal,
+        })
         const config = response.data
+
+        // Don't update state if aborted
+        if (controller.signal.aborted) return
 
         // Populate form with loaded data
         setXpEnabled(config.enabled ?? false)
@@ -67,14 +74,25 @@ export default function XP() {
         setAnnouncementChannel(config.announcementChannel ?? 'same')
         setLevelUpMessage(config.levelUpMessage ?? 'Congratulations {user}, you reached level {level}!')
       } catch (error: any) {
+        // Don't update state if aborted
+        if (controller.signal.aborted) return
+        if (error.name === 'CanceledError' || error.name === 'AbortError') return
+
         console.error('Failed to load XP config:', error)
         setLoadError(error.response?.data?.message || 'Failed to load XP configuration')
       } finally {
-        setIsLoading(false)
+        // Don't update state if aborted
+        if (!controller.signal.aborted) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchConfig()
+
+    return () => {
+      controller.abort()
+    }
   }, [guildId])
 
   // Cleanup timeouts on unmount
@@ -285,12 +303,14 @@ export default function XP() {
                   setMinXpPerMessage(Number.isNaN(value) ? 0 : value)
                 }}
                 onBlur={validateInputs}
+                aria-describedby={errors.minXpPerMessage ? 'minXpPerMessage-error' : undefined}
+                aria-invalid={!!errors.minXpPerMessage}
                 className={`w-full rounded-lg border bg-background px-4 py-2 ${
                   errors.minXpPerMessage ? 'border-destructive' : 'border-border'
                 }`}
               />
               {errors.minXpPerMessage && (
-                <p className="mt-1 text-xs text-destructive">{errors.minXpPerMessage}</p>
+                <p id="minXpPerMessage-error" className="mt-1 text-xs text-destructive">{errors.minXpPerMessage}</p>
               )}
             </div>
             <div>
@@ -307,12 +327,14 @@ export default function XP() {
                   setMaxXpPerMessage(Number.isNaN(value) ? 0 : value)
                 }}
                 onBlur={validateInputs}
+                aria-describedby={errors.maxXpPerMessage ? 'maxXpPerMessage-error' : undefined}
+                aria-invalid={!!errors.maxXpPerMessage}
                 className={`w-full rounded-lg border bg-background px-4 py-2 ${
                   errors.maxXpPerMessage ? 'border-destructive' : 'border-border'
                 }`}
               />
               {errors.maxXpPerMessage && (
-                <p className="mt-1 text-xs text-destructive">{errors.maxXpPerMessage}</p>
+                <p id="maxXpPerMessage-error" className="mt-1 text-xs text-destructive">{errors.maxXpPerMessage}</p>
               )}
             </div>
             <div>
@@ -329,12 +351,14 @@ export default function XP() {
                   setXpCooldown(Number.isNaN(value) ? 0 : value)
                 }}
                 onBlur={validateInputs}
+                aria-describedby={errors.xpCooldown ? 'xpCooldown-error' : undefined}
+                aria-invalid={!!errors.xpCooldown}
                 className={`w-full rounded-lg border bg-background px-4 py-2 ${
                   errors.xpCooldown ? 'border-destructive' : 'border-border'
                 }`}
               />
               {errors.xpCooldown && (
-                <p className="mt-1 text-xs text-destructive">{errors.xpCooldown}</p>
+                <p id="xpCooldown-error" className="mt-1 text-xs text-destructive">{errors.xpCooldown}</p>
               )}
               <p className="mt-1 text-xs text-muted-foreground">Prevent XP farming</p>
             </div>
