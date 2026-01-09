@@ -3,6 +3,20 @@ const path = require('path');
 
 const birthdaysPath = path.join(__dirname, '..', 'data', 'birthdays.json');
 
+// Prototype pollution protection
+const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
+
+/**
+ * Validate that a key is safe to use as an object property
+ * Prevents prototype pollution attacks
+ * @param {string} key - The key to validate
+ * @returns {boolean} - True if safe, false if dangerous
+ */
+function isSafeKey(key) {
+  if (!key || typeof key !== 'string') return false;
+  return !DANGEROUS_KEYS.includes(key);
+}
+
 function ensureBirthdaysFile() {
   try {
     if (!fs.existsSync(birthdaysPath)) {
@@ -67,16 +81,27 @@ function migrateToPerGuild(guildIds) {
   // Old format: all values should be strings (date format "MM-DD")
   // New format: all values should be objects (nested guild data)
   const values = Object.values(birthdays);
-  const allValuesAreStrings = values.every(v => typeof v === 'string');
-  const anyValueIsObject = values.some(v => typeof v === 'object' && v !== null);
+  const stringCount = values.filter(v => typeof v === 'string').length;
+  const objectCount = values.filter(v => typeof v === 'object' && v !== null).length;
 
-  if (anyValueIsObject) {
+  // Detect mixed state (partial migration or corruption)
+  if (stringCount > 0 && objectCount > 0) {
+    console.error('[Birthdays] MIXED STATE DETECTED! Data contains both old-format strings and new-format objects');
+    console.error(`[Birthdays] Found ${stringCount} string values and ${objectCount} object values`);
+    console.error('[Birthdays] This indicates a partial migration or data corruption');
+    console.error('[Birthdays] Manual intervention required - please backup and fix data/birthdays.json');
+    return false;
+  }
+
+  // Already fully migrated
+  if (objectCount === values.length) {
     console.log('[Birthdays] Already in new per-guild format');
     return false;
   }
 
-  if (!allValuesAreStrings) {
-    console.error('[Birthdays] Unexpected data format - not all values are strings or objects');
+  // Check all values are strings (old format)
+  if (stringCount !== values.length) {
+    console.error('[Birthdays] Unexpected data format - values are neither all strings nor all objects');
     return false;
   }
 
@@ -107,6 +132,12 @@ function getBirthdays(guildId) {
     return {};
   }
 
+  // Prevent prototype pollution
+  if (!isSafeKey(guildId)) {
+    console.error('[Birthdays] Unsafe guildId detected (prototype pollution attempt)');
+    return {};
+  }
+
   // Return shallow copy of guild birthdays to prevent external mutation
   return birthdays[guildId] ? { ...birthdays[guildId] } : {};
 }
@@ -132,9 +163,21 @@ function addBirthday(guildId, userId, date) {
     return;
   }
 
+  // Prevent prototype pollution
+  if (!isSafeKey(guildId)) {
+    console.error('[Birthdays] Unsafe guildId detected (prototype pollution attempt)');
+    return;
+  }
+
   // Validate userId
   if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
     console.error('[Birthdays] addBirthday called with invalid userId');
+    return;
+  }
+
+  // Prevent prototype pollution on userId
+  if (!isSafeKey(userId)) {
+    console.error('[Birthdays] Unsafe userId detected (prototype pollution attempt)');
     return;
   }
 
@@ -177,9 +220,21 @@ function removeBirthday(guildId, userId) {
     return;
   }
 
+  // Prevent prototype pollution
+  if (!isSafeKey(guildId)) {
+    console.error('[Birthdays] Unsafe guildId detected (prototype pollution attempt)');
+    return;
+  }
+
   // Validate userId
   if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
     console.error('[Birthdays] removeBirthday called with invalid userId');
+    return;
+  }
+
+  // Prevent prototype pollution on userId
+  if (!isSafeKey(userId)) {
+    console.error('[Birthdays] Unsafe userId detected (prototype pollution attempt)');
     return;
   }
 

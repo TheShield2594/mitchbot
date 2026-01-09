@@ -132,6 +132,13 @@ export default function Economy() {
       return
     }
 
+    // Validate stock
+    const stock = formData.stock
+    if (!Number.isInteger(stock) || (stock < 0 && stock !== -1)) {
+      alert('Stock must be -1 (unlimited) or a non-negative integer')
+      return
+    }
+
     try {
       const response = await fetch(`/api/guild/${guildId}/economy/shop`, {
         method: 'POST',
@@ -155,6 +162,30 @@ export default function Economy() {
     if (!editingItem) return
     if (!guildId) {
       alert('Missing guild ID')
+      return
+    }
+
+    // Client-side validation (same as handleAddItem)
+    const trimmedName = formData.name.trim()
+    if (!trimmedName) {
+      alert('Item name is required')
+      return
+    }
+
+    if (formData.price < 0) {
+      alert('Price must be 0 or greater')
+      return
+    }
+
+    if (formData.type === 'role' && !formData.roleId) {
+      alert('Please select a role for role-type items')
+      return
+    }
+
+    // Validate stock
+    const stock = formData.stock
+    if (!Number.isInteger(stock) || (stock < 0 && stock !== -1)) {
+      alert('Stock must be -1 (unlimited) or a non-negative integer')
       return
     }
 
