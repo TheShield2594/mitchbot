@@ -114,13 +114,21 @@
         const href = this.getAttribute('href');
         if (href === '#') return;
 
+        // Skip if href was changed to a full URL (like analytics link)
+        if (href.startsWith('/') || href.includes('://')) return;
+
         e.preventDefault();
-        const target = document.querySelector(href);
-        if (target) {
-          target.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
-          });
+        try {
+          const target = document.querySelector(href);
+          if (target) {
+            target.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
+        } catch (e) {
+          // Invalid selector, skip smooth scroll
+          console.warn('Invalid selector for smooth scroll:', href);
         }
       });
     });
