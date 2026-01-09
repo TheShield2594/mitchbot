@@ -1,13 +1,33 @@
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { Shield, FileText, Coins, TrendingUp, BarChart3, Settings } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Shield, FileText, Coins, TrendingUp, BarChart3, Settings, ArrowLeft } from 'lucide-react'
 
 export default function GuildOverview() {
   const { guildId } = useParams<{ guildId: string }>()
   const { user } = useAuth()
 
   const guild = user?.guilds?.find((g) => g.id === guildId)
+
+  // Handle guild not found
+  if (!guild) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-muted-foreground">Guild Not Found</h2>
+          <p className="mt-2 text-muted-foreground">
+            The server you're looking for doesn't exist or you don't have access to it.
+          </p>
+          <Link
+            to="/dashboard"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   const quickLinks = [
     {
@@ -52,7 +72,7 @@ export default function GuildOverview() {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold">{guild?.name} Dashboard</h1>
+        <h1 className="text-4xl font-bold">{guild.name} Dashboard</h1>
         <p className="mt-2 text-lg text-muted-foreground">
           Manage your server settings and features
         </p>
@@ -86,12 +106,12 @@ export default function GuildOverview() {
         <div className="grid gap-4 md:grid-cols-3">
           <div>
             <p className="text-sm text-muted-foreground">Server ID</p>
-            <p className="mt-1 font-mono text-sm">{guild?.id}</p>
+            <p className="mt-1 font-mono text-sm">{guild.id}</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Your Role</p>
             <p className="mt-1 text-sm">
-              {guild?.owner ? (
+              {guild.owner ? (
                 <span className="font-medium text-primary">Owner</span>
               ) : (
                 <span className="font-medium text-blue-500">Manager</span>
@@ -100,7 +120,7 @@ export default function GuildOverview() {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Features</p>
-            <p className="mt-1 text-sm">{guild?.features?.length || 0} enabled</p>
+            <p className="mt-1 text-sm">{guild.features?.length || 0} enabled</p>
           </div>
         </div>
       </div>

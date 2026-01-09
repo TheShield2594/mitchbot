@@ -13,11 +13,8 @@ export function ServerList({ guilds, onRefresh, isRefreshing = false }: ServerLi
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<'manageable' | 'all'>('manageable')
 
-  // Determine which servers have the bot (manageable)
-  // For now, we'll check if the bot has been added by checking if we have guild config
-  // In a real scenario, you'd check this via an API endpoint
+  // Filter guilds where user has MANAGE_GUILD permission (0x20) or is owner
   const manageableGuilds = useMemo(() => {
-    // Filter guilds where user has MANAGE_GUILD permission (0x20) or is owner
     return guilds.filter(
       (guild) => guild.owner || (parseInt(guild.permissions, 10) & 0x20) !== 0
     )
@@ -44,6 +41,7 @@ export function ServerList({ guilds, onRefresh, isRefreshing = false }: ServerLi
         {/* Tabs */}
         <div className="flex gap-2 rounded-lg border border-border bg-muted p-1">
           <button
+            type="button"
             onClick={() => setActiveTab('manageable')}
             className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               activeTab === 'manageable'
@@ -54,6 +52,7 @@ export function ServerList({ guilds, onRefresh, isRefreshing = false }: ServerLi
             Manageable ({manageableGuilds.length})
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('all')}
             className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               activeTab === 'all'
@@ -68,6 +67,7 @@ export function ServerList({ guilds, onRefresh, isRefreshing = false }: ServerLi
         {/* Refresh button */}
         {onRefresh && (
           <button
+            type="button"
             onClick={onRefresh}
             disabled={isRefreshing}
             className="flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold transition-colors hover:bg-accent disabled:opacity-50"
@@ -97,7 +97,7 @@ export function ServerList({ guilds, onRefresh, isRefreshing = false }: ServerLi
             <ServerCard
               key={guild.id}
               guild={guild}
-              isManageable={manageableGuilds.some((g) => g.id === guild.id)}
+              hasManagePermission={manageableGuilds.some((g) => g.id === guild.id)}
             />
           ))}
         </div>
