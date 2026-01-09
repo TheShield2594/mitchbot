@@ -83,6 +83,21 @@ export default function Economy() {
     }
   }, [activeTab, guildId])
 
+  // Handle Escape key for modals
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showAddModal) setShowAddModal(false)
+        if (showEditModal) setShowEditModal(false)
+      }
+    }
+
+    if (showAddModal || showEditModal) {
+      document.addEventListener('keydown', handleEscape)
+      return () => document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showAddModal, showEditModal])
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -419,13 +434,19 @@ export default function Economy() {
       {/* Add Item Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-item-modal-title"
+            className="w-full max-w-md rounded-lg border border-border bg-card p-6"
+          >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Add Shop Item</h3>
+              <h3 id="add-item-modal-title" className="text-lg font-semibold">Add Shop Item</h3>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
                 className="rounded-lg p-2 hover:bg-accent"
+                aria-label="Close dialog"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -541,13 +562,19 @@ export default function Economy() {
       {/* Edit Item Modal */}
       {showEditModal && editingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-item-modal-title"
+            className="w-full max-w-md rounded-lg border border-border bg-card p-6"
+          >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Edit Shop Item</h3>
+              <h3 id="edit-item-modal-title" className="text-lg font-semibold">Edit Shop Item</h3>
               <button
                 type="button"
                 onClick={() => setShowEditModal(false)}
                 className="rounded-lg p-2 hover:bg-accent"
+                aria-label="Close dialog"
               >
                 <X className="h-4 w-4" />
               </button>
