@@ -1763,6 +1763,12 @@ async function loadXPConfig() {
       });
     }
 
+    // Populate advanced settings
+    const xpPerCommandInput = document.getElementById('xp-per-command');
+    if (xpPerCommandInput) {
+      xpPerCommandInput.value = xpConfig.xpPerCommand || 25;
+    }
+
     // Update status badge
     updateXPStatus();
 
@@ -1774,6 +1780,10 @@ async function loadXPConfig() {
 
     // Initialize XP filters (channel/role dropdowns and current lists)
     initializeXPFilters();
+
+    // Render channel and role multipliers
+    renderChannelMultipliers();
+    renderRoleMultipliers();
 
   } catch (error) {
     console.error('Error loading XP config:', error);
@@ -1807,9 +1817,12 @@ async function saveXPSettings() {
       announceLevelUp: document.getElementById('xp-announce-levelup').checked,
       levelUpChannel: document.getElementById('xp-levelup-channel').value || null,
       levelUpMessage: document.getElementById('xp-levelup-message').value.trim() || '🎉 {user} just reached **Level {level}**! Keep it up!',
+      xpPerCommand: parseInt(document.getElementById('xp-per-command').value) || 25,
       xpGainChannels: xpConfig.xpGainChannels || [],
       noXpChannels: xpConfig.noXpChannels || [],
       noXpRoles: xpConfig.noXpRoles || [],
+      channelMultipliers: xpConfig.channelMultipliers || {},
+      roleMultipliers: xpConfig.roleMultipliers || {},
     };
 
     // Validate inputs
@@ -1830,6 +1843,11 @@ async function saveXPSettings() {
 
     if (updates.cooldown < 0 || updates.cooldown > 3600) {
       showToast('Invalid Input', 'Cooldown must be between 0 and 3600 seconds', 'error');
+      return;
+    }
+
+    if (updates.xpPerCommand < 0 || updates.xpPerCommand > 100) {
+      showToast('Invalid Input', 'XP Per Command must be between 0 and 100', 'error');
       return;
     }
 
@@ -2006,6 +2024,8 @@ function initializeXPFilters() {
   const gainChannelSelect = document.getElementById('xp-gain-channel-select');
   const noXpChannelSelect = document.getElementById('no-xp-channel-select');
   const noXpRoleSelect = document.getElementById('no-xp-role-select');
+  const channelMultiplierSelect = document.getElementById('channel-multiplier-channel');
+  const roleMultiplierSelect = document.getElementById('role-multiplier-role');
 
   if (config && config.channels) {
     config.channels.forEach(channel => {
@@ -2019,6 +2039,14 @@ function initializeXPFilters() {
         option2.value = channel.id;
         option2.textContent = `#${channel.name}`;
         noXpChannelSelect.appendChild(option2);
+
+        // Add to channel multiplier dropdown
+        if (channelMultiplierSelect) {
+          const option3 = document.createElement('option');
+          option3.value = channel.id;
+          option3.textContent = `#${channel.name}`;
+          channelMultiplierSelect.appendChild(option3);
+        }
       }
     });
   }
@@ -2031,6 +2059,14 @@ function initializeXPFilters() {
         option.value = role.id;
         option.textContent = role.name;
         noXpRoleSelect.appendChild(option);
+
+        // Add to role multiplier dropdown
+        if (roleMultiplierSelect) {
+          const option2 = document.createElement('option');
+          option2.value = role.id;
+          option2.textContent = role.name;
+          roleMultiplierSelect.appendChild(option2);
+        }
       }
     });
   }
@@ -2173,6 +2209,206 @@ function removeNoXPRole(roleId) {
   if (!xpConfig.noXpRoles) return;
   xpConfig.noXpRoles = xpConfig.noXpRoles.filter(id => id !== roleId);
   renderXPFilters();
+}
+
+// ============================================
+// XP MULTIPLIER MANAGEMENT
+// ============================================
+
+function renderChannelMultipliers() {
+  if (!xpConfig) return;
+
+  const channelMultipliersList = document.getElementById('channel-multipliers-list');
+  if (!channelMultipliersList) return;
+
+  const channelMultipliers = xpConfig.channelMultipliers || {};
+
+  if (Object.keys(channelMultipliers).length === 0) {
+    channelMultipliersList.innerHTML = '<div class="form-hint">No channel multipliers configured</div>';
+  } else {
+    channelMultipliersList.innerHTML = Object.entries(channelMultipliers).map(([channelId, multiplier]) => {
+      const channel = config?.channels?.find(c => c.id === channelId);
+      const channelName = channel ? `#${channel.name}` : 'Unknown Channel';
+      return `
+        <div class="role-item">
+          <span>${escapeHtml(channelName)} - ${multiplier}x</span>
+          <button class="btn btn-sm btn-danger" onclick="removeChannelMultiplier('${channelId}')">Remove</button>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function renderRoleMultipliers() {
+  if (!xpConfig) return;
+
+  const roleMultipliersList = document.getElementById('role-multipliers-list');
+  if (!roleMultipliersList) return;
+
+  const roleMultipliers = xpConfig.roleMultipliers || {};
+
+  if (Object.keys(roleMultipliers).length === 0) {
+    roleMultipliersList.innerHTML = '<div class="form-hint">No role multipliers configured</div>';
+  } else {
+    roleMultipliersList.innerHTML = Object.entries(roleMultipliers).map(([roleId, multiplier]) => {
+      const role = config?.roles?.find(r => r.id === roleId);
+      const roleName = role ? role.name : 'Unknown Role';
+      return `
+        <div class="role-item">
+          <span>${escapeHtml(roleName)} - ${multiplier}x</span>
+          <button class="btn btn-sm btn-danger" onclick="removeRoleMultiplier('${roleId}')">Remove</button>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+async function addChannelMultiplier() {
+  const channelSelect = document.getElementById('channel-multiplier-channel');
+  const multiplierInput = document.getElementById('channel-multiplier-value');
+
+  const channelId = channelSelect.value;
+  const multiplier = parseFloat(multiplierInput.value);
+
+  if (!channelId) {
+    showToast('No Selection', 'Please select a channel', 'warning');
+    return;
+  }
+
+  if (isNaN(multiplier) || multiplier < 0 || multiplier > 10) {
+    showToast('Invalid Input', 'Multiplier must be between 0 and 10', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/channel-multiplier`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelId, multiplier }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to add channel multiplier');
+    }
+
+    // Update local config
+    if (!xpConfig.channelMultipliers) xpConfig.channelMultipliers = {};
+    if (multiplier === 1) {
+      delete xpConfig.channelMultipliers[channelId];
+    } else {
+      xpConfig.channelMultipliers[channelId] = multiplier;
+    }
+
+    renderChannelMultipliers();
+    channelSelect.value = '';
+    multiplierInput.value = '';
+    showToast('Success', 'Channel multiplier added', 'success');
+  } catch (error) {
+    console.error('Error adding channel multiplier:', error);
+    showToast('Error', error.message || 'Failed to add channel multiplier', 'error');
+  }
+}
+
+async function removeChannelMultiplier(channelId) {
+  try {
+    // Set multiplier to 1 to remove it
+    const response = await fetch(`/api/guild/${guildId}/xp/channel-multiplier`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelId, multiplier: 1 }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to remove channel multiplier');
+    }
+
+    // Update local config
+    if (xpConfig.channelMultipliers) {
+      delete xpConfig.channelMultipliers[channelId];
+    }
+
+    renderChannelMultipliers();
+    showToast('Success', 'Channel multiplier removed', 'success');
+  } catch (error) {
+    console.error('Error removing channel multiplier:', error);
+    showToast('Error', error.message || 'Failed to remove channel multiplier', 'error');
+  }
+}
+
+async function addRoleMultiplier() {
+  const roleSelect = document.getElementById('role-multiplier-role');
+  const multiplierInput = document.getElementById('role-multiplier-value');
+
+  const roleId = roleSelect.value;
+  const multiplier = parseFloat(multiplierInput.value);
+
+  if (!roleId) {
+    showToast('No Selection', 'Please select a role', 'warning');
+    return;
+  }
+
+  if (isNaN(multiplier) || multiplier < 0 || multiplier > 10) {
+    showToast('Invalid Input', 'Multiplier must be between 0 and 10', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/role-multiplier`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleId, multiplier }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to add role multiplier');
+    }
+
+    // Update local config
+    if (!xpConfig.roleMultipliers) xpConfig.roleMultipliers = {};
+    if (multiplier === 1) {
+      delete xpConfig.roleMultipliers[roleId];
+    } else {
+      xpConfig.roleMultipliers[roleId] = multiplier;
+    }
+
+    renderRoleMultipliers();
+    roleSelect.value = '';
+    multiplierInput.value = '';
+    showToast('Success', 'Role multiplier added', 'success');
+  } catch (error) {
+    console.error('Error adding role multiplier:', error);
+    showToast('Error', error.message || 'Failed to add role multiplier', 'error');
+  }
+}
+
+async function removeRoleMultiplier(roleId) {
+  try {
+    // Set multiplier to 1 to remove it
+    const response = await fetch(`/api/guild/${guildId}/xp/role-multiplier`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleId, multiplier: 1 }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to remove role multiplier');
+    }
+
+    // Update local config
+    if (xpConfig.roleMultipliers) {
+      delete xpConfig.roleMultipliers[roleId];
+    }
+
+    renderRoleMultipliers();
+    showToast('Success', 'Role multiplier removed', 'success');
+  } catch (error) {
+    console.error('Error removing role multiplier:', error);
+    showToast('Error', error.message || 'Failed to remove role multiplier', 'error');
+  }
 }
 
 // ============================================
