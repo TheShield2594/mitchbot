@@ -7,6 +7,8 @@ const { handleCommandError } = require('../utils/commandErrors');
 const { handleBlackjackButton } = require('../commands/economy/blackjack');
 const { handleInventoryButton } = require('../commands/economy/inventory');
 const { handleTradeButton } = require('../commands/economy/trade');
+const { handleHighLowButton } = require('../commands/economy/highlow');
+const { handleDuelButton } = require('../commands/economy/duel');
 
 function getInteractionContext(interaction) {
   return {
@@ -25,6 +27,12 @@ module.exports = {
       try {
         const blackjackHandled = await handleBlackjackButton(interaction);
         if (blackjackHandled) return;
+
+        const highlowHandled = await handleHighLowButton(interaction);
+        if (highlowHandled) return;
+
+        const duelHandled = await handleDuelButton(interaction);
+        if (duelHandled) return;
 
         const inventoryHandled = await handleInventoryButton(interaction);
         if (inventoryHandled) return;

@@ -40,6 +40,8 @@ function getDefaultEconomyConfig() {
     robMinimumBalance: 100, // Target must have at least this much to be robbed
     robInitiatorMinimumBalance: 50, // Initiator must have at least this much to attempt
     robPenaltyPercentage: 10, // % of your balance lost on failed rob
+    fishingCooldownMinutes: 30, // 30 minutes cooldown
+    miningCooldownMinutes: 45, // 45 minutes cooldown
     startingBalance: 100,
   };
 }
@@ -53,6 +55,8 @@ function getDefaultGuildEconomy() {
     beg: {},
     crime: {},
     rob: {}, // { userId: { lastRobAt: ISO string, totalRobs: number, successfulRobs: number, failedRobs: number, targets: { targetId: ISO string } } }
+    fishing: {}, // { userId: { lastFishAt: ISO string, totalFishes: number } }
+    mining: {}, // { userId: { lastMineAt: ISO string, totalMines: number } }
     transactions: [],
     shop: [],
     inventory: {},
@@ -588,6 +592,163 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
   }
 }
 
+// Fishing command functionality
+function claimFishing(guildId, userId, now = new Date()) {
+  const nowMs = now.getTime();
+  const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+  const fishingData = guildData.fishing[userId] || {};
+
+  const cooldownMs = (config.fishingCooldownMinutes || 30) * 60 * 1000;
+
+  if (fishingData.lastFishAt) {
+    const lastFishMs = new Date(fishingData.lastFishAt).getTime();
+    const elapsed = nowMs - lastFishMs;
+
+    if (elapsed < cooldownMs) {
+      const remainingMs = cooldownMs - elapsed;
+      return {
+        ok: false,
+        remainingMs,
+        nextFishAt: new Date(nowMs + remainingMs).toISOString(),
+        balance: getBalance(guildId, userId),
+      };
+    }
+  }
+
+  // Define fish types with rarity and rewards
+  const fishTypes = [
+    // Common (70% total)
+    { name: "Boot", emoji: "🥾", rarity: "Common", value: 5, chance: 0.25 },
+    { name: "Seaweed", emoji: "🌿", rarity: "Common", value: 8, chance: 0.25 },
+    { name: "Sardine", emoji: "🐟", rarity: "Common", value: 15, chance: 0.20 },
+    // Uncommon (20% total)
+    { name: "Salmon", emoji: "🐠", rarity: "Uncommon", value: 35, chance: 0.12 },
+    { name: "Cod", emoji: "🎣", rarity: "Uncommon", value: 40, chance: 0.08 },
+    // Rare (8% total)
+    { name: "Tuna", emoji: "🐡", rarity: "Rare", value: 80, chance: 0.05 },
+    { name: "Swordfish", emoji: "🗡️", rarity: "Rare", value: 100, chance: 0.03 },
+    // Legendary (2% total)
+    { name: "Golden Fish", emoji: "🐠✨", rarity: "Legendary", value: 250, chance: 0.015 },
+    { name: "Whale", emoji: "🐋", rarity: "Legendary", value: 500, chance: 0.005 },
+  ];
+
+  // Roll for a fish
+  const roll = Math.random();
+  let cumulativeChance = 0;
+  let caughtFish = fishTypes[0]; // Default to boot
+
+  for (const fish of fishTypes) {
+    cumulativeChance += fish.chance;
+    if (roll < cumulativeChance) {
+      caughtFish = fish;
+      break;
+    }
+  }
+
+  fishingData.lastFishAt = new Date(nowMs).toISOString();
+  fishingData.totalFishes = (fishingData.totalFishes || 0) + 1;
+
+  // Track fish by rarity for stats
+  if (!fishingData.catchesByRarity) fishingData.catchesByRarity = {};
+  fishingData.catchesByRarity[caughtFish.rarity] =
+    (fishingData.catchesByRarity[caughtFish.rarity] || 0) + 1;
+
+  guildData.fishing[userId] = fishingData;
+
+  const result = addBalance(guildId, userId, caughtFish.value, {
+    type: "fishing_reward",
+    reason: `Caught ${caughtFish.name}`,
+    fish: caughtFish.name,
+    rarity: caughtFish.rarity,
+  });
+
+  return {
+    ok: true,
+    fish: caughtFish,
+    balance: result.balance,
+    nextFishAt: new Date(nowMs + cooldownMs).toISOString(),
+  };
+}
+
+// Mining command functionality
+function claimMining(guildId, userId, now = new Date()) {
+  const nowMs = now.getTime();
+  const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+  const miningData = guildData.mining[userId] || {};
+
+  const cooldownMs = (config.miningCooldownMinutes || 45) * 60 * 1000;
+
+  if (miningData.lastMineAt) {
+    const lastMineMs = new Date(miningData.lastMineAt).getTime();
+    const elapsed = nowMs - lastMineMs;
+
+    if (elapsed < cooldownMs) {
+      const remainingMs = cooldownMs - elapsed;
+      return {
+        ok: false,
+        remainingMs,
+        nextMineAt: new Date(nowMs + remainingMs).toISOString(),
+        balance: getBalance(guildId, userId),
+      };
+    }
+  }
+
+  // Define ore types with rarity and rewards
+  const oreTypes = [
+    // Common (65% total)
+    { name: "Stone", emoji: "🪨", rarity: "Common", value: 10, chance: 0.35 },
+    { name: "Coal", emoji: "⚫", rarity: "Common", value: 20, chance: 0.30 },
+    // Uncommon (25% total)
+    { name: "Iron Ore", emoji: "⚙️", rarity: "Uncommon", value: 50, chance: 0.15 },
+    { name: "Copper Ore", emoji: "🟤", rarity: "Uncommon", value: 45, chance: 0.10 },
+    // Rare (8% total)
+    { name: "Gold Ore", emoji: "🟡", rarity: "Rare", value: 120, chance: 0.05 },
+    { name: "Silver Ore", emoji: "⚪", rarity: "Rare", value: 100, chance: 0.03 },
+    // Legendary (2% total)
+    { name: "Diamond", emoji: "💎", rarity: "Legendary", value: 300, chance: 0.015 },
+    { name: "Emerald", emoji: "💚", rarity: "Legendary", value: 400, chance: 0.005 },
+  ];
+
+  // Roll for an ore
+  const roll = Math.random();
+  let cumulativeChance = 0;
+  let minedOre = oreTypes[0]; // Default to stone
+
+  for (const ore of oreTypes) {
+    cumulativeChance += ore.chance;
+    if (roll < cumulativeChance) {
+      minedOre = ore;
+      break;
+    }
+  }
+
+  miningData.lastMineAt = new Date(nowMs).toISOString();
+  miningData.totalMines = (miningData.totalMines || 0) + 1;
+
+  // Track ores by rarity for stats
+  if (!miningData.minesByRarity) miningData.minesByRarity = {};
+  miningData.minesByRarity[minedOre.rarity] =
+    (miningData.minesByRarity[minedOre.rarity] || 0) + 1;
+
+  guildData.mining[userId] = miningData;
+
+  const result = addBalance(guildId, userId, minedOre.value, {
+    type: "mining_reward",
+    reason: `Mined ${minedOre.name}`,
+    ore: minedOre.name,
+    rarity: minedOre.rarity,
+  });
+
+  return {
+    ok: true,
+    ore: minedOre,
+    balance: result.balance,
+    nextMineAt: new Date(nowMs + cooldownMs).toISOString(),
+  };
+}
+
 // Shop item management
 function addShopItem(guildId, itemData) {
   const guildData = getGuildEconomy(guildId);
@@ -844,6 +1005,8 @@ module.exports = {
   claimBeg,
   claimCrime,
   attemptRob,
+  claimFishing,
+  claimMining,
   formatCoins,
   formatRelativeTimestamp,
   getBalance,
