@@ -15,10 +15,19 @@ export function ServerList({ guilds, onRefresh, isRefreshing = false }: ServerLi
 
   // Filter guilds where user has MANAGE_GUILD permission (0x20) or is owner
   const manageableGuilds = useMemo(() => {
-    return guilds.filter(
-      (guild) => guild.owner || (parseInt(guild.permissions, 10) & 0x20) !== 0
-    )
+    return guilds.filter((guild) => {
+      if (guild.owner) return true
+      const permissions = parseInt(guild.permissions, 10)
+      const safePermissions = Number.isNaN(permissions) ? 0 : permissions
+      return (safePermissions & 0x20) !== 0
+    })
   }, [guilds])
+
+  // Create a Set of manageable guild IDs for O(1) lookup
+  const manageableGuildIds = useMemo(
+    () => new Set(manageableGuilds.map((g) => g.id)),
+    [manageableGuilds]
+  )
 
   // Filter guilds based on active tab and search query
   const filteredGuilds = useMemo(() => {
@@ -97,7 +106,7 @@ export function ServerList({ guilds, onRefresh, isRefreshing = false }: ServerLi
             <ServerCard
               key={guild.id}
               guild={guild}
-              hasManagePermission={manageableGuilds.some((g) => g.id === guild.id)}
+              hasManagePermission={manageableGuildIds.has(guild.id)}
             />
           ))}
         </div>

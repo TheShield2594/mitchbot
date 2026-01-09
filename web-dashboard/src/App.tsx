@@ -12,6 +12,8 @@ import Logging from './pages/guild/Logging'
 import Economy from './pages/guild/Economy'
 import XP from './pages/guild/XP'
 import Analytics from './pages/guild/Analytics'
+import Welcome from './pages/guild/Welcome'
+import Settings from './pages/guild/Settings'
 
 // Create a client
 const queryClient = new QueryClient({
@@ -53,6 +55,8 @@ function App() {
             <Route path="economy" element={<Economy />} />
             <Route path="xp" element={<XP />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="welcome" element={<Welcome />} />
+            <Route path="settings" element={<Settings />} />
             {/* Add more guild routes here as needed */}
           </Route>
           <Route path="*" element={<NotFound />} />

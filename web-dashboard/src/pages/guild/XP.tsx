@@ -1,9 +1,111 @@
 import { useState } from 'react'
-import { TrendingUp, Award, Settings } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { TrendingUp, Award, Settings, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import api from '@/lib/api'
+
+type TabType = 'configuration' | 'rewards' | 'leaderboard'
 
 export default function XP() {
+  const { guildId } = useParams<{ guildId: string }>()
+  const [activeTab, setActiveTab] = useState<TabType>('configuration')
   const [xpEnabled, setXpEnabled] = useState(false)
   const [announcementsEnabled, setAnnouncementsEnabled] = useState(false)
+
+  // XP settings state
+  const [minXpPerMessage, setMinXpPerMessage] = useState<number>(15)
+  const [maxXpPerMessage, setMaxXpPerMessage] = useState<number>(25)
+  const [xpCooldown, setXpCooldown] = useState<number>(60)
+
+  // Announcement settings state
+  const [announcementChannel, setAnnouncementChannel] = useState<string>('same')
+  const [levelUpMessage, setLevelUpMessage] = useState<string>('Congratulations {user}, you reached level {level}!')
+
+  // Validation errors
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Save state
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [saveMessage, setSaveMessage] = useState<string>('')
+
+  // Validate inputs
+  const validateInputs = () => {
+    const newErrors: Record<string, string> = {}
+
+    if (minXpPerMessage < 0) {
+      newErrors.minXpPerMessage = 'Must be at least 0'
+    }
+
+    if (maxXpPerMessage < 0) {
+      newErrors.maxXpPerMessage = 'Must be at least 0'
+    }
+
+    if (minXpPerMessage > maxXpPerMessage) {
+      newErrors.minXpPerMessage = 'Min XP cannot be greater than Max XP'
+    }
+
+    if (xpCooldown < 0) {
+      newErrors.xpCooldown = 'Must be at least 0'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  // Handle save
+  const handleSave = async () => {
+    // Validate first
+    if (!validateInputs()) {
+      setSaveStatus('error')
+      setSaveMessage('Please fix validation errors before saving')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+      return
+    }
+
+    if (!guildId) {
+      setSaveStatus('error')
+      setSaveMessage('Guild ID is missing')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+      return
+    }
+
+    setIsSaving(true)
+    setSaveStatus('idle')
+    setSaveMessage('')
+
+    try {
+      const config = {
+        enabled: xpEnabled,
+        xpMin: minXpPerMessage,
+        xpMax: maxXpPerMessage,
+        cooldown: xpCooldown,
+        announcements: announcementsEnabled,
+        announcementChannel: announcementChannel,
+        levelUpMessage: levelUpMessage,
+        // These would normally come from additional form fields
+        xpGainChannels: [],
+        noXpChannels: [],
+        noXpRoles: [],
+        channelMultipliers: {},
+        roleMultipliers: {},
+      }
+
+      await api.post(`/api/guild/${guildId}/xp/config`, config)
+
+      setSaveStatus('success')
+      setSaveMessage('XP configuration saved successfully!')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    } catch (error: any) {
+      console.error('Failed to save XP config:', error)
+      setSaveStatus('error')
+      setSaveMessage(
+        error.response?.data?.message || 'Failed to save XP configuration. Please try again.'
+      )
+      setTimeout(() => setSaveStatus('idle'), 5000)
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -20,21 +122,36 @@ export default function XP() {
         <div className="flex gap-4">
           <button
             type="button"
-            className="flex items-center gap-2 border-b-2 border-primary px-4 py-3 text-sm font-medium text-primary"
+            onClick={() => setActiveTab('configuration')}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'configuration'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
           >
             <Settings className="h-4 w-4" />
             Configuration
           </button>
           <button
             type="button"
-            className="flex items-center gap-2 border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground"
+            onClick={() => setActiveTab('rewards')}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'rewards'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
           >
             <Award className="h-4 w-4" />
             Level Rewards
           </button>
           <button
             type="button"
-            className="flex items-center gap-2 border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground"
+            onClick={() => setActiveTab('leaderboard')}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'leaderboard'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
           >
             <TrendingUp className="h-4 w-4" />
             Leaderboard
@@ -42,8 +159,9 @@ export default function XP() {
         </div>
       </div>
 
-      {/* Configuration */}
-      <div className="space-y-6">
+      {/* Tab content */}
+      {activeTab === 'configuration' && (
+        <div className="space-y-6">
         {/* Enable toggle */}
         <div className="rounded-lg border border-border bg-card p-6">
           <div className="flex items-center justify-between">
@@ -82,9 +200,20 @@ export default function XP() {
               <input
                 id="minXpPerMessage"
                 type="number"
-                placeholder="15"
-                className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                min="0"
+                value={minXpPerMessage}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value, 10)
+                  setMinXpPerMessage(Number.isNaN(value) ? 0 : value)
+                }}
+                onBlur={validateInputs}
+                className={`w-full rounded-lg border bg-background px-4 py-2 ${
+                  errors.minXpPerMessage ? 'border-destructive' : 'border-border'
+                }`}
               />
+              {errors.minXpPerMessage && (
+                <p className="mt-1 text-xs text-destructive">{errors.minXpPerMessage}</p>
+              )}
             </div>
             <div>
               <label htmlFor="maxXpPerMessage" className="mb-2 block text-sm font-medium">
@@ -93,9 +222,20 @@ export default function XP() {
               <input
                 id="maxXpPerMessage"
                 type="number"
-                placeholder="25"
-                className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                min="0"
+                value={maxXpPerMessage}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value, 10)
+                  setMaxXpPerMessage(Number.isNaN(value) ? 0 : value)
+                }}
+                onBlur={validateInputs}
+                className={`w-full rounded-lg border bg-background px-4 py-2 ${
+                  errors.maxXpPerMessage ? 'border-destructive' : 'border-border'
+                }`}
               />
+              {errors.maxXpPerMessage && (
+                <p className="mt-1 text-xs text-destructive">{errors.maxXpPerMessage}</p>
+              )}
             </div>
             <div>
               <label htmlFor="xpCooldown" className="mb-2 block text-sm font-medium">
@@ -104,9 +244,20 @@ export default function XP() {
               <input
                 id="xpCooldown"
                 type="number"
-                placeholder="60"
-                className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                min="0"
+                value={xpCooldown}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value, 10)
+                  setXpCooldown(Number.isNaN(value) ? 0 : value)
+                }}
+                onBlur={validateInputs}
+                className={`w-full rounded-lg border bg-background px-4 py-2 ${
+                  errors.xpCooldown ? 'border-destructive' : 'border-border'
+                }`}
               />
+              {errors.xpCooldown && (
+                <p className="mt-1 text-xs text-destructive">{errors.xpCooldown}</p>
+              )}
               <p className="mt-1 text-xs text-muted-foreground">Prevent XP farming</p>
             </div>
           </div>
@@ -143,9 +294,11 @@ export default function XP() {
               </label>
               <select
                 id="announcementChannel"
+                value={announcementChannel}
+                onChange={(e) => setAnnouncementChannel(e.target.value)}
                 className="w-full rounded-lg border border-border bg-background px-4 py-2"
               >
-                <option>Same channel as message</option>
+                <option value="same">Same channel as message</option>
               </select>
             </div>
             <div>
@@ -155,6 +308,8 @@ export default function XP() {
               <input
                 id="levelUpMessage"
                 type="text"
+                value={levelUpMessage}
+                onChange={(e) => setLevelUpMessage(e.target.value)}
                 placeholder="Congratulations {user}, you reached level {level}!"
                 className="w-full rounded-lg border border-border bg-background px-4 py-2"
               />
@@ -165,20 +320,66 @@ export default function XP() {
           </div>
         </div>
 
-        {/* Save button */}
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              // Handle save logic here
-              console.log('Saving XP settings...')
-            }}
-            className="rounded-lg bg-primary px-6 py-2 font-semibold text-primary-foreground hover:bg-primary/90"
-          >
-            Save Changes
-          </button>
+          {/* Save button and status */}
+          <div className="flex flex-col items-end gap-3">
+            {saveStatus !== 'idle' && (
+              <div
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm ${
+                  saveStatus === 'success'
+                    ? 'bg-green-500/10 text-green-500'
+                    : 'bg-destructive/10 text-destructive'
+                }`}
+              >
+                {saveStatus === 'success' ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : (
+                  <AlertCircle className="h-4 w-4" />
+                )}
+                <span>{saveMessage}</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Rewards tab */}
+      {activeTab === 'rewards' && (
+        <div className="space-y-6">
+          <div className="rounded-lg border border-border bg-card p-12 text-center">
+            <Award className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-semibold text-muted-foreground">
+              Level Rewards Coming Soon
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Configure role rewards and perks for reaching specific levels
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Leaderboard tab */}
+      {activeTab === 'leaderboard' && (
+        <div className="space-y-6">
+          <div className="rounded-lg border border-border bg-card p-12 text-center">
+            <TrendingUp className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-semibold text-muted-foreground">
+              Leaderboard Coming Soon
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              View top members ranked by XP and level
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -14,6 +14,11 @@ export function ServerCard({ guild, hasManagePermission }: ServerCardProps) {
 
   const clientId = import.meta.env.VITE_CLIENT_ID
 
+  // Safe placeholder for empty guild names
+  const guildInitial = guild.name?.trim()
+    ? guild.name.trim().charAt(0).toUpperCase()
+    : guild.id?.charAt(0) || '?'
+
   return (
     <div className="group relative overflow-hidden rounded-lg border border-border bg-card p-6 transition-all hover:border-primary/50 hover:shadow-lg">
       {/* Status badge */}
@@ -38,7 +43,7 @@ export function ServerCard({ guild, hasManagePermission }: ServerCardProps) {
             <img src={iconUrl} alt={guild.name} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary">
-              {guild.name.charAt(0).toUpperCase()}
+              {guildInitial}
             </div>
           )}
         </div>
@@ -77,7 +82,7 @@ export function ServerCard({ guild, hasManagePermission }: ServerCardProps) {
           </Link>
         ) : clientId ? (
           <a
-            href={`https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands&guild_id=${guild.id}`}
+            href={`https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=32&scope=bot%20applications.commands&guild_id=${guild.id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold transition-colors hover:bg-accent"
