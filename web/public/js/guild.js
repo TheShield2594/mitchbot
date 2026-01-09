@@ -220,6 +220,10 @@ class FeatureHealthMonitor {
     const section = document.getElementById(`health-${type}-section`);
     const list = document.getElementById(`health-${type}-list`);
 
+    if (!section || !list) {
+      return;
+    }
+
     if (items.length === 0) {
       section.style.display = 'none';
       return;
@@ -498,6 +502,11 @@ class SaveButton {
 function initializeHealthToggle() {
   const toggle = document.getElementById('health-toggle');
   const content = document.getElementById('health-content');
+
+  if (!toggle || !content) {
+    return;
+  }
+
   let isExpanded = true;
 
   toggle.addEventListener('click', () => {
@@ -2015,8 +2024,8 @@ function initializeXPFilters() {
   }
 
   // Populate role dropdown
-  if (guildRoles && guildRoles.length > 0) {
-    guildRoles.forEach(role => {
+  if (config && config.roles && config.roles.length > 0) {
+    config.roles.forEach(role => {
       if (role.name !== '@everyone') {
         const option = document.createElement('option');
         option.value = role.id;
