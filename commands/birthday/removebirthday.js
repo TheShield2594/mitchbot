@@ -15,14 +15,15 @@ module.exports = {
     const user = interaction.options.getUser('user');
     await interaction.deferReply({ ephemeral: true });
 
-    if (!user || !getBirthdays()[user.id]) {
+    const guildBirthdays = getBirthdays(interaction.guildId);
+    if (!user || !guildBirthdays[user.id]) {
       await interaction.editReply({
         content: 'Usage: /remove_birthday @user',
       });
       return;
     }
 
-    removeBirthday(user.id);
+    removeBirthday(interaction.guildId, user.id);
     await interaction.editReply({
       content: `Removed birthday for ${user.username}`,
     });

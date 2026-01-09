@@ -45,7 +45,7 @@ module.exports = {
       return;
     }
 
-    addBirthday(user.id, date);
+    addBirthday(interaction.guildId, user.id, date);
     await interaction.editReply({
       content: `Added birthday for ${user.username} on ${date}`,
     });
