@@ -5,6 +5,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('add_birthday')
     .setDescription('Add a Birthday')
+    .setDMPermission(false)
     .addUserOption((option) =>
       option
         .setName('user')
@@ -21,6 +22,14 @@ module.exports = {
     const user = interaction.options.getUser('user');
     const date = interaction.options.getString('date');
     await interaction.deferReply({ ephemeral: true });
+
+    // Ensure command is only used in guilds
+    if (!interaction.guildId) {
+      await interaction.editReply({
+        content: 'This command can only be used in a server, not in DMs.',
+      });
+      return;
+    }
 
     if (!/^\d{2}-\d{2}$/.test(date)) {
       await interaction.editReply({
@@ -45,7 +54,7 @@ module.exports = {
       return;
     }
 
-    addBirthday(user.id, date);
+    addBirthday(interaction.guildId, user.id, date);
     await interaction.editReply({
       content: `Added birthday for ${user.username} on ${date}`,
     });

@@ -432,7 +432,7 @@ router.delete('/guild/:guildId/warnings/:userId', ensureServerManager, (req, res
 // Get birthdays
 router.get('/guild/:guildId/birthdays', ensureServerManager, (req, res) => {
   try {
-    const birthdays = getBirthdays();
+    const birthdays = getBirthdays(req.params.guildId);
     res.json(birthdays);
   } catch (error) {
     console.error('Error getting birthdays:', error);
@@ -449,7 +449,7 @@ router.post('/guild/:guildId/birthdays', ensureServerManager, (req, res) => {
       return res.status(400).json({ error: 'userId and date are required' });
     }
 
-    addBirthday(userId, date);
+    addBirthday(req.params.guildId, userId, date);
     res.json({ success: true });
   } catch (error) {
     console.error('Error adding birthday:', error);
@@ -460,7 +460,7 @@ router.post('/guild/:guildId/birthdays', ensureServerManager, (req, res) => {
 // Remove birthday
 router.delete('/guild/:guildId/birthdays/:userId', ensureServerManager, (req, res) => {
   try {
-    removeBirthday(req.params.userId);
+    removeBirthday(req.params.guildId, req.params.userId);
     res.json({ success: true });
   } catch (error) {
     console.error('Error removing birthday:', error);
