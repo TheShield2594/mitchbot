@@ -847,7 +847,12 @@ function claimHunting(guildId, userId, now = new Date()) {
     // Hunt failed - no reward but cooldown still applies
     huntingData.failedHunts = (huntingData.failedHunts || 0) + 1;
     guildData.hunting[userId] = huntingData;
-    saveEconomyData();
+
+    // Use addBalance with 0 to ensure consistent saving and transaction logging
+    addBalance(guildId, userId, 0, {
+      type: "hunting_failed",
+      reason: "Hunt failed - no catch",
+    });
 
     return {
       ok: true,
