@@ -13,36 +13,144 @@ const logger = require("../../utils/logger");
 
 // Active trivia games storage with file-based persistence
 const activeGames = new Map();
-const fs = require("fs");
+const fs = require("fs").promises;
+const fsSync = require("fs");
 const path = require("path");
 const ACTIVE_GAMES_FILE = path.join(__dirname, "../../data/active_trivia_games.json");
 
-// Load active games from file on startup
-function loadActiveGames() {
+// Write queue to prevent concurrent writes
+let writeQueue = Promise.resolve();
+let pendingWrite = null;
+let writeTimeoutId = null;
+
+// Debounced save function - coalesces multiple saves
+function saveActiveGames() {
+    // Clear any pending timeout
+    if (writeTimeoutId) {
+        clearTimeout(writeTimeoutId);
+    }
+
+    // Debounce writes by 100ms
+    writeTimeoutId = setTimeout(() => {
+        // Prepare data for persistence, excluding non-serializable properties
+        const gamesToSave = {};
+        for (const [gameId, game] of activeGames.entries()) {
+            gamesToSave[gameId] = {
+                question: game.question,
+                bet: game.bet,
+                guildId: game.guildId,
+                userId: game.userId,
+                expiresAt: game.expiresAt,
+                // Exclude: interaction, timeoutHandle (not serializable)
+            };
+        }
+
+        // Queue the write operation
+        writeQueue = writeQueue
+            .then(() => fs.writeFile(ACTIVE_GAMES_FILE, JSON.stringify(gamesToSave, null, 2)))
+            .catch(error => {
+                logger.error("Failed to save active trivia games", { error });
+            });
+    }, 100);
+}
+
+// Load active games from file on startup (async)
+async function loadActiveGames() {
     try {
-        if (fs.existsSync(ACTIVE_GAMES_FILE)) {
-            const data = JSON.parse(fs.readFileSync(ACTIVE_GAMES_FILE, "utf8"));
-            for (const [gameId, game] of Object.entries(data)) {
-                activeGames.set(gameId, game);
+        // Check if file exists
+        try {
+            await fs.access(ACTIVE_GAMES_FILE);
+        } catch {
+            // File doesn't exist, that's okay
+            return;
+        }
+
+        const data = await fs.readFile(ACTIVE_GAMES_FILE, "utf8");
+        const games = JSON.parse(data);
+
+        const now = Date.now();
+        for (const [gameId, game] of Object.entries(games)) {
+            // Check if game has expired
+            if (game.expiresAt && game.expiresAt < now) {
+                // Game expired, handle it
+                logger.info("Removing expired trivia game on load", { gameId, expiresAt: game.expiresAt });
+                continue;
+            }
+
+            activeGames.set(gameId, game);
+
+            // Recreate timeout if game hasn't expired
+            if (game.expiresAt) {
+                const timeRemaining = Math.max(0, game.expiresAt - now);
+                scheduleGameTimeout(gameId, game, timeRemaining);
             }
         }
+
+        logger.info(`Loaded ${activeGames.size} active trivia games`);
     } catch (error) {
         logger.error("Failed to load active trivia games", { error });
     }
 }
 
-// Save active games to file
-function saveActiveGames() {
-    try {
-        const data = Object.fromEntries(activeGames);
-        fs.writeFileSync(ACTIVE_GAMES_FILE, JSON.stringify(data, null, 2));
-    } catch (error) {
-        logger.error("Failed to save active trivia games", { error });
-    }
+// Schedule a game timeout
+function scheduleGameTimeout(gameId, game, timeoutMs) {
+    const timeoutId = setTimeout(async () => {
+        if (activeGames.has(gameId)) {
+            await handleGameTimeout(gameId, game);
+        }
+    }, timeoutMs);
+
+    // Store timeout ID on game object for cleanup
+    game.timeoutHandle = timeoutId;
 }
 
-// Load games on module initialization
-loadActiveGames();
+// Handle game timeout
+async function handleGameTimeout(gameId, game) {
+    activeGames.delete(gameId);
+    saveActiveGames();
+
+    // Get fresh config for the timeout handler
+    await initEconomy();
+    const config = getEconomyConfig(game.guildId);
+
+    // Log loss (bet already deducted)
+    logTransaction(game.guildId, {
+        userId: game.userId,
+        amount: -game.bet,
+        balanceAfter: getBalance(game.guildId, game.userId),
+        type: "triviabet",
+        action: "timeout",
+        reason: "Trivia Bet - timeout",
+        metadata: { bet: game.bet },
+    });
+
+    // Try to update the interaction if we have it
+    if (game.interaction) {
+        try {
+            const embed = new EmbedBuilder()
+                .setColor("#e67e22")
+                .setTitle("⏱️ Time's Up!")
+                .setDescription(
+                    `You didn't answer in time!\n\n` +
+                    `**Correct Answer:** ${game.question.options[game.question.correctAnswer]}\n\n` +
+                    `You lost ${formatCoins(game.bet, config.currencyName)}.`
+                )
+                .setFooter({ text: `Guild: ${game.interaction.guild?.name || "Unknown"}` })
+                .setTimestamp();
+
+            await game.interaction.editReply({ embeds: [embed], components: [] });
+        } catch (error) {
+            logger.warn("Failed to send trivia timeout notification", { gameId, error });
+        }
+    }
+
+    logger.info("Trivia game timed out", { gameId, userId: game.userId });
+}
+
+// Load games on module initialization (don't await, let it run in background)
+loadActiveGames().catch(error => {
+    logger.error("Failed to initialize trivia games on startup", { error });
+});
 
 // Trivia questions database
 const triviaQuestions = [
@@ -254,47 +362,13 @@ async function execute(interaction) {
         const embed = createQuestionEmbed(game, config, interaction.guild?.name || "Unknown");
         await interaction.reply({ embeds: [embed], components: [row] });
 
-        // Set timeout for unanswered question (30 seconds)
-        const timeoutId = setTimeout(async () => {
-            if (activeGames.has(gameId)) {
-                const expiredGame = activeGames.get(gameId);
-                activeGames.delete(gameId);
-                saveActiveGames();
+        // Set expiration timestamp and schedule timeout (30 seconds)
+        game.expiresAt = Date.now() + 30000;
+        game.interaction = interaction; // Store for timeout handler
 
-                // Log loss (bet already deducted)
-                logTransaction(expiredGame.guildId, {
-                    userId: expiredGame.userId,
-                    amount: -expiredGame.bet,
-                    balanceAfter: getBalance(expiredGame.guildId, expiredGame.userId),
-                    type: "triviabet",
-                    action: "timeout",
-                    reason: "Trivia Bet - timeout",
-                    metadata: { bet: expiredGame.bet },
-                });
-
-                try {
-                    const embed = new EmbedBuilder()
-                        .setColor("#e67e22")
-                        .setTitle("⏱️ Time's Up!")
-                        .setDescription(
-                            `You didn't answer in time!\n\n` +
-                            `**Correct Answer:** ${expiredGame.question.options[expiredGame.question.correctAnswer]}\n\n` +
-                            `You lost ${formatCoins(expiredGame.bet, config.currencyName)}.`
-                        )
-                        .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
-                        .setTimestamp();
-
-                    await interaction.editReply({ embeds: [embed], components: [] });
-                } catch (error) {
-                    logger.warn("Failed to send trivia timeout notification", {
-                        gameId,
-                        error,
-                    });
-                }
-            }
-        }, 30000);
-
-        game.timeoutId = timeoutId;
+        // Schedule timeout using helper function
+        scheduleGameTimeout(gameId, game, 30000);
+        saveActiveGames();
     } catch (error) {
         // Clean up partially created game
         if (activeGames.has(gameId)) {
@@ -412,7 +486,7 @@ async function handleTriviaBetButton(interaction) {
             .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
             .setTimestamp();
 
-        if (game.timeoutId) clearTimeout(game.timeoutId);
+        if (game.timeoutHandle) clearTimeout(game.timeoutHandle);
         activeGames.delete(gameId);
         saveActiveGames();
 
@@ -456,7 +530,7 @@ async function handleTriviaBetButton(interaction) {
             .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
             .setTimestamp();
 
-        if (game.timeoutId) clearTimeout(game.timeoutId);
+        if (game.timeoutHandle) clearTimeout(game.timeoutHandle);
         activeGames.delete(gameId);
         saveActiveGames();
 
