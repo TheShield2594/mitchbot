@@ -42,6 +42,8 @@ function getDefaultEconomyConfig() {
     robPenaltyPercentage: 10, // % of your balance lost on failed rob
     fishingCooldownMinutes: 30, // 30 minutes cooldown
     miningCooldownMinutes: 45, // 45 minutes cooldown
+    huntingCooldownMinutes: 60, // 60 minutes cooldown
+    huntingSuccessChance: 0.7, // 70% success rate
     startingBalance: 100,
   };
 }
@@ -57,6 +59,7 @@ function getDefaultGuildEconomy() {
     rob: {}, // { userId: { lastRobAt: ISO string, totalRobs: number, successfulRobs: number, failedRobs: number, targets: { targetId: ISO string } } }
     fishing: {}, // { userId: { lastFishAt: ISO string, totalFishes: number } }
     mining: {}, // { userId: { lastMineAt: ISO string, totalMines: number } }
+    hunting: {}, // { userId: { lastHuntAt: ISO string, totalHunts: number, successfulHunts: number } }
     transactions: [],
     shop: [],
     inventory: {},
@@ -749,6 +752,104 @@ function claimMining(guildId, userId, now = new Date()) {
   };
 }
 
+// Hunting command functionality
+function claimHunting(guildId, userId, now = new Date()) {
+  const nowMs = now.getTime();
+  const guildData = getGuildEconomy(guildId);
+  const config = getEconomyConfig(guildId);
+  const huntingData = guildData.hunting[userId] || {};
+
+  const cooldownMs = (config.huntingCooldownMinutes || 60) * 60 * 1000;
+
+  if (huntingData.lastHuntAt) {
+    const lastHuntMs = new Date(huntingData.lastHuntAt).getTime();
+    const elapsed = nowMs - lastHuntMs;
+
+    if (elapsed < cooldownMs) {
+      const remainingMs = cooldownMs - elapsed;
+      return {
+        ok: false,
+        remainingMs,
+        nextHuntAt: new Date(nowMs + remainingMs).toISOString(),
+        balance: getBalance(guildId, userId),
+      };
+    }
+  }
+
+  // Check if hunt is successful
+  const successChance = config.huntingSuccessChance || 0.7;
+  const success = Math.random() < successChance;
+
+  huntingData.lastHuntAt = new Date(nowMs).toISOString();
+  huntingData.totalHunts = (huntingData.totalHunts || 0) + 1;
+
+  if (success) {
+    // Define animal types with rarity and rewards
+    const animals = [
+      // Common (50% of successful hunts)
+      { name: "Rabbit", emoji: "🐰", rarity: "Common", value: 30, chance: 0.25 },
+      { name: "Duck", emoji: "🦆", rarity: "Common", value: 35, chance: 0.25 },
+      // Uncommon (30% of successful hunts)
+      { name: "Deer", emoji: "🦌", rarity: "Uncommon", value: 80, chance: 0.15 },
+      { name: "Boar", emoji: "🐗", rarity: "Uncommon", value: 90, chance: 0.15 },
+      // Rare (15% of successful hunts)
+      { name: "Wolf", emoji: "🐺", rarity: "Rare", value: 150, chance: 0.08 },
+      { name: "Bear", emoji: "🐻", rarity: "Rare", value: 200, chance: 0.07 },
+      // Legendary (5% of successful hunts)
+      { name: "Golden Stag", emoji: "🦌✨", rarity: "Legendary", value: 400, chance: 0.03 },
+      { name: "Dragon", emoji: "🐉", rarity: "Legendary", value: 750, chance: 0.02 },
+    ];
+
+    // Roll for an animal
+    const roll = Math.random();
+    let cumulativeChance = 0;
+    let caughtAnimal = animals[0]; // Default to rabbit
+
+    for (const animal of animals) {
+      cumulativeChance += animal.chance;
+      if (roll < cumulativeChance) {
+        caughtAnimal = animal;
+        break;
+      }
+    }
+
+    huntingData.successfulHunts = (huntingData.successfulHunts || 0) + 1;
+
+    // Track catches by rarity for stats
+    if (!huntingData.catchesByRarity) huntingData.catchesByRarity = {};
+    huntingData.catchesByRarity[caughtAnimal.rarity] =
+      (huntingData.catchesByRarity[caughtAnimal.rarity] || 0) + 1;
+
+    guildData.hunting[userId] = huntingData;
+
+    const result = addBalance(guildId, userId, caughtAnimal.value, {
+      type: "hunting_reward",
+      reason: `Hunted ${caughtAnimal.name}`,
+      animal: caughtAnimal.name,
+      rarity: caughtAnimal.rarity,
+    });
+
+    return {
+      ok: true,
+      success: true,
+      animal: caughtAnimal,
+      balance: result.balance,
+      nextHuntAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  } else {
+    // Hunt failed - no reward but cooldown still applies
+    huntingData.failedHunts = (huntingData.failedHunts || 0) + 1;
+    guildData.hunting[userId] = huntingData;
+
+    return {
+      ok: true,
+      success: false,
+      balance: getBalance(guildId, userId),
+      nextHuntAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  }
+}
+
 // Shop item management
 function addShopItem(guildId, itemData) {
   const guildData = getGuildEconomy(guildId);
@@ -1007,6 +1108,7 @@ module.exports = {
   attemptRob,
   claimFishing,
   claimMining,
+  claimHunting,
   formatCoins,
   formatRelativeTimestamp,
   getBalance,

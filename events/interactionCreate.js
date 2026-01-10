@@ -9,6 +9,10 @@ const { handleInventoryButton } = require('../commands/economy/inventory');
 const { handleTradeButton } = require('../commands/economy/trade');
 const { handleHighLowButton } = require('../commands/economy/highlow');
 const { handleDuelButton } = require('../commands/economy/duel');
+const { handleCrashButton } = require('../commands/economy/crash');
+const { handleDoubleOrNothingButton } = require('../commands/economy/doubleornothing');
+const { handleHeistButton } = require('../commands/economy/heist');
+const { handleTriviaBetButton } = require('../commands/economy/triviabet');
 
 function getInteractionContext(interaction) {
   return {
@@ -31,8 +35,20 @@ module.exports = {
         const highlowHandled = await handleHighLowButton(interaction);
         if (highlowHandled) return;
 
+        const crashHandled = await handleCrashButton(interaction);
+        if (crashHandled) return;
+
+        const donHandled = await handleDoubleOrNothingButton(interaction);
+        if (donHandled) return;
+
         const duelHandled = await handleDuelButton(interaction);
         if (duelHandled) return;
+
+        const heistHandled = await handleHeistButton(interaction);
+        if (heistHandled) return;
+
+        const triviaHandled = await handleTriviaBetButton(interaction);
+        if (triviaHandled) return;
 
         const inventoryHandled = await handleInventoryButton(interaction);
         if (inventoryHandled) return;
