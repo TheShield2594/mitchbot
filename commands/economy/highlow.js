@@ -66,15 +66,15 @@ async function execute(interaction) {
         return;
     }
 
-    // Deduct bet immediately
-    addBalance(interaction.guildId, interaction.user.id, -betAmount, {
-        type: "highlow",
-        action: "bet_placed",
-        bet: betAmount,
-        reason: "High/Low bet placed",
-    });
-
     try {
+        // Deduct bet immediately
+        addBalance(interaction.guildId, interaction.user.id, -betAmount, {
+            type: "highlow",
+            action: "bet_placed",
+            bet: betAmount,
+            reason: "High/Low bet placed",
+        });
+
         // Initialize game
         const game = {
             currentNumber: Math.floor(Math.random() * 100) + 1,
@@ -249,11 +249,6 @@ async function handleHighLowButton(interaction) {
         won = nextNumber < game.currentNumber;
     }
 
-    // Handle tie (next number equals current number) - count as loss
-    if (nextNumber === game.currentNumber) {
-        won = false;
-    }
-
     if (won) {
         // Correct guess - increase streak and continue
         game.streak++;
@@ -303,15 +298,15 @@ async function handleHighLowButton(interaction) {
             .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
             .setTimestamp();
 
-        // Log game outcome (bet was already deducted at game start, so amount is 0)
+        // Log game outcome (bet was pre-deducted at game start)
         logTransaction(game.guildId, {
             userId: game.userId,
-            amount: 0,
+            amount: -game.bet,
             balanceAfter: getBalance(game.guildId, game.userId),
             type: "highlow",
             action: "loss",
-            reason: "High/Low loss (bet already deducted)",
-            metadata: { bet: game.bet, streak: game.streak },
+            reason: "High/Low loss (pre-deducted bet)",
+            metadata: { bet: game.bet, streak: game.streak, preDeducted: true },
         });
 
         if (game.timeoutId) clearTimeout(game.timeoutId);

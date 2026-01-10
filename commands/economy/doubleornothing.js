@@ -245,10 +245,28 @@ async function handleDoubleOrNothingButton(interaction) {
 
     if (success) {
         // Won - double the winnings and continue
+        const previousWinnings = game.currentWinnings;
         game.currentWinnings *= 2;
         game.round++;
         // Decrease success chance each round (gets harder)
         game.successChance = Math.max(0.25, game.successChance - 0.05);
+
+        // Log the successful double
+        logTransaction(game.guildId, {
+            userId: game.userId,
+            amount: 0,
+            balanceAfter: getBalance(game.guildId, game.userId),
+            type: "doubleornothing",
+            action: "doubled",
+            reason: `Double or Nothing - round ${game.round - 1} won`,
+            metadata: {
+                bet: game.originalBet,
+                round: game.round - 1,
+                previousWinnings,
+                newWinnings: game.currentWinnings,
+                newSuccessChance: game.successChance,
+            },
+        });
 
         const row = new ActionRowBuilder()
             .addComponents(

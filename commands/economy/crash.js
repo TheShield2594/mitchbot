@@ -84,15 +84,15 @@ async function execute(interaction) {
         return;
     }
 
-    // Deduct bet immediately
-    addBalance(interaction.guildId, interaction.user.id, -betAmount, {
-        type: "crash",
-        action: "bet_placed",
-        bet: betAmount,
-        reason: "Crash bet placed",
-    });
-
     try {
+        // Deduct bet immediately
+        addBalance(interaction.guildId, interaction.user.id, -betAmount, {
+            type: "crash",
+            action: "bet_placed",
+            bet: betAmount,
+            reason: "Crash bet placed",
+        });
+
         // Initialize game
         const crashPoint = calculateCrashPoint();
         const game = {
@@ -139,11 +139,11 @@ async function execute(interaction) {
 
                 logTransaction(currentGame.guildId, {
                     userId: currentGame.userId,
-                    amount: -currentGame.bet,
+                    amount: 0,
                     balanceAfter: getBalance(currentGame.guildId, currentGame.userId),
                     type: "crash",
                     action: "crashed",
-                    reason: "Crash game - lost",
+                    reason: "Crash game - settlement, bet already deducted",
                     metadata: {
                         bet: currentGame.bet,
                         crashPoint: currentGame.crashPoint.toFixed(2),
@@ -177,13 +177,47 @@ async function execute(interaction) {
         game.updateInterval = updateInterval;
 
         // Set maximum game time (30 seconds)
-        setTimeout(() => {
+        setTimeout(async () => {
             if (activeGames.has(gameId)) {
                 const expiredGame = activeGames.get(gameId);
                 if (expiredGame.updateInterval) {
                     clearInterval(expiredGame.updateInterval);
                 }
                 activeGames.delete(gameId);
+
+                // Log the loss
+                logTransaction(expiredGame.guildId, {
+                    userId: expiredGame.userId,
+                    amount: 0,
+                    balanceAfter: getBalance(expiredGame.guildId, expiredGame.userId),
+                    type: "crash",
+                    action: "timeout",
+                    reason: "Crash game - timeout, bet lost",
+                    metadata: {
+                        bet: expiredGame.bet,
+                        crashPoint: expiredGame.crashPoint.toFixed(2),
+                        reachedMultiplier: expiredGame.currentMultiplier.toFixed(2),
+                    },
+                });
+
+                // Notify player
+                try {
+                    const embed = new EmbedBuilder()
+                        .setColor("#e74c3c")
+                        .setTitle("⏱️ Game Timeout")
+                        .setDescription(
+                            `Your Crash game timed out after 30 seconds.\n\n` +
+                            `**Final Multiplier:** ${expiredGame.currentMultiplier.toFixed(2)}x\n` +
+                            `**Crash Point:** ${expiredGame.crashPoint.toFixed(2)}x\n` +
+                            `**Bet Lost:** ${formatCoins(expiredGame.bet, config.currencyName)}`
+                        )
+                        .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
+                        .setTimestamp();
+
+                    await interaction.editReply({ embeds: [embed], components: [] });
+                } catch (error) {
+                    logger.warn("Failed to notify player of timeout", { gameId, error });
+                }
             }
         }, 30000);
 
