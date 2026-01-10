@@ -88,7 +88,7 @@ module.exports = {
                 multiplier: -0.5,
                 chance: 0.05,
                 color: "#9b59b6",
-                description: "A curse doubled your losses!"
+                description: "A curse increased your loss by 50%!"
             },
         ];
 

@@ -2,11 +2,14 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const {
     claimHunting,
     ECONOMY_EMBED_COLOR,
+    ECONOMY_FAILURE_COLOR,
+    RARITY_COLORS,
     formatCoins,
     getEconomyConfig,
     initEconomy,
 } = require("../../utils/economy");
 const { formatRelativeTimestamp } = require("../../utils/timeFormatters");
+const logger = require("../../utils/logger");
 
 // Hunting flavor messages based on rarity
 const huntingMessages = {
@@ -88,7 +91,7 @@ module.exports = {
         if (!result.success) {
             // Hunt failed - no catch
             const embed = new EmbedBuilder()
-                .setColor("#e67e22")
+                .setColor(ECONOMY_FAILURE_COLOR)
                 .setTitle("🏹 Hunt Failed")
                 .setDescription(
                     "You spent hours tracking but came back empty-handed.\n\n" +
@@ -106,20 +109,28 @@ module.exports = {
             return;
         }
 
-        // Successful hunt
+        // Successful hunt - validate animal data
+        if (!result.animal) {
+            logger.error("Missing animal data in successful hunt result", {
+                guildId: interaction.guildId,
+                userId: interaction.user.id,
+                result,
+            });
+            const embed = new EmbedBuilder()
+                .setColor(ECONOMY_FAILURE_COLOR)
+                .setTitle("🏹 Hunt Error")
+                .setDescription("Something went wrong with your hunt. Please try again later.")
+                .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
+                .setTimestamp();
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+            return;
+        }
+
         const animal = result.animal;
         const huntingMessage = getHuntingMessage(animal.rarity);
 
-        // Color based on rarity
-        const rarityColors = {
-            Common: "#95a5a6",
-            Uncommon: "#3498db",
-            Rare: "#9b59b6",
-            Legendary: "#f1c40f",
-        };
-
         const embed = new EmbedBuilder()
-            .setColor(rarityColors[animal.rarity] || ECONOMY_EMBED_COLOR)
+            .setColor(RARITY_COLORS[animal.rarity] || ECONOMY_EMBED_COLOR)
             .setTitle("🏹 Successful Hunt!")
             .setDescription(
                 `You ${huntingMessage} ${animal.emoji} **${animal.name}**!\n\n` +

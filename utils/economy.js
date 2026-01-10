@@ -9,6 +9,13 @@ const DAILY_REWARD = 100;
 const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const MAX_TRANSACTIONS = 1000;
 const ECONOMY_EMBED_COLOR = "#2b6cb0";
+const ECONOMY_FAILURE_COLOR = "#e67e22";
+const RARITY_COLORS = {
+  Common: "#95a5a6",
+  Uncommon: "#3498db",
+  Rare: "#9b59b6",
+  Legendary: "#f1c40f",
+};
 
 let economyData = {};
 let writeQueue = Promise.resolve();
@@ -1101,6 +1108,8 @@ module.exports = {
   DAILY_REWARD,
   DAILY_COOLDOWN_MS,
   ECONOMY_EMBED_COLOR,
+  ECONOMY_FAILURE_COLOR,
+  RARITY_COLORS,
   addBalance,
   claimDaily,
   claimWork,

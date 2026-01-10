@@ -219,16 +219,16 @@ async function execute(interaction) {
         }
     }
 
-    // Deduct bet immediately
-    addBalance(interaction.guildId, interaction.user.id, -betAmount, {
-        type: "triviabet",
-        action: "bet_placed",
-        bet: betAmount,
-        difficulty: question.difficulty,
-        reason: "Trivia Bet placed",
-    });
-
     try {
+        // Deduct bet
+        addBalance(interaction.guildId, interaction.user.id, -betAmount, {
+            type: "triviabet",
+            action: "bet_placed",
+            bet: betAmount,
+            difficulty: question.difficulty,
+            reason: "Trivia Bet placed",
+        });
+
         // Initialize game
         const game = {
             question: question,
@@ -296,6 +296,12 @@ async function execute(interaction) {
 
         game.timeoutId = timeoutId;
     } catch (error) {
+        // Clean up partially created game
+        if (activeGames.has(gameId)) {
+            activeGames.delete(gameId);
+            saveActiveGames();
+        }
+
         // Refund bet on any error during game setup
         addBalance(interaction.guildId, interaction.user.id, betAmount, {
             type: "triviabet",

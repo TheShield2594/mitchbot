@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const {
     claimMining,
     ECONOMY_EMBED_COLOR,
+    RARITY_COLORS,
     formatCoins,
     getEconomyConfig,
     initEconomy,
@@ -88,16 +89,8 @@ module.exports = {
         const ore = result.ore;
         const miningMessage = getMiningMessage(ore.rarity);
 
-        // Color based on rarity
-        const rarityColors = {
-            Common: "#95a5a6",
-            Uncommon: "#3498db",
-            Rare: "#9b59b6",
-            Legendary: "#f1c40f",
-        };
-
         const embed = new EmbedBuilder()
-            .setColor(rarityColors[ore.rarity] || ECONOMY_EMBED_COLOR)
+            .setColor(RARITY_COLORS[ore.rarity] || ECONOMY_EMBED_COLOR)
             .setTitle("⛏️ Mining Success!")
             .setDescription(
                 `You ${miningMessage} ${ore.emoji} **${ore.name}**!\n\n` +
