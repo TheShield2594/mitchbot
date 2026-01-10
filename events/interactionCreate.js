@@ -7,6 +7,25 @@ const { handleCommandError } = require('../utils/commandErrors');
 const { handleBlackjackButton } = require('../commands/economy/blackjack');
 const { handleInventoryButton } = require('../commands/economy/inventory');
 const { handleTradeButton } = require('../commands/economy/trade');
+const { handleHighLowButton } = require('../commands/economy/highlow');
+const { handleDuelButton } = require('../commands/economy/duel');
+const { handleCrashButton } = require('../commands/economy/crash');
+const { handleDoubleOrNothingButton } = require('../commands/economy/doubleornothing');
+const { handleHeistButton } = require('../commands/economy/heist');
+const { handleTriviaBetButton } = require('../commands/economy/triviabet');
+
+// Button handlers registry - add new handlers here
+const buttonHandlers = [
+  handleBlackjackButton,
+  handleHighLowButton,
+  handleCrashButton,
+  handleDoubleOrNothingButton,
+  handleDuelButton,
+  handleHeistButton,
+  handleTriviaBetButton,
+  handleInventoryButton,
+  handleTradeButton,
+];
 
 function getInteractionContext(interaction) {
   return {
@@ -20,20 +39,17 @@ function getInteractionContext(interaction) {
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
-    // Handle button interactions (e.g., blackjack, inventory, trade)
+    // Handle button interactions
     if (interaction.isButton()) {
       try {
-        const blackjackHandled = await handleBlackjackButton(interaction);
-        if (blackjackHandled) return;
-
-        const inventoryHandled = await handleInventoryButton(interaction);
-        if (inventoryHandled) return;
-
-        const tradeHandled = await handleTradeButton(interaction);
-        if (tradeHandled) return;
+        // Try each handler in order until one handles the interaction
+        for (const handler of buttonHandlers) {
+          const handled = await handler(interaction);
+          if (handled) return;
+        }
 
         // If no handler processed it, allow other button handlers to run
-        // Future button handlers can be added here
+        // Future button handlers can be added to the buttonHandlers array
       } catch (error) {
         logger.error('Button interaction error', {
           customId: interaction.customId,
