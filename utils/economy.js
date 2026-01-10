@@ -9,6 +9,13 @@ const DAILY_REWARD = 100;
 const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const MAX_TRANSACTIONS = 1000;
 const ECONOMY_EMBED_COLOR = "#2b6cb0";
+const ECONOMY_FAILURE_COLOR = "#e67e22";
+const RARITY_COLORS = {
+  Common: "#95a5a6",
+  Uncommon: "#3498db",
+  Rare: "#9b59b6",
+  Legendary: "#f1c40f",
+};
 
 let economyData = {};
 let writeQueue = Promise.resolve();
@@ -840,7 +847,12 @@ function claimHunting(guildId, userId, now = new Date()) {
     // Hunt failed - no reward but cooldown still applies
     huntingData.failedHunts = (huntingData.failedHunts || 0) + 1;
     guildData.hunting[userId] = huntingData;
-    saveEconomyData();
+
+    // Use addBalance with 0 to ensure consistent saving and transaction logging
+    addBalance(guildId, userId, 0, {
+      type: "hunting_failed",
+      reason: "Hunt failed - no catch",
+    });
 
     return {
       ok: true,
@@ -1101,6 +1113,8 @@ module.exports = {
   DAILY_REWARD,
   DAILY_COOLDOWN_MS,
   ECONOMY_EMBED_COLOR,
+  ECONOMY_FAILURE_COLOR,
+  RARITY_COLORS,
   addBalance,
   claimDaily,
   claimWork,
