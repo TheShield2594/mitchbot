@@ -1763,6 +1763,12 @@ async function loadXPConfig() {
       });
     }
 
+    // Populate advanced settings
+    const xpPerCommandInput = document.getElementById('xp-per-command');
+    if (xpPerCommandInput) {
+      xpPerCommandInput.value = xpConfig.xpPerCommand || 25;
+    }
+
     // Update status badge
     updateXPStatus();
 
@@ -1774,6 +1780,10 @@ async function loadXPConfig() {
 
     // Initialize XP filters (channel/role dropdowns and current lists)
     initializeXPFilters();
+
+    // Render channel and role multipliers
+    renderChannelMultipliers();
+    renderRoleMultipliers();
 
   } catch (error) {
     console.error('Error loading XP config:', error);
@@ -1807,9 +1817,12 @@ async function saveXPSettings() {
       announceLevelUp: document.getElementById('xp-announce-levelup').checked,
       levelUpChannel: document.getElementById('xp-levelup-channel').value || null,
       levelUpMessage: document.getElementById('xp-levelup-message').value.trim() || '🎉 {user} just reached **Level {level}**! Keep it up!',
+      xpPerCommand: parseInt(document.getElementById('xp-per-command').value) || 25,
       xpGainChannels: xpConfig.xpGainChannels || [],
       noXpChannels: xpConfig.noXpChannels || [],
       noXpRoles: xpConfig.noXpRoles || [],
+      channelMultipliers: xpConfig.channelMultipliers || {},
+      roleMultipliers: xpConfig.roleMultipliers || {},
     };
 
     // Validate inputs
@@ -1830,6 +1843,11 @@ async function saveXPSettings() {
 
     if (updates.cooldown < 0 || updates.cooldown > 3600) {
       showToast('Invalid Input', 'Cooldown must be between 0 and 3600 seconds', 'error');
+      return;
+    }
+
+    if (updates.xpPerCommand < 0 || updates.xpPerCommand > 100) {
+      showToast('Invalid Input', 'XP Per Command must be between 0 and 100', 'error');
       return;
     }
 
@@ -2006,6 +2024,8 @@ function initializeXPFilters() {
   const gainChannelSelect = document.getElementById('xp-gain-channel-select');
   const noXpChannelSelect = document.getElementById('no-xp-channel-select');
   const noXpRoleSelect = document.getElementById('no-xp-role-select');
+  const channelMultiplierSelect = document.getElementById('channel-multiplier-channel');
+  const roleMultiplierSelect = document.getElementById('role-multiplier-role');
 
   if (config && config.channels) {
     config.channels.forEach(channel => {
@@ -2019,6 +2039,14 @@ function initializeXPFilters() {
         option2.value = channel.id;
         option2.textContent = `#${channel.name}`;
         noXpChannelSelect.appendChild(option2);
+
+        // Add to channel multiplier dropdown
+        if (channelMultiplierSelect) {
+          const option3 = document.createElement('option');
+          option3.value = channel.id;
+          option3.textContent = `#${channel.name}`;
+          channelMultiplierSelect.appendChild(option3);
+        }
       }
     });
   }
@@ -2031,6 +2059,14 @@ function initializeXPFilters() {
         option.value = role.id;
         option.textContent = role.name;
         noXpRoleSelect.appendChild(option);
+
+        // Add to role multiplier dropdown
+        if (roleMultiplierSelect) {
+          const option2 = document.createElement('option');
+          option2.value = role.id;
+          option2.textContent = role.name;
+          roleMultiplierSelect.appendChild(option2);
+        }
       }
     });
   }
@@ -2173,6 +2209,206 @@ function removeNoXPRole(roleId) {
   if (!xpConfig.noXpRoles) return;
   xpConfig.noXpRoles = xpConfig.noXpRoles.filter(id => id !== roleId);
   renderXPFilters();
+}
+
+// ============================================
+// XP MULTIPLIER MANAGEMENT
+// ============================================
+
+function renderChannelMultipliers() {
+  if (!xpConfig) return;
+
+  const channelMultipliersList = document.getElementById('channel-multipliers-list');
+  if (!channelMultipliersList) return;
+
+  const channelMultipliers = xpConfig.channelMultipliers || {};
+
+  if (Object.keys(channelMultipliers).length === 0) {
+    channelMultipliersList.innerHTML = '<div class="form-hint">No channel multipliers configured</div>';
+  } else {
+    channelMultipliersList.innerHTML = Object.entries(channelMultipliers).map(([channelId, multiplier]) => {
+      const channel = config?.channels?.find(c => c.id === channelId);
+      const channelName = channel ? `#${channel.name}` : 'Unknown Channel';
+      return `
+        <div class="role-item">
+          <span>${escapeHtml(channelName)} - ${multiplier}x</span>
+          <button class="btn btn-sm btn-danger" onclick="removeChannelMultiplier('${channelId}')">Remove</button>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function renderRoleMultipliers() {
+  if (!xpConfig) return;
+
+  const roleMultipliersList = document.getElementById('role-multipliers-list');
+  if (!roleMultipliersList) return;
+
+  const roleMultipliers = xpConfig.roleMultipliers || {};
+
+  if (Object.keys(roleMultipliers).length === 0) {
+    roleMultipliersList.innerHTML = '<div class="form-hint">No role multipliers configured</div>';
+  } else {
+    roleMultipliersList.innerHTML = Object.entries(roleMultipliers).map(([roleId, multiplier]) => {
+      const role = config?.roles?.find(r => r.id === roleId);
+      const roleName = role ? role.name : 'Unknown Role';
+      return `
+        <div class="role-item">
+          <span>${escapeHtml(roleName)} - ${multiplier}x</span>
+          <button class="btn btn-sm btn-danger" onclick="removeRoleMultiplier('${roleId}')">Remove</button>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+async function addChannelMultiplier() {
+  const channelSelect = document.getElementById('channel-multiplier-channel');
+  const multiplierInput = document.getElementById('channel-multiplier-value');
+
+  const channelId = channelSelect.value;
+  const multiplier = parseFloat(multiplierInput.value);
+
+  if (!channelId) {
+    showToast('No Selection', 'Please select a channel', 'warning');
+    return;
+  }
+
+  if (isNaN(multiplier) || multiplier < 0 || multiplier > 10) {
+    showToast('Invalid Input', 'Multiplier must be between 0 and 10', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/channel-multiplier`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelId, multiplier }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to add channel multiplier');
+    }
+
+    // Update local config
+    if (!xpConfig.channelMultipliers) xpConfig.channelMultipliers = {};
+    if (multiplier === 1) {
+      delete xpConfig.channelMultipliers[channelId];
+    } else {
+      xpConfig.channelMultipliers[channelId] = multiplier;
+    }
+
+    renderChannelMultipliers();
+    channelSelect.value = '';
+    multiplierInput.value = '';
+    showToast('Success', 'Channel multiplier added', 'success');
+  } catch (error) {
+    console.error('Error adding channel multiplier:', error);
+    showToast('Error', error.message || 'Failed to add channel multiplier', 'error');
+  }
+}
+
+async function removeChannelMultiplier(channelId) {
+  try {
+    // Set multiplier to 1 to remove it
+    const response = await fetch(`/api/guild/${guildId}/xp/channel-multiplier`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelId, multiplier: 1 }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to remove channel multiplier');
+    }
+
+    // Update local config
+    if (xpConfig.channelMultipliers) {
+      delete xpConfig.channelMultipliers[channelId];
+    }
+
+    renderChannelMultipliers();
+    showToast('Success', 'Channel multiplier removed', 'success');
+  } catch (error) {
+    console.error('Error removing channel multiplier:', error);
+    showToast('Error', error.message || 'Failed to remove channel multiplier', 'error');
+  }
+}
+
+async function addRoleMultiplier() {
+  const roleSelect = document.getElementById('role-multiplier-role');
+  const multiplierInput = document.getElementById('role-multiplier-value');
+
+  const roleId = roleSelect.value;
+  const multiplier = parseFloat(multiplierInput.value);
+
+  if (!roleId) {
+    showToast('No Selection', 'Please select a role', 'warning');
+    return;
+  }
+
+  if (isNaN(multiplier) || multiplier < 0 || multiplier > 10) {
+    showToast('Invalid Input', 'Multiplier must be between 0 and 10', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/guild/${guildId}/xp/role-multiplier`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleId, multiplier }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to add role multiplier');
+    }
+
+    // Update local config
+    if (!xpConfig.roleMultipliers) xpConfig.roleMultipliers = {};
+    if (multiplier === 1) {
+      delete xpConfig.roleMultipliers[roleId];
+    } else {
+      xpConfig.roleMultipliers[roleId] = multiplier;
+    }
+
+    renderRoleMultipliers();
+    roleSelect.value = '';
+    multiplierInput.value = '';
+    showToast('Success', 'Role multiplier added', 'success');
+  } catch (error) {
+    console.error('Error adding role multiplier:', error);
+    showToast('Error', error.message || 'Failed to add role multiplier', 'error');
+  }
+}
+
+async function removeRoleMultiplier(roleId) {
+  try {
+    // Set multiplier to 1 to remove it
+    const response = await fetch(`/api/guild/${guildId}/xp/role-multiplier`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleId, multiplier: 1 }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to remove role multiplier');
+    }
+
+    // Update local config
+    if (xpConfig.roleMultipliers) {
+      delete xpConfig.roleMultipliers[roleId];
+    }
+
+    renderRoleMultipliers();
+    showToast('Success', 'Role multiplier removed', 'success');
+  } catch (error) {
+    console.error('Error removing role multiplier:', error);
+    showToast('Error', error.message || 'Failed to remove role multiplier', 'error');
+  }
 }
 
 // ============================================
@@ -2844,6 +3080,36 @@ async function saveWelcomeSettings() {
 }
 
 // ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+function scrollToSection(sectionId) {
+  const section = document.getElementById(`section-${sectionId}`);
+  const sidebarLinks = document.querySelectorAll('.guild-sidebar__link');
+
+  if (section) {
+    // Update active link in sidebar
+    sidebarLinks.forEach(link => {
+      link.classList.remove('guild-sidebar__link--active');
+      if (link.getAttribute('data-section') === sectionId) {
+        link.classList.add('guild-sidebar__link--active');
+      }
+    });
+
+    // Hide all sections
+    document.querySelectorAll('.guild-section').forEach(s => {
+      s.classList.remove('guild-section--active');
+    });
+
+    // Show target section
+    section.classList.add('guild-section--active');
+
+    // Scroll to top smoothly
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 
@@ -2858,5 +3124,211 @@ document.addEventListener('DOMContentLoaded', () => {
   if (analyticsLink) {
     const baseHref = analyticsLink.dataset.guildHref || '/analytics.html?guild=';
     analyticsLink.href = `${baseHref}${guildId}`;
+  }
+
+  // ============================================
+  // EVENT LISTENERS - Replacing inline handlers
+  // ============================================
+
+  // Quick action buttons (scrollToSection)
+  const quickActionBtns = document.querySelectorAll('.quick-action-btn');
+  quickActionBtns.forEach((btn, index) => {
+    const sections = ['automod', 'logging', 'wordfilter', 'birthdays'];
+    if (sections[index]) {
+      btn.addEventListener('click', () => scrollToSection(sections[index]));
+    }
+  });
+
+  // Save buttons - Automod
+  document.querySelectorAll('button').forEach(btn => {
+    const text = btn.textContent.trim();
+
+    if (text === 'Save Automod Settings' || text === 'Save Changes') {
+      // Check parent section to determine which save function
+      const section = btn.closest('.guild-section');
+      if (section) {
+        const sectionId = section.id;
+        if (sectionId === 'section-automod' ||
+            sectionId === 'section-wordfilter' ||
+            sectionId === 'section-invitefilter' ||
+            sectionId === 'section-linkfilter' ||
+            sectionId === 'section-spam' ||
+            sectionId === 'section-mention-spam' ||
+            sectionId === 'section-caps-spam' ||
+            sectionId === 'section-attachment-spam' ||
+            sectionId === 'section-emoji-spam' ||
+            sectionId === 'section-automod-whitelist') {
+          btn.addEventListener('click', saveAutomod);
+        }
+      }
+    }
+
+    if (text === 'Save Anti-Raid Settings') {
+      btn.addEventListener('click', saveAntiRaid);
+    }
+
+    if (text === 'Save Logging Settings') {
+      btn.addEventListener('click', saveSettings);
+    }
+
+    if (text === 'Save Economy Settings') {
+      btn.addEventListener('click', saveEconomySettings);
+    }
+
+    if (text === 'Save Welcome Settings') {
+      btn.addEventListener('click', saveWelcomeSettings);
+    }
+
+    if (text === 'Reset Changes' && btn.closest('#section-welcome')) {
+      btn.addEventListener('click', loadWelcomeConfig);
+    }
+
+    if (text === 'Add Word') {
+      btn.addEventListener('click', addWord);
+    }
+
+    if (text === 'Add Domain') {
+      const parentGroup = btn.closest('.form-group');
+      if (parentGroup) {
+        const label = parentGroup.querySelector('.form-label');
+        if (label && label.textContent.includes('Whitelisted')) {
+          btn.addEventListener('click', addWhitelist);
+        } else if (label && label.textContent.includes('Blacklisted')) {
+          btn.addEventListener('click', addBlacklist);
+        }
+      }
+    }
+
+    if (text === 'Add Role') {
+      const parentSection = btn.closest('.guild-section');
+      if (parentSection && parentSection.id === 'section-automod-whitelist') {
+        btn.addEventListener('click', addWhitelistedRole);
+      }
+    }
+
+    if (text === 'Add Channel') {
+      btn.addEventListener('click', addWhitelistedChannel);
+    }
+
+    if (text === 'Add Shop Item' || text === 'Add Item') {
+      const modal = btn.closest('#add-shop-item-modal');
+      if (modal) {
+        btn.addEventListener('click', saveShopItem);
+      } else {
+        btn.addEventListener('click', openAddShopItemModal);
+      }
+    }
+
+    if (text === 'Cancel') {
+      const addModal = btn.closest('#add-shop-item-modal');
+      const editModal = btn.closest('#edit-shop-item-modal');
+      if (addModal) {
+        btn.addEventListener('click', closeAddShopItemModal);
+      } else if (editModal) {
+        btn.addEventListener('click', closeEditShopItemModal);
+      }
+    }
+
+    if (text === 'Update Item') {
+      btn.addEventListener('click', updateShopItem);
+    }
+
+    if (text === 'Add Reward') {
+      btn.addEventListener('click', addLevelRole);
+    }
+
+    if (text === 'Add' && btn.closest('#section-xp')) {
+      const parentGroup = btn.closest('.form-group');
+      if (parentGroup) {
+        const label = parentGroup.querySelector('.form-label');
+        if (label) {
+          const labelText = label.textContent;
+          if (labelText.includes('XP Gain Channels')) {
+            btn.addEventListener('click', addXPGainChannel);
+          } else if (labelText.includes('No XP Channels')) {
+            btn.addEventListener('click', addNoXPChannel);
+          } else if (labelText.includes('No XP Roles')) {
+            btn.addEventListener('click', addNoXPRole);
+          } else if (labelText.includes('Channel Multiplier')) {
+            btn.addEventListener('click', addChannelMultiplier);
+          } else if (labelText.includes('Role') && labelText.includes('Multiplier')) {
+            btn.addEventListener('click', addRoleMultiplier);
+          }
+        }
+      }
+    }
+
+    if (text === 'Save XP Settings') {
+      btn.addEventListener('click', saveXPSettings);
+    }
+
+    if (text === 'Reset Changes' && btn.closest('#section-xp')) {
+      btn.addEventListener('click', loadXPConfig);
+    }
+
+    if (text === 'Add Message') {
+      btn.addEventListener('click', addReactionRoleMessage);
+    }
+  });
+
+  // Modal close buttons (×)
+  document.querySelectorAll('.modal-close').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const modal = this.closest('.modal');
+      if (modal) {
+        if (modal.id === 'add-shop-item-modal') {
+          closeAddShopItemModal();
+        } else if (modal.id === 'edit-shop-item-modal') {
+          closeEditShopItemModal();
+        }
+      }
+    });
+  });
+
+  // onchange event listeners
+  const economyEnabledCheckbox = document.getElementById('economy-enabled');
+  if (economyEnabledCheckbox) {
+    economyEnabledCheckbox.addEventListener('change', updateEconomyStatus);
+  }
+
+  const shopItemTypeSelect = document.getElementById('shop-item-type');
+  if (shopItemTypeSelect) {
+    shopItemTypeSelect.addEventListener('change', toggleRoleSelect);
+  }
+
+  const editShopItemTypeSelect = document.getElementById('edit-shop-item-type');
+  if (editShopItemTypeSelect) {
+    editShopItemTypeSelect.addEventListener('change', toggleEditShopItemRoleSelect);
+  }
+
+  const xpEnabledCheckbox = document.getElementById('xp-enabled');
+  if (xpEnabledCheckbox) {
+    xpEnabledCheckbox.addEventListener('change', updateXPStatus);
+  }
+
+  const reactionRolesEnabledCheckbox = document.getElementById('reactionroles-enabled');
+  if (reactionRolesEnabledCheckbox) {
+    reactionRolesEnabledCheckbox.addEventListener('change', toggleReactionRolesSettings);
+  }
+
+  const welcomeEnabledCheckbox = document.getElementById('welcome-enabled');
+  if (welcomeEnabledCheckbox) {
+    welcomeEnabledCheckbox.addEventListener('change', toggleWelcomeSettings);
+  }
+
+  const leaveEnabledCheckbox = document.getElementById('leave-enabled');
+  if (leaveEnabledCheckbox) {
+    leaveEnabledCheckbox.addEventListener('change', toggleLeaveSettings);
+  }
+
+  // oninput event listeners
+  const welcomeMessageTextarea = document.getElementById('welcome-message');
+  if (welcomeMessageTextarea) {
+    welcomeMessageTextarea.addEventListener('input', updateWelcomePreview);
+  }
+
+  const leaveMessageTextarea = document.getElementById('leave-message');
+  if (leaveMessageTextarea) {
+    leaveMessageTextarea.addEventListener('input', updateLeavePreview);
   }
 });

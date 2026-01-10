@@ -1,6 +1,6 @@
 const { Events } = require('discord.js');
 const schedule = require('node-schedule');
-const { getBirthdays } = require('../utils/birthdays');
+const { getBirthdays, migrateToPerGuild } = require('../utils/birthdays');
 const { initReminders, schedulePendingReminders } = require('../utils/reminders');
 const { initModeration, getAllTempbans, removeTempban, addLog, getGuildConfig, addBirthdayRole, removeBirthdayRole, getAllBirthdayRoles } = require('../utils/moderation');
 const { initEconomy } = require('../utils/economy');
@@ -22,8 +22,6 @@ const announcedBirthdays = new Map(); // key: `${guildId}-${userId}-${today}`, v
 async function checkBirthdays(client) {
   const now = new Date();
   const today = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-  const birthdays = getBirthdays();
 
   // Process birthdays for each guild
   for (const guild of client.guilds.cache.values()) {
@@ -50,6 +48,9 @@ async function checkBirthdays(client) {
       });
       continue;
     }
+
+    // Get birthdays for this specific guild
+    const birthdays = getBirthdays(guild.id);
 
     // Check each birthday
     for (const [userId, birthday] of Object.entries(birthdays)) {
@@ -299,6 +300,18 @@ module.exports = {
   once: true,
   async execute(client) {
     logger.info('Logged in', { userTag: client.user.tag, userId: client.user.id });
+
+    // Migrate birthdays from global to per-guild format if needed
+    try {
+      const guildIds = Array.from(client.guilds.cache.keys());
+      const migrated = migrateToPerGuild(guildIds);
+      if (migrated) {
+        logger.info('Birthday data migrated to per-guild format', { guildCount: guildIds.length });
+      }
+    } catch (error) {
+      logger.error('Failed to migrate birthday data', { error });
+    }
+
     schedule.scheduleJob('0 0 * * *', () => checkBirthdays(client));
     try {
       await initReminders();

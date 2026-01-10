@@ -5,6 +5,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('remove_birthday')
     .setDescription('Remove a birthday reminder')
+    .setDMPermission(false)
     .addUserOption((option) =>
       option
         .setName('user')
@@ -15,14 +16,23 @@ module.exports = {
     const user = interaction.options.getUser('user');
     await interaction.deferReply({ ephemeral: true });
 
-    if (!user || !getBirthdays()[user.id]) {
+    // Ensure command is only used in guilds
+    if (!interaction.guildId) {
       await interaction.editReply({
-        content: 'Usage: /remove_birthday @user',
+        content: 'This command can only be used in a server, not in DMs.',
       });
       return;
     }
 
-    removeBirthday(user.id);
+    const guildBirthdays = getBirthdays(interaction.guildId);
+    if (!user || !guildBirthdays[user.id]) {
+      await interaction.editReply({
+        content: `No birthday found for ${user?.username || 'that user'}. Make sure they have a birthday set first.`,
+      });
+      return;
+    }
+
+    removeBirthday(interaction.guildId, user.id);
     await interaction.editReply({
       content: `Removed birthday for ${user.username}`,
     });
