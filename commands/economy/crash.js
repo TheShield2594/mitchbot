@@ -24,7 +24,7 @@ function calculateCrashPoint() {
 }
 
 function createGameEmbed(game, config, guildName, crashed = false, cashedOut = false) {
-    const currentMultiplier = crashed || cashedOut ? game.crashPoint : game.currentMultiplier;
+    const currentMultiplier = crashed ? game.crashPoint : game.currentMultiplier;
     const potentialWin = Math.floor(game.bet * currentMultiplier);
 
     let description = "";

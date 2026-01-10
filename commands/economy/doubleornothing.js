@@ -73,7 +73,7 @@ async function execute(interaction) {
     });
 
     try {
-        // Initialize game (first round always wins to start the chain)
+        // Initialize game with 55% success chance for first round
         const game = {
             originalBet: betAmount,
             currentWinnings: betAmount,
@@ -115,13 +115,27 @@ async function execute(interaction) {
                     reason: "Double or Nothing auto cash-out (timeout)",
                 });
 
+                const newBalance = getBalance(expiredGame.guildId, expiredGame.userId);
+                const profit = expiredGame.currentWinnings - expiredGame.originalBet;
+
+                const embed = new EmbedBuilder()
+                    .setColor("#f39c12")
+                    .setTitle("⏱️ Auto Cash-Out (Timeout)")
+                    .setDescription(
+                        `Your game timed out and you were automatically cashed out.\\n\\n` +
+                        `**Original Bet:** ${formatCoins(expiredGame.originalBet, config.currencyName)}\\n` +
+                        `**Final Winnings:** ${formatCoins(expiredGame.currentWinnings, config.currencyName)}\\n` +
+                        `**Profit:** ${formatCoins(profit, config.currencyName)}\\n` +
+                        `**Rounds Survived:** ${expiredGame.round}`
+                    )
+                    .addFields({ name: "New Balance", value: formatCoins(newBalance, config.currencyName) })
+                    .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
+                    .setTimestamp();
+
                 try {
-                    await interaction.followUp({
-                        content: `⏱️ Your Double or Nothing game timed out. You automatically cashed out with ${formatCoins(expiredGame.currentWinnings, config.currencyName)}!`,
-                        ephemeral: true,
-                    });
+                    await interaction.editReply({ embeds: [embed], components: [] });
                 } catch (error) {
-                    logger.warn("Failed to send game timeout notification", {
+                    logger.warn("Failed to update game timeout message", {
                         gameId,
                         error,
                     });

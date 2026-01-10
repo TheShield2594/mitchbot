@@ -67,6 +67,15 @@ module.exports = {
         const userBet = interaction.options.getString("bet");
         const specificNumber = interaction.options.getInteger("number");
 
+        // Validate mutually exclusive bet types
+        if (specificNumber !== null && userBet !== "0") {
+            await interaction.reply({
+                content: "You cannot specify both a specific number and another bet type. Please choose one betting method.",
+                ephemeral: true,
+            });
+            return;
+        }
+
         // Validate gambling command
         const config = await validateGamblingCommand(interaction, betAmount);
         if (!config) return;

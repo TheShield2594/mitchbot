@@ -121,13 +121,20 @@ async function execute(interaction) {
                     reason: "High/Low game expired - bet refunded",
                 });
 
+                const embed = new EmbedBuilder()
+                    .setColor("#f39c12")
+                    .setTitle("⏱️ Game Expired")
+                    .setDescription(
+                        `Your High/Low game expired due to inactivity.\n\n` +
+                        `Your bet of ${formatCoins(expiredGame.bet, config.currencyName)} has been refunded.`
+                    )
+                    .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
+                    .setTimestamp();
+
                 try {
-                    await interaction.followUp({
-                        content: `⏱️ Your High/Low game expired due to inactivity. Your bet of ${formatCoins(expiredGame.bet, config.currencyName)} has been refunded.`,
-                        ephemeral: true,
-                    });
+                    await interaction.editReply({ embeds: [embed], components: [] });
                 } catch (error) {
-                    logger.warn("Failed to send game expiration notification", {
+                    logger.warn("Failed to update expired game message", {
                         gameId,
                         error,
                     });
@@ -296,13 +303,14 @@ async function handleHighLowButton(interaction) {
             .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
             .setTimestamp();
 
+        // Log game outcome (bet was already deducted at game start, so amount is 0)
         logTransaction(game.guildId, {
             userId: game.userId,
-            amount: -game.bet,
+            amount: 0,
             balanceAfter: getBalance(game.guildId, game.userId),
             type: "highlow",
             action: "loss",
-            reason: "High/Low loss",
+            reason: "High/Low loss (bet already deducted)",
             metadata: { bet: game.bet, streak: game.streak },
         });
 

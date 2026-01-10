@@ -120,7 +120,10 @@ module.exports = {
 
         // Special case: cursed (lose more than bet)
         if (result.multiplier < 0) {
-            winnings = -Math.floor(betAmount * (1 + Math.abs(result.multiplier)));
+            const potentialLoss = Math.floor(betAmount * (1 + Math.abs(result.multiplier)));
+            const currentBalance = getBalance(interaction.guildId, interaction.user.id);
+            // Cap loss to current balance to prevent negative balance
+            winnings = -Math.min(potentialLoss, currentBalance);
         }
 
         // Update balance

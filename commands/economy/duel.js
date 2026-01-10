@@ -11,6 +11,20 @@ const logger = require("../../utils/logger");
 
 // Active duels storage (in-memory, resets on bot restart)
 const activeDuels = new Map();
+// Secondary index: maps "guildId-userId" -> duelId for O(1) active duel lookups
+const userToDuelId = new Map();
+
+// Helper function to delete a duel and clean up secondary index
+function deleteDuel(duelId) {
+    const duel = activeDuels.get(duelId);
+    if (duel) {
+        const challengerKey = `${duel.guildId}-${duel.challengerId}`;
+        const opponentKey = `${duel.guildId}-${duel.opponentId}`;
+        userToDuelId.delete(challengerKey);
+        userToDuelId.delete(opponentKey);
+        activeDuels.delete(duelId);
+    }
+}
 
 const data = new SlashCommandBuilder()
     .setName("duel")
@@ -91,22 +105,24 @@ async function execute(interaction) {
 
     const duelId = `${interaction.guildId}-${interaction.id}`;
 
-    // Check if either user already has an active duel
-    for (const [id, duel] of activeDuels.entries()) {
-        if ((duel.challengerId === challenger.id || duel.opponentId === challenger.id) && id.startsWith(interaction.guildId)) {
-            await interaction.reply({
-                content: "You already have an active duel! Finish it first.",
-                ephemeral: true,
-            });
-            return;
-        }
-        if ((duel.challengerId === opponent.id || duel.opponentId === opponent.id) && id.startsWith(interaction.guildId)) {
-            await interaction.reply({
-                content: `${opponent.username} already has an active duel!`,
-                ephemeral: true,
-            });
-            return;
-        }
+    // Check if either user already has an active duel (O(1) lookup)
+    const challengerKey = `${interaction.guildId}-${challenger.id}`;
+    const opponentKey = `${interaction.guildId}-${opponent.id}`;
+
+    if (userToDuelId.has(challengerKey)) {
+        await interaction.reply({
+            content: "You already have an active duel! Finish it first.",
+            ephemeral: true,
+        });
+        return;
+    }
+
+    if (userToDuelId.has(opponentKey)) {
+        await interaction.reply({
+            content: `${opponent.username} already has an active duel!`,
+            ephemeral: true,
+        });
+        return;
     }
 
     // Create duel
@@ -120,6 +136,9 @@ async function execute(interaction) {
     };
 
     activeDuels.set(duelId, duel);
+    // Add to secondary index for O(1) lookups
+    userToDuelId.set(challengerKey, duelId);
+    userToDuelId.set(opponentKey, duelId);
 
     // Create buttons
     const row = new ActionRowBuilder()
@@ -151,7 +170,7 @@ async function execute(interaction) {
     // Set timeout to auto-decline after 1 minute
     const timeoutId = setTimeout(async () => {
         if (activeDuels.has(duelId)) {
-            activeDuels.delete(duelId);
+            deleteDuel(duelId);
 
             try {
                 await interaction.editReply({
@@ -221,7 +240,7 @@ async function handleDuelButton(interaction) {
             .setTimestamp();
 
         if (duel.timeoutId) clearTimeout(duel.timeoutId);
-        activeDuels.delete(duelId);
+        deleteDuel(duelId);
         await interaction.update({ embeds: [embed], components: [] });
         return true;
     }
@@ -239,7 +258,7 @@ async function handleDuelButton(interaction) {
             .setTimestamp();
 
         if (duel.timeoutId) clearTimeout(duel.timeoutId);
-        activeDuels.delete(duelId);
+        deleteDuel(duelId);
         await interaction.update({ embeds: [embed], components: [] });
         return true;
     }
@@ -253,7 +272,7 @@ async function handleDuelButton(interaction) {
             .setTimestamp();
 
         if (duel.timeoutId) clearTimeout(duel.timeoutId);
-        activeDuels.delete(duelId);
+        deleteDuel(duelId);
         await interaction.update({ embeds: [embed], components: [] });
         return true;
     }
@@ -274,6 +293,42 @@ async function handleDuelButton(interaction) {
         opponent: duel.challengerId,
         reason: "Duel bet placed",
     });
+
+    // Atomic balance check: verify neither player went negative
+    const challengerBalanceAfter = getBalance(duel.guildId, duel.challengerId);
+    const opponentBalanceAfter = getBalance(duel.guildId, duel.opponentId);
+
+    if (challengerBalanceAfter < 0 || opponentBalanceAfter < 0) {
+        // Refund both players
+        addBalance(duel.guildId, duel.challengerId, duel.bet, {
+            type: "duel",
+            action: "refund",
+            bet: duel.bet,
+            reason: "Duel refund - negative balance detected",
+        });
+
+        addBalance(duel.guildId, duel.opponentId, duel.bet, {
+            type: "duel",
+            action: "refund",
+            bet: duel.bet,
+            reason: "Duel refund - negative balance detected",
+        });
+
+        const embed = new EmbedBuilder()
+            .setColor("#e74c3c")
+            .setTitle("⚔️ Duel Cancelled")
+            .setDescription(
+                `The duel was cancelled due to a balance conflict. ` +
+                `Both bets have been refunded.`
+            )
+            .setFooter({ text: `Guild: ${interaction.guild?.name || "Unknown"}` })
+            .setTimestamp();
+
+        if (duel.timeoutId) clearTimeout(duel.timeoutId);
+        deleteDuel(duelId);
+        await interaction.update({ embeds: [embed], components: [] });
+        return true;
+    }
 
     // Determine winner (50/50 coin flip)
     const challengerWins = Math.random() < 0.5;
@@ -315,7 +370,7 @@ async function handleDuelButton(interaction) {
         .setTimestamp();
 
     if (duel.timeoutId) clearTimeout(duel.timeoutId);
-    activeDuels.delete(duelId);
+    deleteDuel(duelId);
     await interaction.update({ embeds: [embed], components: [] });
 
     return true;

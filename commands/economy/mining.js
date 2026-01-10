@@ -6,19 +6,7 @@ const {
     getEconomyConfig,
     initEconomy,
 } = require("../../utils/economy");
-
-function formatRelativeTimestamp(isoString) {
-    if (!isoString) {
-        return "soon";
-    }
-
-    const timestamp = Math.floor(new Date(isoString).getTime() / 1000);
-    if (Number.isNaN(timestamp)) {
-        return "soon";
-    }
-
-    return `<t:${timestamp}:R>`;
-}
+const { formatRelativeTimestamp } = require("../../utils/timeFormatters");
 
 // Mining flavor messages based on rarity
 const miningMessages = {

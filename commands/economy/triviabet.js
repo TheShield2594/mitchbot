@@ -11,8 +11,38 @@ const {
 const { validateGamblingCommand } = require("../../utils/gamblingValidation");
 const logger = require("../../utils/logger");
 
-// Active trivia games storage (in-memory, resets on bot restart)
+// Active trivia games storage with file-based persistence
 const activeGames = new Map();
+const fs = require("fs");
+const path = require("path");
+const ACTIVE_GAMES_FILE = path.join(__dirname, "../../data/active_trivia_games.json");
+
+// Load active games from file on startup
+function loadActiveGames() {
+    try {
+        if (fs.existsSync(ACTIVE_GAMES_FILE)) {
+            const data = JSON.parse(fs.readFileSync(ACTIVE_GAMES_FILE, "utf8"));
+            for (const [gameId, game] of Object.entries(data)) {
+                activeGames.set(gameId, game);
+            }
+        }
+    } catch (error) {
+        logger.error("Failed to load active trivia games", { error });
+    }
+}
+
+// Save active games to file
+function saveActiveGames() {
+    try {
+        const data = Object.fromEntries(activeGames);
+        fs.writeFileSync(ACTIVE_GAMES_FILE, JSON.stringify(data, null, 2));
+    } catch (error) {
+        logger.error("Failed to save active trivia games", { error });
+    }
+}
+
+// Load games on module initialization
+loadActiveGames();
 
 // Trivia questions database
 const triviaQuestions = [
@@ -181,7 +211,12 @@ async function execute(interaction) {
         question = getRandomQuestion();
     } else {
         const filtered = triviaQuestions.filter(q => q.difficulty === difficultyChoice);
-        question = filtered[Math.floor(Math.random() * filtered.length)];
+        // Handle empty filter by falling back to random question
+        if (filtered.length === 0) {
+            question = getRandomQuestion();
+        } else {
+            question = filtered[Math.floor(Math.random() * filtered.length)];
+        }
     }
 
     // Deduct bet immediately
@@ -203,6 +238,7 @@ async function execute(interaction) {
         };
 
         activeGames.set(gameId, game);
+        saveActiveGames();
 
         // Create answer buttons
         const row = new ActionRowBuilder();
@@ -223,6 +259,7 @@ async function execute(interaction) {
             if (activeGames.has(gameId)) {
                 const expiredGame = activeGames.get(gameId);
                 activeGames.delete(gameId);
+                saveActiveGames();
 
                 // Log loss (bet already deducted)
                 logTransaction(expiredGame.guildId, {
@@ -296,14 +333,21 @@ async function handleTriviaBetButton(interaction) {
     }
 
     const gameId = match[1];
-    const answerIndex = parseInt(match[2]);
+    const answerIndex = parseInt(match[2], 10);
 
     if (!activeGames.has(gameId)) {
-        await interaction.update({
-            content: "This trivia game has expired or already been completed.",
-            components: [],
-            embeds: [],
-        });
+        try {
+            await interaction.update({
+                content: "This trivia game has expired or already been completed.",
+                components: [],
+                embeds: [],
+            });
+        } catch (error) {
+            logger.warn("Failed to update expired trivia game interaction", {
+                gameId,
+                error,
+            });
+        }
         return true;
     }
 
@@ -311,10 +355,18 @@ async function handleTriviaBetButton(interaction) {
 
     // Verify it's the right player
     if (game.userId !== interaction.user.id) {
-        await interaction.reply({
-            content: "This isn't your trivia game!",
-            ephemeral: true,
-        });
+        try {
+            await interaction.reply({
+                content: "This isn't your trivia game!",
+                ephemeral: true,
+            });
+        } catch (error) {
+            logger.warn("Failed to send wrong player message", {
+                gameId,
+                userId: interaction.user.id,
+                error,
+            });
+        }
         return true;
     }
 
@@ -356,7 +408,16 @@ async function handleTriviaBetButton(interaction) {
 
         if (game.timeoutId) clearTimeout(game.timeoutId);
         activeGames.delete(gameId);
-        await interaction.update({ embeds: [embed], components: [] });
+        saveActiveGames();
+
+        try {
+            await interaction.update({ embeds: [embed], components: [] });
+        } catch (error) {
+            logger.warn("Failed to update trivia game with correct answer", {
+                gameId,
+                error,
+            });
+        }
     } else {
         // Wrong answer - lose bet
         logTransaction(game.guildId, {
@@ -391,7 +452,16 @@ async function handleTriviaBetButton(interaction) {
 
         if (game.timeoutId) clearTimeout(game.timeoutId);
         activeGames.delete(gameId);
-        await interaction.update({ embeds: [embed], components: [] });
+        saveActiveGames();
+
+        try {
+            await interaction.update({ embeds: [embed], components: [] });
+        } catch (error) {
+            logger.warn("Failed to update trivia game with wrong answer", {
+                gameId,
+                error,
+            });
+        }
     }
 
     return true;
