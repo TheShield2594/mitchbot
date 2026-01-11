@@ -45,11 +45,26 @@ function saveActiveGames() {
             };
         }
 
-        // Queue the write operation
+        // Queue the write operation with atomic writes
         writeQueue = writeQueue
-            .then(() => fs.writeFile(ACTIVE_GAMES_FILE, JSON.stringify(gamesToSave, null, 2)))
+            .then(async () => {
+                // Ensure directory exists
+                const dir = path.dirname(ACTIVE_GAMES_FILE);
+                await fs.mkdir(dir, { recursive: true });
+
+                // Write to temp file
+                const tempFile = ACTIVE_GAMES_FILE + '.tmp';
+                await fs.writeFile(tempFile, JSON.stringify(gamesToSave, null, 2));
+
+                // Atomic rename
+                await fs.rename(tempFile, ACTIVE_GAMES_FILE);
+            })
             .catch(error => {
-                logger.error("Failed to save active trivia games", { error });
+                logger.error("Failed to save active trivia games", {
+                    error: error.message,
+                    stack: error.stack,
+                    code: error.code,
+                });
             });
     }, 100);
 }
@@ -95,8 +110,16 @@ async function loadActiveGames() {
 // Schedule a game timeout
 function scheduleGameTimeout(gameId, game, timeoutMs) {
     const timeoutId = setTimeout(async () => {
-        if (activeGames.has(gameId)) {
-            await handleGameTimeout(gameId, game);
+        try {
+            if (activeGames.has(gameId)) {
+                await handleGameTimeout(gameId, game);
+            }
+        } catch (error) {
+            logger.error("Error in trivia game timeout handler", {
+                gameId,
+                userId: game.userId,
+                error,
+            });
         }
     }, timeoutMs);
 
@@ -112,17 +135,6 @@ async function handleGameTimeout(gameId, game) {
     // Get fresh config for the timeout handler
     await initEconomy();
     const config = getEconomyConfig(game.guildId);
-
-    // Log loss (bet already deducted)
-    logTransaction(game.guildId, {
-        userId: game.userId,
-        amount: -game.bet,
-        balanceAfter: getBalance(game.guildId, game.userId),
-        type: "triviabet",
-        action: "timeout",
-        reason: "Trivia Bet - timeout",
-        metadata: { bet: game.bet },
-    });
 
     // Try to update the interaction if we have it
     if (game.interaction) {
@@ -147,9 +159,11 @@ async function handleGameTimeout(gameId, game) {
     logger.info("Trivia game timed out", { gameId, userId: game.userId });
 }
 
-// Load games on module initialization (don't await, let it run in background)
-loadActiveGames().catch(error => {
+// Load games on module initialization - store Promise for command handlers to await
+const loadActiveGamesPromise = loadActiveGames().catch(error => {
     logger.error("Failed to initialize trivia games on startup", { error });
+    // Return resolved promise so awaiting handlers don't hang
+    return Promise.resolve();
 });
 
 // Trivia questions database
@@ -297,6 +311,9 @@ const data = new SlashCommandBuilder()
 async function execute(interaction) {
     const betAmount = interaction.options.getInteger("amount");
     const difficultyChoice = interaction.options.getString("difficulty") || "Random";
+
+    // Wait for games to load from disk
+    await loadActiveGamesPromise;
 
     // Validate gambling command
     const config = await validateGamblingCommand(interaction, betAmount);
@@ -499,20 +516,7 @@ async function handleTriviaBetButton(interaction) {
             });
         }
     } else {
-        // Wrong answer - lose bet
-        logTransaction(game.guildId, {
-            userId: game.userId,
-            amount: -game.bet,
-            balanceAfter: getBalance(game.guildId, game.userId),
-            type: "triviabet",
-            action: "lost",
-            reason: "Trivia Bet - wrong answer",
-            metadata: {
-                bet: game.bet,
-                difficulty: game.question.difficulty,
-            },
-        });
-
+        // Wrong answer - lose bet (bet already deducted at game start)
         const embed = new EmbedBuilder()
             .setColor("#e74c3c")
             .setTitle("❌ Incorrect!")

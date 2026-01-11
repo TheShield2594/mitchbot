@@ -114,7 +114,10 @@ module.exports = {
             logger.error("Missing animal data in successful hunt result", {
                 guildId: interaction.guildId,
                 userId: interaction.user.id,
-                result,
+                resultSuccess: result.success,
+                resultOk: result.ok,
+                resultAction: result.action,
+                animalPresent: !!result.animal,
             });
             const embed = new EmbedBuilder()
                 .setColor(ECONOMY_FAILURE_COLOR)
