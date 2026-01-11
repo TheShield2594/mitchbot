@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const {
     claimHunting,
+    rollbackHunt,
     ECONOMY_EMBED_COLOR,
     ECONOMY_FAILURE_COLOR,
     RARITY_COLORS,
@@ -116,9 +117,11 @@ module.exports = {
                 userId: interaction.user.id,
                 resultSuccess: result.success,
                 resultOk: result.ok,
-                resultAction: result.action,
-                animalPresent: !!result.animal,
             });
+
+            // Rollback hunt to refund cooldown and attempt
+            rollbackHunt(interaction.guildId, interaction.user.id);
+
             const embed = new EmbedBuilder()
                 .setColor(ECONOMY_FAILURE_COLOR)
                 .setTitle("🏹 Hunt Error")
@@ -132,8 +135,11 @@ module.exports = {
         const animal = result.animal;
         const huntingMessage = getHuntingMessage(animal.rarity);
 
+        // Normalize rarity for color lookup to avoid silent mismatches
+        const normalizedRarity = String(animal.rarity || "").trim();
+
         const embed = new EmbedBuilder()
-            .setColor(RARITY_COLORS[animal.rarity] || ECONOMY_EMBED_COLOR)
+            .setColor(RARITY_COLORS[normalizedRarity] || ECONOMY_EMBED_COLOR)
             .setTitle("🏹 Successful Hunt!")
             .setDescription(
                 `You ${huntingMessage} ${animal.emoji} **${animal.name}**!\n\n` +

@@ -14,7 +14,6 @@ const logger = require("../../utils/logger");
 // Active trivia games storage with file-based persistence
 const activeGames = new Map();
 const fs = require("fs").promises;
-const fsSync = require("fs");
 const path = require("path");
 const ACTIVE_GAMES_FILE = path.join(__dirname, "../../data/active_trivia_games.json");
 

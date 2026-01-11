@@ -863,6 +863,25 @@ function claimHunting(guildId, userId, now = new Date()) {
   }
 }
 
+// Rollback hunt when data validation fails
+function rollbackHunt(guildId, userId) {
+  const guildData = getGuildEconomy(guildId);
+  const huntingData = guildData.hunting[userId];
+
+  if (!huntingData) return; // Nothing to rollback
+
+  // Reset cooldown to allow immediate retry
+  huntingData.lastHuntAt = null;
+
+  // Decrement hunt counter
+  if (huntingData.totalHunts > 0) {
+    huntingData.totalHunts -= 1;
+  }
+
+  guildData.hunting[userId] = huntingData;
+  saveEconomyData();
+}
+
 // Shop item management
 function addShopItem(guildId, itemData) {
   const guildData = getGuildEconomy(guildId);
@@ -1124,6 +1143,7 @@ module.exports = {
   claimFishing,
   claimMining,
   claimHunting,
+  rollbackHunt,
   formatCoins,
   formatRelativeTimestamp,
   getBalance,
