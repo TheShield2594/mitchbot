@@ -840,6 +840,7 @@ function claimHunting(guildId, userId, now = new Date()) {
       ok: true,
       success: true,
       animal: caughtAnimal,
+      reward: caughtAnimal.value,
       balance: result.balance,
       nextHuntAt: new Date(nowMs + cooldownMs).toISOString(),
     };
@@ -864,7 +865,7 @@ function claimHunting(guildId, userId, now = new Date()) {
 }
 
 // Rollback hunt when data validation fails
-function rollbackHunt(guildId, userId) {
+function rollbackHunt(guildId, userId, rewardAmount = null) {
   const guildData = getGuildEconomy(guildId);
   const huntingData = guildData.hunting[userId];
 
@@ -878,8 +879,22 @@ function rollbackHunt(guildId, userId) {
     huntingData.totalHunts -= 1;
   }
 
+  // Decrement successful hunts if this was a successful hunt
+  if (huntingData.successfulHunts > 0 && rewardAmount !== null) {
+    huntingData.successfulHunts -= 1;
+  }
+
   guildData.hunting[userId] = huntingData;
-  saveEconomyData();
+
+  // Reverse the balance credit if reward was given
+  if (rewardAmount !== null && rewardAmount > 0) {
+    addBalance(guildId, userId, -rewardAmount, {
+      type: "hunting_rollback",
+      reason: "Hunt rollback due to data validation failure",
+    });
+  } else {
+    saveEconomyData();
+  }
 }
 
 // Shop item management

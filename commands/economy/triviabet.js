@@ -69,6 +69,7 @@ function saveActiveGames() {
 }
 
 // Load active games from file on startup (async)
+// NOTE: Restored games lack the interaction object, so timeout notifications cannot be sent
 async function loadActiveGames() {
     try {
         // Check if file exists
@@ -83,6 +84,7 @@ async function loadActiveGames() {
         const games = JSON.parse(data);
 
         const now = Date.now();
+        let restoredCount = 0;
         for (const [gameId, game] of Object.entries(games)) {
             // Check if game has expired
             if (game.expiresAt && game.expiresAt < now) {
@@ -92,21 +94,26 @@ async function loadActiveGames() {
             }
 
             activeGames.set(gameId, game);
+            restoredCount++;
 
             // Recreate timeout if game hasn't expired
+            // NOTE: game.interaction is not persisted, so timeout handler cannot send Discord notifications
             if (game.expiresAt) {
                 const timeRemaining = Math.max(0, game.expiresAt - now);
                 scheduleGameTimeout(gameId, game, timeRemaining);
             }
         }
 
-        logger.info(`Loaded ${activeGames.size} active trivia games`);
+        if (restoredCount > 0) {
+            logger.info(`Loaded ${restoredCount} active trivia games (timeout notifications unavailable for restored games)`);
+        }
     } catch (error) {
         logger.error("Failed to load active trivia games", { error });
     }
 }
 
 // Schedule a game timeout
+// NOTE: Restored games lack game.interaction, so notification delivery will fail silently
 function scheduleGameTimeout(gameId, game, timeoutMs) {
     const timeoutId = setTimeout(async () => {
         try {
@@ -127,6 +134,7 @@ function scheduleGameTimeout(gameId, game, timeoutMs) {
 }
 
 // Handle game timeout
+// NOTE: game.interaction may be missing for restored games, preventing Discord notification
 async function handleGameTimeout(gameId, game) {
     activeGames.delete(gameId);
     saveActiveGames();
@@ -161,8 +169,7 @@ async function handleGameTimeout(gameId, game) {
 // Load games on module initialization - store Promise for command handlers to await
 const loadActiveGamesPromise = loadActiveGames().catch(error => {
     logger.error("Failed to initialize trivia games on startup", { error });
-    // Return resolved promise so awaiting handlers don't hang
-    return Promise.resolve();
+    // On error, promise resolves to undefined so awaiting handlers don't hang
 });
 
 // Trivia questions database

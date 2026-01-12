@@ -119,8 +119,8 @@ module.exports = {
                 resultOk: result.ok,
             });
 
-            // Rollback hunt to refund cooldown and attempt
-            rollbackHunt(interaction.guildId, interaction.user.id);
+            // Rollback hunt to refund cooldown, attempt, and reverse balance credit
+            rollbackHunt(interaction.guildId, interaction.user.id, result.reward);
 
             const embed = new EmbedBuilder()
                 .setColor(ECONOMY_FAILURE_COLOR)
