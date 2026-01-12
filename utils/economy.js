@@ -21,6 +21,7 @@ const RARITY_COLORS = {
 let economyData = {};
 let writeQueue = Promise.resolve();
 let hasLoaded = false;
+let loadingPromise = null; // Track ongoing load operation
 
 function getDefaultEconomyConfig() {
   return {
@@ -97,18 +98,6 @@ async function loadEconomyData() {
   }
 }
 
-function loadEconomyDataSync() {
-  ensureEconomyFile();
-
-  try {
-    const data = fs.readFileSync(economyPath, "utf8");
-    return JSON.parse(data);
-  } catch (error) {
-    console.warn("Failed to load economy data", { error });
-    return {};
-  }
-}
-
 async function saveEconomyDataWithRetry(payload, retries = 0) {
   const MAX_RETRIES = 3;
   const tmpPath = `${economyPath}.tmp`;
@@ -158,17 +147,43 @@ async function initEconomy() {
   hasLoaded = true;
 }
 
-function ensureEconomyDataLoaded() {
+/**
+ * Ensure economy data is loaded (async, non-blocking)
+ * Uses a promise to ensure only one load operation happens at a time
+ * @returns {Promise<void>}
+ */
+async function ensureEconomyDataLoaded() {
+  // Already loaded
   if (hasLoaded) {
     return;
   }
 
-  economyData = loadEconomyDataSync();
-  hasLoaded = true;
+  // Load already in progress, wait for it
+  if (loadingPromise) {
+    await loadingPromise;
+    return;
+  }
+
+  // Start loading
+  loadingPromise = (async () => {
+    try {
+      economyData = await loadEconomyData();
+      hasLoaded = true;
+    } catch (error) {
+      console.error('Failed to load economy data', { error });
+      // Set empty data as fallback
+      economyData = {};
+      hasLoaded = true;
+    } finally {
+      loadingPromise = null;
+    }
+  })();
+
+  await loadingPromise;
 }
 
-function getGuildEconomy(guildId) {
-  ensureEconomyDataLoaded();
+async function getGuildEconomy(guildId) {
+  await ensureEconomyDataLoaded();
 
   if (!economyData[guildId]) {
     economyData[guildId] = getDefaultGuildEconomy();
@@ -182,13 +197,13 @@ function getGuildEconomy(guildId) {
   return economyData[guildId];
 }
 
-function getEconomyConfig(guildId) {
-  const guildData = getGuildEconomy(guildId);
+async function getEconomyConfig(guildId) {
+  const guildData = await getGuildEconomy(guildId);
   return guildData.config;
 }
 
-function updateEconomyConfig(guildId, updates) {
-  const guildData = getGuildEconomy(guildId);
+async function updateEconomyConfig(guildId, updates) {
+  const guildData = await getGuildEconomy(guildId);
   guildData.config = {
     ...guildData.config,
     ...updates,
@@ -197,9 +212,9 @@ function updateEconomyConfig(guildId, updates) {
   return guildData.config;
 }
 
-function getBalance(guildId, userId) {
-  const guildData = getGuildEconomy(guildId);
-  const config = getEconomyConfig(guildId);
+async function getBalance(guildId, userId) {
+  const guildData = await getGuildEconomy(guildId);
+  const config = await getEconomyConfig(guildId);
 
   // If user has no balance set and starting balance is configured, initialize it
   if (guildData.balances[userId] === undefined) {
@@ -213,13 +228,13 @@ function getBalance(guildId, userId) {
   return Number(guildData.balances[userId] || 0);
 }
 
-function setBalance(guildId, userId, amount) {
-  const guildData = getGuildEconomy(guildId);
+async function setBalance(guildId, userId, amount) {
+  const guildData = await getGuildEconomy(guildId);
   guildData.balances[userId] = amount;
 }
 
-function logTransaction(guildId, entry) {
-  const guildData = getGuildEconomy(guildId);
+async function logTransaction(guildId, entry) {
+  const guildData = await getGuildEconomy(guildId);
   const transaction = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
@@ -238,8 +253,8 @@ function addBalance(guildId, userId, amount, details = {}) {
   // Use lock to prevent race conditions on balance modifications
   const lockKey = `balance:${guildId}:${userId}`;
 
-  return withLock(lockKey, () => {
-    const current = getBalance(guildId, userId);
+  return withLock(lockKey, async () => {
+    const current = await getBalance(guildId, userId);
     const updated = current + amount;
 
     // Prevent negative balances unless explicitly allowed (e.g., for admin adjustments)
@@ -247,9 +262,9 @@ function addBalance(guildId, userId, amount, details = {}) {
       throw new Error(`Insufficient funds. Current: ${current}, Attempted: ${amount}, Result: ${updated}`);
     }
 
-    setBalance(guildId, userId, updated);
+    await setBalance(guildId, userId, updated);
 
-    const transaction = logTransaction(guildId, {
+    const transaction = await logTransaction(guildId, {
       userId,
       amount,
       balanceAfter: updated,
