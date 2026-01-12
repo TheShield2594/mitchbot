@@ -9,6 +9,13 @@ const DAILY_REWARD = 100;
 const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const MAX_TRANSACTIONS = 1000;
 const ECONOMY_EMBED_COLOR = "#2b6cb0";
+const ECONOMY_FAILURE_COLOR = "#e67e22";
+const RARITY_COLORS = {
+  Common: "#95a5a6",
+  Uncommon: "#3498db",
+  Rare: "#9b59b6",
+  Legendary: "#f1c40f",
+};
 
 let economyData = {};
 let writeQueue = Promise.resolve();
@@ -833,6 +840,7 @@ function claimHunting(guildId, userId, now = new Date()) {
       ok: true,
       success: true,
       animal: caughtAnimal,
+      reward: caughtAnimal.value,
       balance: result.balance,
       nextHuntAt: new Date(nowMs + cooldownMs).toISOString(),
     };
@@ -840,7 +848,12 @@ function claimHunting(guildId, userId, now = new Date()) {
     // Hunt failed - no reward but cooldown still applies
     huntingData.failedHunts = (huntingData.failedHunts || 0) + 1;
     guildData.hunting[userId] = huntingData;
-    saveEconomyData();
+
+    // Use addBalance with 0 to ensure consistent saving and transaction logging
+    addBalance(guildId, userId, 0, {
+      type: "hunting_failed",
+      reason: "Hunt failed - no catch",
+    });
 
     return {
       ok: true,
@@ -848,6 +861,39 @@ function claimHunting(guildId, userId, now = new Date()) {
       balance: getBalance(guildId, userId),
       nextHuntAt: new Date(nowMs + cooldownMs).toISOString(),
     };
+  }
+}
+
+// Rollback hunt when data validation fails
+function rollbackHunt(guildId, userId, rewardAmount = null) {
+  const guildData = getGuildEconomy(guildId);
+  const huntingData = guildData.hunting[userId];
+
+  if (!huntingData) return; // Nothing to rollback
+
+  // Reset cooldown to allow immediate retry
+  huntingData.lastHuntAt = null;
+
+  // Decrement hunt counter
+  if (huntingData.totalHunts > 0) {
+    huntingData.totalHunts -= 1;
+  }
+
+  // Decrement successful hunts if this was a successful hunt
+  if (huntingData.successfulHunts > 0 && rewardAmount !== null) {
+    huntingData.successfulHunts -= 1;
+  }
+
+  guildData.hunting[userId] = huntingData;
+
+  // Reverse the balance credit if reward was given
+  if (rewardAmount !== null && rewardAmount > 0) {
+    addBalance(guildId, userId, -rewardAmount, {
+      type: "hunting_rollback",
+      reason: "Hunt rollback due to data validation failure",
+    });
+  } else {
+    saveEconomyData();
   }
 }
 
@@ -1101,6 +1147,8 @@ module.exports = {
   DAILY_REWARD,
   DAILY_COOLDOWN_MS,
   ECONOMY_EMBED_COLOR,
+  ECONOMY_FAILURE_COLOR,
+  RARITY_COLORS,
   addBalance,
   claimDaily,
   claimWork,
@@ -1110,6 +1158,7 @@ module.exports = {
   claimFishing,
   claimMining,
   claimHunting,
+  rollbackHunt,
   formatCoins,
   formatRelativeTimestamp,
   getBalance,

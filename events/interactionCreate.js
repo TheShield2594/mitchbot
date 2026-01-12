@@ -14,18 +14,18 @@ const { handleDoubleOrNothingButton } = require('../commands/economy/doubleornot
 const { handleHeistButton } = require('../commands/economy/heist');
 const { handleTriviaBetButton } = require('../commands/economy/triviabet');
 
-// Button handlers registry - add new handlers here
-const buttonHandlers = [
-  handleBlackjackButton,
-  handleHighLowButton,
-  handleCrashButton,
-  handleDoubleOrNothingButton,
-  handleDuelButton,
-  handleHeistButton,
-  handleTriviaBetButton,
-  handleInventoryButton,
-  handleTradeButton,
-];
+// Button handlers registry - Maps customId prefixes to handlers for O(1) dispatch
+const buttonHandlerMap = new Map([
+  ['blackjack', handleBlackjackButton],
+  ['highlow', handleHighLowButton],
+  ['crash', handleCrashButton],
+  ['don', handleDoubleOrNothingButton],
+  ['duel', handleDuelButton],
+  ['heist', handleHeistButton],
+  ['trivia', handleTriviaBetButton],
+  ['inventory', handleInventoryButton],
+  ['trade', handleTradeButton],
+]);
 
 function getInteractionContext(interaction) {
   return {
@@ -42,14 +42,19 @@ module.exports = {
     // Handle button interactions
     if (interaction.isButton()) {
       try {
-        // Try each handler in order until one handles the interaction
-        for (const handler of buttonHandlers) {
+        // Extract prefix from customId for O(1) handler lookup
+        const customId = interaction.customId;
+        const prefix = customId.split('_')[0];
+
+        // Lookup and call the appropriate handler
+        const handler = buttonHandlerMap.get(prefix);
+        if (handler) {
           const handled = await handler(interaction);
           if (handled) return;
         }
 
-        // If no handler processed it, allow other button handlers to run
-        // Future button handlers can be added to the buttonHandlers array
+        // If no handler processed it, silently continue
+        // (customId might be for a different system or deprecated)
       } catch (error) {
         logger.error('Button interaction error', {
           customId: interaction.customId,
