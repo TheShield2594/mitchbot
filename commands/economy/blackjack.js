@@ -199,7 +199,7 @@ async function execute(interaction) {
                 const embed = createGameEmbed(game, config, interaction.guild?.name || "Unknown", true)
                     .setDescription("🤝 **Push!** Both you and the dealer have blackjack.");
 
-                activeGames.delete(gameId);
+                await cleanupGame(gameId);
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -218,7 +218,7 @@ async function execute(interaction) {
                 .setColor("#2ecc71")
                 .setDescription(`🎉 **BLACKJACK!** You won ${formatCoins(winnings, config.currencyName)}!`);
 
-            activeGames.delete(gameId);
+            await cleanupGame(gameId);
             await interaction.reply({ embeds: [embed] });
             return;
         }
@@ -243,7 +243,7 @@ async function execute(interaction) {
             const timeoutId = setTimeout(async () => {
                 if (activeGames.has(gameId)) {
                     const expiredGame = activeGames.get(gameId);
-                    activeGames.delete(gameId);
+                    await cleanupGame(gameId);
 
                     // Refund the bet
                     addBalance(expiredGame.guildId, expiredGame.userId, expiredGame.bet, {
@@ -268,7 +268,7 @@ async function execute(interaction) {
                 }
             }, 120000);
 
-            // Store timeout ID on game object so it can be cleared when game ends
+            // Store timeout ID for cleanup
             game.timeoutId = timeoutId;
         } catch (error) {
             // Refund bet on any error during game setup
@@ -345,9 +345,8 @@ async function handleBlackjackButton(interaction) {
                 .setColor("#e74c3c")
                 .setDescription(`💥 **BUST!** You went over 21. You lost ${formatCoins(game.bet, config.currencyName)}.`);
 
-            // Clear timeout before deleting game
-            if (game.timeoutId) clearTimeout(game.timeoutId);
-            activeGames.delete(gameId);
+            // Clean up game
+            await cleanupGame(gameId);
             await interaction.update({ embeds: [embed], components: [] });
 
             // Zero amount used intentionally for audit/logging — no balance change
@@ -453,9 +452,8 @@ async function handleBlackjackButton(interaction) {
             .setDescription(resultMessage)
             .addFields({ name: "New Balance", value: formatCoins(newBalance, config.currencyName), inline: true });
 
-        // Clear timeout before deleting game
-        if (game.timeoutId) clearTimeout(game.timeoutId);
-        activeGames.delete(gameId);
+        // Clean up game
+        await cleanupGame(gameId);
         await interaction.update({ embeds: [embed], components: [] });
     }
 

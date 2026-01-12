@@ -109,16 +109,41 @@ function loadEconomyDataSync() {
   }
 }
 
+async function saveEconomyDataWithRetry(payload, retries = 0) {
+  const MAX_RETRIES = 3;
+  const tmpPath = `${economyPath}.tmp`;
+
+  try {
+    await fsp.writeFile(tmpPath, payload, "utf8");
+    await fsp.rename(tmpPath, economyPath);
+  } catch (error) {
+    if (retries < MAX_RETRIES) {
+      // Wait before retry (exponential backoff: 1s, 2s, 4s)
+      const delay = 1000 * Math.pow(2, retries);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return saveEconomyDataWithRetry(payload, retries + 1);
+    }
+
+    // All retries failed - this is critical
+    console.error("CRITICAL: Economy data save failed after all retries", {
+      error,
+      retries: MAX_RETRIES,
+      file: economyPath,
+      dataSize: payload.length,
+    });
+
+    throw error;
+  }
+}
+
 function saveEconomyData() {
   const payload = JSON.stringify(economyData, null, 2);
   writeQueue = writeQueue
     .then(async () => {
-      const tmpPath = `${economyPath}.tmp`;
-      await fsp.writeFile(tmpPath, payload, "utf8");
-      await fsp.rename(tmpPath, economyPath);
+      await saveEconomyDataWithRetry(payload);
     })
     .catch((error) => {
-      console.warn("Failed to save economy data", { error });
+      console.error("Failed to save economy data", { error });
     });
 
   return writeQueue;

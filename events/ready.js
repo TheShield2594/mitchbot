@@ -3,7 +3,7 @@ const schedule = require('node-schedule');
 const { getBirthdays, migrateToPerGuild } = require('../utils/birthdays');
 const { initReminders, schedulePendingReminders } = require('../utils/reminders');
 const { initModeration, getAllTempbans, removeTempban, addLog, getGuildConfig, addBirthdayRole, removeBirthdayRole, getAllBirthdayRoles } = require('../utils/moderation');
-const { initEconomy } = require('../utils/economy');
+const { initEconomy, addBalance } = require('../utils/economy');
 const { initQuests } = require('../utils/quests');
 const { initTrivia } = require('../utils/trivia');
 const { initStats, getWeeklyRecap, generateRecapMessage } = require('../utils/stats');
@@ -11,6 +11,7 @@ const { initSnark } = require('../utils/snark');
 const { initAchievements } = require('../utils/achievements');
 const { initXP } = require('../utils/xp');
 const { initReactionRoles } = require('../utils/reactionRoles');
+const { cleanupExpiredGames } = require('../utils/gameState');
 const logger = require('../utils/logger');
 
 // Track active birthday roles for removal after 24 hours (in-memory cache, backed by persistent storage)
@@ -342,6 +343,14 @@ module.exports = {
     try {
       await initEconomy();
       logger.info('Economy system initialized');
+
+      // Clean up and refund expired games from previous session
+      const refundedGames = await cleanupExpiredGames((guildId, userId, amount, details) => {
+        return addBalance(guildId, userId, amount, details);
+      });
+      if (refundedGames.length > 0) {
+        logger.info('Refunded expired games from previous session', { count: refundedGames.length });
+      }
     } catch (error) {
       logger.error('Failed to initialize economy', { error });
     }
@@ -395,11 +404,23 @@ module.exports = {
       logger.error('Failed to initialize reaction roles', { error });
     }
 
-    // Check for expired tempbans every minute
+    // Check for expired tempbans immediately on startup, then every minute
+    try {
+      await checkExpiredTempbans(client);
+      logger.info('Initial tempban check completed');
+    } catch (error) {
+      logger.error('Failed to check expired tempbans on startup', { error });
+    }
     schedule.scheduleJob('* * * * *', () => checkExpiredTempbans(client));
     logger.info('Tempban scheduler initialized');
 
-    // Check for expired birthday roles every hour
+    // Check for expired birthday roles immediately on startup, then every hour
+    try {
+      await checkExpiredBirthdayRoles(client);
+      logger.info('Initial birthday role check completed');
+    } catch (error) {
+      logger.error('Failed to check expired birthday roles on startup', { error });
+    }
     schedule.scheduleJob('0 * * * *', () => checkExpiredBirthdayRoles(client));
     logger.info('Birthday role scheduler initialized');
 
