@@ -1,6 +1,7 @@
 const { Events } = require('discord.js');
 const schedule = require('node-schedule');
-const { getBirthdays, migrateToPerGuild } = require('../utils/birthdays');
+const { getBirthdays } = require('../utils/birthdays');
+const { runMigrations } = require('../utils/migrations');
 const { initReminders, schedulePendingReminders } = require('../utils/reminders');
 const { initModeration, getAllTempbans, removeTempban, addLog, getGuildConfig, addBirthdayRole, removeBirthdayRole, getAllBirthdayRoles } = require('../utils/moderation');
 const { initEconomy, addBalance } = require('../utils/economy');
@@ -304,15 +305,23 @@ module.exports = {
   async execute(client) {
     logger.info('Logged in', { userTag: client.user.tag, userId: client.user.id });
 
-    // Migrate birthdays from global to per-guild format if needed
+    // Run data migrations (only runs once per version)
     try {
       const guildIds = Array.from(client.guilds.cache.keys());
-      const migrated = migrateToPerGuild(guildIds);
-      if (migrated) {
-        logger.info('Birthday data migrated to per-guild format', { guildCount: guildIds.length });
+      const migrationResult = await runMigrations({ guildIds, client });
+
+      if (migrationResult.upToDate) {
+        logger.info('Migrations up to date', { version: migrationResult.currentVersion });
+      } else {
+        logger.info('Migrations completed', {
+          fromVersion: migrationResult.fromVersion,
+          toVersion: migrationResult.toVersion,
+          migrationsRun: migrationResult.migrations.length,
+        });
       }
     } catch (error) {
-      logger.error('Failed to migrate birthday data', { error });
+      logger.error('CRITICAL: Migrations failed - bot may not work correctly', { error });
+      // Don't exit - let bot continue with potentially old data format
     }
 
     schedule.scheduleJob('0 0 * * *', () => checkBirthdays(client));
