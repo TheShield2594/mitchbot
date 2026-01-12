@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("node:crypto");
+const { withLock } = require("./locks");
 
 const fsp = fs.promises;
 
@@ -209,22 +210,33 @@ function logTransaction(guildId, entry) {
 }
 
 function addBalance(guildId, userId, amount, details = {}) {
-  const current = getBalance(guildId, userId);
-  const updated = current + amount;
-  setBalance(guildId, userId, updated);
+  // Use lock to prevent race conditions on balance modifications
+  const lockKey = `balance:${guildId}:${userId}`;
 
-  const transaction = logTransaction(guildId, {
-    userId,
-    amount,
-    balanceAfter: updated,
-    type: details.type || "adjustment",
-    reason: details.reason || null,
-    metadata: details.metadata || null,
+  return withLock(lockKey, () => {
+    const current = getBalance(guildId, userId);
+    const updated = current + amount;
+
+    // Prevent negative balances unless explicitly allowed (e.g., for admin adjustments)
+    if (updated < 0 && !details.allowNegative) {
+      throw new Error(`Insufficient funds. Current: ${current}, Attempted: ${amount}, Result: ${updated}`);
+    }
+
+    setBalance(guildId, userId, updated);
+
+    const transaction = logTransaction(guildId, {
+      userId,
+      amount,
+      balanceAfter: updated,
+      type: details.type || "adjustment",
+      reason: details.reason || null,
+      metadata: details.metadata || null,
+    });
+
+    saveEconomyData();
+
+    return { balance: updated, transaction };
   });
-
-  saveEconomyData();
-
-  return { balance: updated, transaction };
 }
 
 function getDailyCooldown(lastClaimAt, nowMs, cooldownHours = 24) {
@@ -471,15 +483,21 @@ function claimCrime(guildId, userId, now = new Date()) {
 }
 
 function attemptRob(guildId, userId, targetId, now = new Date()) {
-  const nowMs = now.getTime();
-  const guildData = getGuildEconomy(guildId);
-  const config = getEconomyConfig(guildId);
-  const robData = guildData.rob[userId] || { targets: {} };
+  // Lock both users to prevent race conditions
+  // Sort IDs to prevent deadlocks (always acquire locks in same order)
+  const [firstId, secondId] = [userId, targetId].sort();
+  const lockKey = `rob:${guildId}:${firstId}:${secondId}`;
 
-  // Can't rob yourself
-  if (userId === targetId) {
-    return { ok: false, error: "cant_rob_self" };
-  }
+  return withLock(lockKey, () => {
+    const nowMs = now.getTime();
+    const guildData = getGuildEconomy(guildId);
+    const config = getEconomyConfig(guildId);
+    const robData = guildData.rob[userId] || { targets: {} };
+
+    // Can't rob yourself
+    if (userId === targetId) {
+      return { ok: false, error: "cant_rob_self" };
+    }
 
   // Check global cooldown
   const cooldownMs = (config.robCooldownMinutes || 180) * 60 * 1000;
@@ -599,7 +617,7 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
       balance: getBalance(guildId, userId),
       nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
     };
-  }
+  });
 }
 
 // Fishing command functionality
@@ -960,60 +978,65 @@ function deleteShopItem(guildId, itemId) {
 
 // Purchase and inventory management
 function purchaseItem(guildId, userId, itemId) {
-  const guildData = getGuildEconomy(guildId);
-  const item = getShopItem(guildId, itemId);
+  // Lock to prevent race conditions on stock and balance
+  const lockKey = `purchase:${guildId}:${userId}:${itemId}`;
 
-  if (!item) {
-    return { ok: false, error: "Item not found" };
-  }
+  return withLock(lockKey, () => {
+    const guildData = getGuildEconomy(guildId);
+    const item = getShopItem(guildId, itemId);
 
-  if (item.stock !== -1 && item.stock <= 0) {
-    return { ok: false, error: "Item out of stock" };
-  }
+    if (!item) {
+      return { ok: false, error: "Item not found" };
+    }
 
-  const balance = getBalance(guildId, userId);
+    if (item.stock !== -1 && item.stock <= 0) {
+      return { ok: false, error: "Item out of stock" };
+    }
 
-  if (balance < item.price) {
-    return { ok: false, error: "Insufficient funds", balance, price: item.price };
-  }
+    const balance = getBalance(guildId, userId);
 
-  // Deduct balance
-  addBalance(guildId, userId, -item.price, {
-    type: "purchase",
-    reason: `Purchased ${item.name}`,
-    metadata: { itemId: item.id, itemName: item.name },
+    if (balance < item.price) {
+      return { ok: false, error: "Insufficient funds", balance, price: item.price };
+    }
+
+    // Deduct balance
+    addBalance(guildId, userId, -item.price, {
+      type: "purchase",
+      reason: `Purchased ${item.name}`,
+      metadata: { itemId: item.id, itemName: item.name },
+    });
+
+    // Add to inventory
+    if (!guildData.inventory[userId]) {
+      guildData.inventory[userId] = [];
+    }
+
+    const inventoryItem = {
+      id: randomUUID(),
+      itemId: item.id,
+      name: item.name,
+      description: item.description,
+      type: item.type,
+      roleId: item.roleId,
+      metadata: item.metadata,
+      purchasedAt: new Date().toISOString(),
+    };
+
+    guildData.inventory[userId].push(inventoryItem);
+
+    // Decrease stock if limited
+    if (item.stock !== -1) {
+      item.stock -= 1;
+    }
+
+    saveEconomyData();
+
+    return {
+      ok: true,
+      item: inventoryItem,
+      balance: getBalance(guildId, userId),
+    };
   });
-
-  // Add to inventory
-  if (!guildData.inventory[userId]) {
-    guildData.inventory[userId] = [];
-  }
-
-  const inventoryItem = {
-    id: randomUUID(),
-    itemId: item.id,
-    name: item.name,
-    description: item.description,
-    type: item.type,
-    roleId: item.roleId,
-    metadata: item.metadata,
-    purchasedAt: new Date().toISOString(),
-  };
-
-  guildData.inventory[userId].push(inventoryItem);
-
-  // Decrease stock if limited
-  if (item.stock !== -1) {
-    item.stock -= 1;
-  }
-
-  saveEconomyData();
-
-  return {
-    ok: true,
-    item: inventoryItem,
-    balance: getBalance(guildId, userId),
-  };
 }
 
 function getInventory(guildId, userId) {
@@ -1111,36 +1134,43 @@ function getLeaderboard(guildId, limit = 10) {
 
 // Transfer coins between users
 function transferCoins(guildId, fromUserId, toUserId, amount) {
-  if (amount <= 0) {
-    return { ok: false, error: "Amount must be positive" };
-  }
+  // Lock both users to prevent race conditions
+  // Sort IDs to prevent deadlocks (always acquire locks in same order)
+  const [firstId, secondId] = [fromUserId, toUserId].sort();
+  const lockKey = `transfer:${guildId}:${firstId}:${secondId}`;
 
-  const fromBalance = getBalance(guildId, fromUserId);
+  return withLock(lockKey, () => {
+    if (amount <= 0) {
+      return { ok: false, error: "Amount must be positive" };
+    }
 
-  if (fromBalance < amount) {
-    return { ok: false, error: "Insufficient funds", balance: fromBalance };
-  }
+    const fromBalance = getBalance(guildId, fromUserId);
 
-  // Deduct from sender
-  addBalance(guildId, fromUserId, -amount, {
-    type: "transfer_out",
-    reason: `Transferred to <@${toUserId}>`,
-    metadata: { recipientId: toUserId },
+    if (fromBalance < amount) {
+      return { ok: false, error: "Insufficient funds", balance: fromBalance };
+    }
+
+    // Deduct from sender
+    addBalance(guildId, fromUserId, -amount, {
+      type: "transfer_out",
+      reason: `Transferred to <@${toUserId}>`,
+      metadata: { recipientId: toUserId },
+    });
+
+    // Add to recipient
+    addBalance(guildId, toUserId, amount, {
+      type: "transfer_in",
+      reason: `Received from <@${fromUserId}>`,
+      metadata: { senderId: fromUserId },
+    });
+
+    return {
+      ok: true,
+      amount,
+      fromBalance: getBalance(guildId, fromUserId),
+      toBalance: getBalance(guildId, toUserId),
+    };
   });
-
-  // Add to recipient
-  addBalance(guildId, toUserId, amount, {
-    type: "transfer_in",
-    reason: `Received from <@${fromUserId}>`,
-    metadata: { senderId: fromUserId },
-  });
-
-  return {
-    ok: true,
-    amount,
-    fromBalance: getBalance(guildId, fromUserId),
-    toBalance: getBalance(guildId, toUserId),
-  };
 }
 
 module.exports = {

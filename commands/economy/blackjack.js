@@ -9,12 +9,13 @@ const {
     initEconomy,
 } = require("../../utils/economy");
 const { validateGamblingCommand } = require("../../utils/gamblingValidation");
+const { saveGame, removeGame } = require("../../utils/gameState");
 const logger = require("../../utils/logger");
 
 const CARD_SUITS = ["♠️", "♥️", "♣️", "♦️"];
 const CARD_VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
-// Active games storage (in-memory, resets on bot restart)
+// Active games storage (in-memory + persistent to disk)
 const activeGames = new Map();
 
 function createDeck() {
@@ -103,6 +104,21 @@ function createGameEmbed(game, config, guildName, gameOver = false) {
     return embed;
 }
 
+/**
+ * Clean up game from both memory and persistent storage
+ * @param {string} gameId - Game ID to clean up
+ */
+async function cleanupGame(gameId) {
+    const game = activeGames.get(gameId);
+    if (game?.timeoutId) {
+        clearTimeout(game.timeoutId);
+    }
+    activeGames.delete(gameId);
+    await removeGame(gameId).catch(err => {
+        logger.warn('Failed to remove game from persistent storage', { gameId, error: err });
+    });
+}
+
 const data = new SlashCommandBuilder()
     .setName("blackjack")
     .setDescription("Play blackjack against the dealer")
@@ -154,10 +170,17 @@ async function execute(interaction) {
             bet: betAmount,
             guildId: interaction.guildId,
             userId: interaction.user.id,
+            gameType: 'blackjack',
+            startedAt: Date.now(),
         };
 
         // Set immediately after game creation to prevent race condition
         activeGames.set(gameId, game);
+
+        // Persist to disk to survive bot restarts
+        await saveGame(gameId, game).catch(err => {
+            logger.error('Failed to persist blackjack game', { gameId, error: err });
+        });
 
         const playerValue = calculateHand(game.playerHand);
         const dealerValue = calculateHand(game.dealerHand);
