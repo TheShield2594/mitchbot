@@ -12,6 +12,8 @@ const { initAchievements } = require('../utils/achievements');
 const { initXP } = require('../utils/xp');
 const { initReactionRoles } = require('../utils/reactionRoles');
 const { cleanupExpiredGames } = require('../utils/gameState');
+const { initBackupSystem } = require('../utils/backups');
+const { initHealthCheckSystem, runAllHealthChecks } = require('../utils/healthCheck');
 const logger = require('../utils/logger');
 
 // Track active birthday roles for removal after 24 hours (in-memory cache, backed by persistent storage)
@@ -427,5 +429,30 @@ module.exports = {
     // Send weekly recap every Sunday at midnight
     schedule.scheduleJob('0 0 * * 0', () => sendWeeklyRecap(client));
     logger.info('Weekly recap scheduler initialized');
+
+    // Initialize automated backup system
+    try {
+      await initBackupSystem(false); // false = don't run immediately on startup
+      logger.info('Backup system initialized');
+    } catch (error) {
+      logger.error('Failed to initialize backup system', { error });
+    }
+
+    // Initialize health check system and run initial check
+    try {
+      initHealthCheckSystem('0 * * * *'); // Run hourly
+      logger.info('Health check system initialized');
+
+      // Run initial health check on startup
+      setTimeout(async () => {
+        try {
+          await runAllHealthChecks();
+        } catch (error) {
+          logger.error('Initial health check failed', { error });
+        }
+      }, 5000); // Wait 5 seconds after startup to let systems stabilize
+    } catch (error) {
+      logger.error('Failed to initialize health check system', { error });
+    }
   },
 };
