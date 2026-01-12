@@ -52,11 +52,12 @@ async function initReminders() {
   reminders = await loadReminders();
 }
 
-function createReminder({ userId, channelId, message, scheduledAt }) {
+function createReminder({ userId, channelId, guildId, message, scheduledAt }) {
   const reminder = {
     id: randomUUID(),
     userId,
     channelId,
+    guildId: guildId || null, // Support for reminders without guild context (DMs)
     message,
     scheduledAt,
     createdAt: new Date().toISOString(),
@@ -209,9 +210,24 @@ function cancelReminder(reminderId) {
   return true;
 }
 
+function getRemindersByGuild(guildId) {
+  return reminders.filter((reminder) => reminder.guildId === guildId);
+}
+
+function getRemindersByUser(userId, guildId = null) {
+  if (guildId) {
+    return reminders.filter(
+      (reminder) => reminder.userId === userId && reminder.guildId === guildId
+    );
+  }
+  return reminders.filter((reminder) => reminder.userId === userId);
+}
+
 module.exports = {
   cancelReminder,
   createReminder,
+  getRemindersByGuild,
+  getRemindersByUser,
   initReminders,
   schedulePendingReminders,
   scheduleReminder,

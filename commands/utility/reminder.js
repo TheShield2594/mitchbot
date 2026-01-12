@@ -28,6 +28,7 @@ module.exports = {
         const reminder = createReminder({
             userId: interaction.user.id,
             channelId: interaction.channelId,
+            guildId: interaction.guildId, // Add guild ID for proper scoping
             message,
             scheduledAt,
         });
