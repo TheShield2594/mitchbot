@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("node:crypto");
+const { withLock } = require("./locks");
 
 const fsp = fs.promises;
 
@@ -20,6 +21,7 @@ const RARITY_COLORS = {
 let economyData = {};
 let writeQueue = Promise.resolve();
 let hasLoaded = false;
+let loadingPromise = null; // Track ongoing load operation
 
 function getDefaultEconomyConfig() {
   return {
@@ -96,15 +98,30 @@ async function loadEconomyData() {
   }
 }
 
-function loadEconomyDataSync() {
-  ensureEconomyFile();
+async function saveEconomyDataWithRetry(payload, retries = 0) {
+  const MAX_RETRIES = 3;
+  const tmpPath = `${economyPath}.tmp`;
 
   try {
-    const data = fs.readFileSync(economyPath, "utf8");
-    return JSON.parse(data);
+    await fsp.writeFile(tmpPath, payload, "utf8");
+    await fsp.rename(tmpPath, economyPath);
   } catch (error) {
-    console.warn("Failed to load economy data", { error });
-    return {};
+    if (retries < MAX_RETRIES) {
+      // Wait before retry (exponential backoff: 1s, 2s, 4s)
+      const delay = 1000 * Math.pow(2, retries);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return saveEconomyDataWithRetry(payload, retries + 1);
+    }
+
+    // All retries failed - this is critical
+    console.error("CRITICAL: Economy data save failed after all retries", {
+      error,
+      retries: MAX_RETRIES,
+      file: economyPath,
+      dataSize: payload.length,
+    });
+
+    throw error;
   }
 }
 
@@ -112,12 +129,10 @@ function saveEconomyData() {
   const payload = JSON.stringify(economyData, null, 2);
   writeQueue = writeQueue
     .then(async () => {
-      const tmpPath = `${economyPath}.tmp`;
-      await fsp.writeFile(tmpPath, payload, "utf8");
-      await fsp.rename(tmpPath, economyPath);
+      await saveEconomyDataWithRetry(payload);
     })
     .catch((error) => {
-      console.warn("Failed to save economy data", { error });
+      console.error("Failed to save economy data", { error });
     });
 
   return writeQueue;
@@ -132,17 +147,43 @@ async function initEconomy() {
   hasLoaded = true;
 }
 
-function ensureEconomyDataLoaded() {
+/**
+ * Ensure economy data is loaded (async, non-blocking)
+ * Uses a promise to ensure only one load operation happens at a time
+ * @returns {Promise<void>}
+ */
+async function ensureEconomyDataLoaded() {
+  // Already loaded
   if (hasLoaded) {
     return;
   }
 
-  economyData = loadEconomyDataSync();
-  hasLoaded = true;
+  // Load already in progress, wait for it
+  if (loadingPromise) {
+    await loadingPromise;
+    return;
+  }
+
+  // Start loading
+  loadingPromise = (async () => {
+    try {
+      economyData = await loadEconomyData();
+      hasLoaded = true;
+    } catch (error) {
+      console.error('Failed to load economy data', { error });
+      // Set empty data as fallback
+      economyData = {};
+      hasLoaded = true;
+    } finally {
+      loadingPromise = null;
+    }
+  })();
+
+  await loadingPromise;
 }
 
-function getGuildEconomy(guildId) {
-  ensureEconomyDataLoaded();
+async function getGuildEconomy(guildId) {
+  await ensureEconomyDataLoaded();
 
   if (!economyData[guildId]) {
     economyData[guildId] = getDefaultGuildEconomy();
@@ -156,13 +197,13 @@ function getGuildEconomy(guildId) {
   return economyData[guildId];
 }
 
-function getEconomyConfig(guildId) {
-  const guildData = getGuildEconomy(guildId);
+async function getEconomyConfig(guildId) {
+  const guildData = await getGuildEconomy(guildId);
   return guildData.config;
 }
 
-function updateEconomyConfig(guildId, updates) {
-  const guildData = getGuildEconomy(guildId);
+async function updateEconomyConfig(guildId, updates) {
+  const guildData = await getGuildEconomy(guildId);
   guildData.config = {
     ...guildData.config,
     ...updates,
@@ -171,9 +212,9 @@ function updateEconomyConfig(guildId, updates) {
   return guildData.config;
 }
 
-function getBalance(guildId, userId) {
-  const guildData = getGuildEconomy(guildId);
-  const config = getEconomyConfig(guildId);
+async function getBalance(guildId, userId) {
+  const guildData = await getGuildEconomy(guildId);
+  const config = await getEconomyConfig(guildId);
 
   // If user has no balance set and starting balance is configured, initialize it
   if (guildData.balances[userId] === undefined) {
@@ -187,13 +228,13 @@ function getBalance(guildId, userId) {
   return Number(guildData.balances[userId] || 0);
 }
 
-function setBalance(guildId, userId, amount) {
-  const guildData = getGuildEconomy(guildId);
+async function setBalance(guildId, userId, amount) {
+  const guildData = await getGuildEconomy(guildId);
   guildData.balances[userId] = amount;
 }
 
-function logTransaction(guildId, entry) {
-  const guildData = getGuildEconomy(guildId);
+async function logTransaction(guildId, entry) {
+  const guildData = await getGuildEconomy(guildId);
   const transaction = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
@@ -209,22 +250,33 @@ function logTransaction(guildId, entry) {
 }
 
 function addBalance(guildId, userId, amount, details = {}) {
-  const current = getBalance(guildId, userId);
-  const updated = current + amount;
-  setBalance(guildId, userId, updated);
+  // Use lock to prevent race conditions on balance modifications
+  const lockKey = `balance:${guildId}:${userId}`;
 
-  const transaction = logTransaction(guildId, {
-    userId,
-    amount,
-    balanceAfter: updated,
-    type: details.type || "adjustment",
-    reason: details.reason || null,
-    metadata: details.metadata || null,
+  return withLock(lockKey, async () => {
+    const current = await getBalance(guildId, userId);
+    const updated = current + amount;
+
+    // Prevent negative balances unless explicitly allowed (e.g., for admin adjustments)
+    if (updated < 0 && !details.allowNegative) {
+      throw new Error(`Insufficient funds. Current: ${current}, Attempted: ${amount}, Result: ${updated}`);
+    }
+
+    await setBalance(guildId, userId, updated);
+
+    const transaction = await logTransaction(guildId, {
+      userId,
+      amount,
+      balanceAfter: updated,
+      type: details.type || "adjustment",
+      reason: details.reason || null,
+      metadata: details.metadata || null,
+    });
+
+    saveEconomyData();
+
+    return { balance: updated, transaction };
   });
-
-  saveEconomyData();
-
-  return { balance: updated, transaction };
 }
 
 function getDailyCooldown(lastClaimAt, nowMs, cooldownHours = 24) {
@@ -470,16 +522,22 @@ function claimCrime(guildId, userId, now = new Date()) {
   }
 }
 
-function attemptRob(guildId, userId, targetId, now = new Date()) {
-  const nowMs = now.getTime();
-  const guildData = getGuildEconomy(guildId);
-  const config = getEconomyConfig(guildId);
-  const robData = guildData.rob[userId] || { targets: {} };
+async function attemptRob(guildId, userId, targetId, now = new Date()) {
+  // Lock both users to prevent race conditions
+  // Sort IDs to prevent deadlocks (always acquire locks in same order)
+  const [firstId, secondId] = [userId, targetId].sort();
+  const lockKey = `rob:${guildId}:${firstId}:${secondId}`;
 
-  // Can't rob yourself
-  if (userId === targetId) {
-    return { ok: false, error: "cant_rob_self" };
-  }
+  return withLock(lockKey, async () => {
+    const nowMs = now.getTime();
+    const guildData = getGuildEconomy(guildId);
+    const config = getEconomyConfig(guildId);
+    const robData = guildData.rob[userId] || { targets: {} };
+
+    // Can't rob yourself
+    if (userId === targetId) {
+      return { ok: false, error: "cant_rob_self" };
+    }
 
   // Check global cooldown
   const cooldownMs = (config.robCooldownMinutes || 180) * 60 * 1000;
@@ -513,8 +571,8 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
     }
   }
 
-  const userBalance = getBalance(guildId, userId);
-  const targetBalance = getBalance(guildId, targetId);
+  const userBalance = await getBalance(guildId, userId);
+  const targetBalance = await getBalance(guildId, targetId);
 
   // Check if target has minimum balance
   const minimumBalance = config.robMinimumBalance || 100;
@@ -559,13 +617,13 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
     robData.successfulRobs = (robData.successfulRobs || 0) + 1;
 
     // Transfer money from target to robber
-    addBalance(guildId, targetId, -stolenAmount, {
+    await addBalance(guildId, targetId, -stolenAmount, {
       type: "robbed",
       reason: `Robbed by user ${userId}`,
       robberId: userId,
     });
 
-    addBalance(guildId, userId, stolenAmount, {
+    await addBalance(guildId, userId, stolenAmount, {
       type: "rob_success",
       reason: `Robbed user ${targetId}`,
       victimId: targetId,
@@ -576,8 +634,8 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
       ok: true,
       success: true,
       stolenAmount,
-      balance: getBalance(guildId, userId),
-      targetBalance: getBalance(guildId, targetId),
+      balance: await getBalance(guildId, userId),
+      targetBalance: await getBalance(guildId, targetId),
       nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
     };
   } else {
@@ -585,7 +643,7 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
     const penalty = potentialPenalty;
     robData.failedRobs = (robData.failedRobs || 0) + 1;
 
-    addBalance(guildId, userId, -penalty, {
+    await addBalance(guildId, userId, -penalty, {
       type: "rob_failure",
       reason: `Failed rob attempt on user ${targetId}`,
       targetId,
@@ -596,10 +654,10 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
       ok: true,
       success: false,
       penalty,
-      balance: getBalance(guildId, userId),
+      balance: await getBalance(guildId, userId),
       nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
     };
-  }
+  });
 }
 
 // Fishing command functionality
@@ -959,61 +1017,67 @@ function deleteShopItem(guildId, itemId) {
 }
 
 // Purchase and inventory management
-function purchaseItem(guildId, userId, itemId) {
-  const guildData = getGuildEconomy(guildId);
-  const item = getShopItem(guildId, itemId);
+async function purchaseItem(guildId, userId, itemId) {
+  // Lock per-item to serialize all purchases of the same item
+  // This prevents stock race conditions when multiple users buy simultaneously
+  const lockKey = `purchase:${guildId}:item:${itemId}`;
 
-  if (!item) {
-    return { ok: false, error: "Item not found" };
-  }
+  return withLock(lockKey, async () => {
+    const guildData = getGuildEconomy(guildId);
+    const item = getShopItem(guildId, itemId);
 
-  if (item.stock !== -1 && item.stock <= 0) {
-    return { ok: false, error: "Item out of stock" };
-  }
+    if (!item) {
+      return { ok: false, error: "Item not found" };
+    }
 
-  const balance = getBalance(guildId, userId);
+    if (item.stock !== -1 && item.stock <= 0) {
+      return { ok: false, error: "Item out of stock" };
+    }
 
-  if (balance < item.price) {
-    return { ok: false, error: "Insufficient funds", balance, price: item.price };
-  }
+    const balance = await getBalance(guildId, userId);
 
-  // Deduct balance
-  addBalance(guildId, userId, -item.price, {
-    type: "purchase",
-    reason: `Purchased ${item.name}`,
-    metadata: { itemId: item.id, itemName: item.name },
+    if (balance < item.price) {
+      return { ok: false, error: "Insufficient funds", balance, price: item.price };
+    }
+
+    // Deduct balance
+    await addBalance(guildId, userId, -item.price, {
+      type: "purchase",
+      reason: `Purchased ${item.name}`,
+      metadata: { itemId: item.id, itemName: item.name },
+    });
+
+    // Add to inventory
+    if (!guildData.inventory[userId]) {
+      guildData.inventory[userId] = [];
+    }
+
+    const inventoryItem = {
+      id: randomUUID(),
+      itemId: item.id,
+      name: item.name,
+      description: item.description,
+      type: item.type,
+      roleId: item.roleId,
+      metadata: item.metadata,
+      purchasedAt: new Date().toISOString(),
+    };
+
+    guildData.inventory[userId].push(inventoryItem);
+
+    // Decrease stock if limited
+    if (item.stock !== -1) {
+      item.stock -= 1;
+    }
+
+    await saveEconomyData();
+
+    return {
+      ok: true,
+      item: inventoryItem,
+      balance: await getBalance(guildId, userId),
+    };
   });
-
-  // Add to inventory
-  if (!guildData.inventory[userId]) {
-    guildData.inventory[userId] = [];
-  }
-
-  const inventoryItem = {
-    id: randomUUID(),
-    itemId: item.id,
-    name: item.name,
-    description: item.description,
-    type: item.type,
-    roleId: item.roleId,
-    metadata: item.metadata,
-    purchasedAt: new Date().toISOString(),
-  };
-
-  guildData.inventory[userId].push(inventoryItem);
-
-  // Decrease stock if limited
-  if (item.stock !== -1) {
-    item.stock -= 1;
-  }
-
-  saveEconomyData();
-
-  return {
-    ok: true,
-    item: inventoryItem,
-    balance: getBalance(guildId, userId),
-  };
 }
 
 function getInventory(guildId, userId) {
@@ -1110,37 +1174,44 @@ function getLeaderboard(guildId, limit = 10) {
 }
 
 // Transfer coins between users
-function transferCoins(guildId, fromUserId, toUserId, amount) {
-  if (amount <= 0) {
-    return { ok: false, error: "Amount must be positive" };
-  }
+async function transferCoins(guildId, fromUserId, toUserId, amount) {
+  // Lock both users to prevent race conditions
+  // Sort IDs to prevent deadlocks (always acquire locks in same order)
+  const [firstId, secondId] = [fromUserId, toUserId].sort();
+  const lockKey = `transfer:${guildId}:${firstId}:${secondId}`;
 
-  const fromBalance = getBalance(guildId, fromUserId);
+  return withLock(lockKey, async () => {
+    if (amount <= 0) {
+      return { ok: false, error: "Amount must be positive" };
+    }
 
-  if (fromBalance < amount) {
-    return { ok: false, error: "Insufficient funds", balance: fromBalance };
-  }
+    const fromBalance = await getBalance(guildId, fromUserId);
 
-  // Deduct from sender
-  addBalance(guildId, fromUserId, -amount, {
-    type: "transfer_out",
-    reason: `Transferred to <@${toUserId}>`,
-    metadata: { recipientId: toUserId },
+    if (fromBalance < amount) {
+      return { ok: false, error: "Insufficient funds", balance: fromBalance };
+    }
+
+    // Deduct from sender
+    await addBalance(guildId, fromUserId, -amount, {
+      type: "transfer_out",
+      reason: `Transferred to <@${toUserId}>`,
+      metadata: { recipientId: toUserId },
+    });
+
+    // Add to recipient
+    await addBalance(guildId, toUserId, amount, {
+      type: "transfer_in",
+      reason: `Received from <@${fromUserId}>`,
+      metadata: { senderId: fromUserId },
+    });
+
+    return {
+      ok: true,
+      amount,
+      fromBalance: await getBalance(guildId, fromUserId),
+      toBalance: await getBalance(guildId, toUserId),
+    };
   });
-
-  // Add to recipient
-  addBalance(guildId, toUserId, amount, {
-    type: "transfer_in",
-    reason: `Received from <@${fromUserId}>`,
-    metadata: { senderId: fromUserId },
-  });
-
-  return {
-    ok: true,
-    amount,
-    fromBalance: getBalance(guildId, fromUserId),
-    toBalance: getBalance(guildId, toUserId),
-  };
 }
 
 module.exports = {

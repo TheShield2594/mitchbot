@@ -1,9 +1,10 @@
 const { Events } = require('discord.js');
 const schedule = require('node-schedule');
-const { getBirthdays, migrateToPerGuild } = require('../utils/birthdays');
+const { getBirthdays } = require('../utils/birthdays');
+const { runMigrations } = require('../utils/migrations');
 const { initReminders, schedulePendingReminders } = require('../utils/reminders');
 const { initModeration, getAllTempbans, removeTempban, addLog, getGuildConfig, addBirthdayRole, removeBirthdayRole, getAllBirthdayRoles } = require('../utils/moderation');
-const { initEconomy } = require('../utils/economy');
+const { initEconomy, addBalance } = require('../utils/economy');
 const { initQuests } = require('../utils/quests');
 const { initTrivia } = require('../utils/trivia');
 const { initStats, getWeeklyRecap, generateRecapMessage } = require('../utils/stats');
@@ -11,6 +12,9 @@ const { initSnark } = require('../utils/snark');
 const { initAchievements } = require('../utils/achievements');
 const { initXP } = require('../utils/xp');
 const { initReactionRoles } = require('../utils/reactionRoles');
+const { cleanupExpiredGames } = require('../utils/gameState');
+const { initBackupSystem } = require('../utils/backups');
+const { initHealthCheckSystem, runAllHealthChecks } = require('../utils/healthCheck');
 const logger = require('../utils/logger');
 
 // Track active birthday roles for removal after 24 hours (in-memory cache, backed by persistent storage)
@@ -18,6 +22,10 @@ const activeBirthdayRoles = new Map(); // key: `${guildId}-${userId}`, value: { 
 
 // Track announced birthdays to prevent duplicates on same day
 const announcedBirthdays = new Map(); // key: `${guildId}-${userId}-${today}`, value: timestamp
+
+// Track scheduled jobs and timers for cleanup
+const scheduledJobs = [];
+let healthCheckTimer = null;
 
 async function checkBirthdays(client) {
   const now = new Date();
@@ -301,18 +309,34 @@ module.exports = {
   async execute(client) {
     logger.info('Logged in', { userTag: client.user.tag, userId: client.user.id });
 
-    // Migrate birthdays from global to per-guild format if needed
+    // Run data migrations (only runs once per version)
     try {
       const guildIds = Array.from(client.guilds.cache.keys());
-      const migrated = migrateToPerGuild(guildIds);
-      if (migrated) {
-        logger.info('Birthday data migrated to per-guild format', { guildCount: guildIds.length });
+      const migrationResult = await runMigrations({ guildIds, client });
+
+      if (migrationResult.upToDate) {
+        logger.info('Migrations up to date', { version: migrationResult.currentVersion });
+      } else {
+        logger.info('Migrations completed', {
+          fromVersion: migrationResult.fromVersion,
+          toVersion: migrationResult.toVersion,
+          migrationsRun: migrationResult.migrations.length,
+        });
       }
     } catch (error) {
-      logger.error('Failed to migrate birthday data', { error });
+      logger.error('CRITICAL: Migrations failed - shutting down to prevent data corruption', { error });
+      process.exit(1); // Exit to prevent running with incompatible data format
     }
 
-    schedule.scheduleJob('0 0 * * *', () => checkBirthdays(client));
+    // Schedule birthday checks daily at midnight
+    const birthdayJob = schedule.scheduleJob('0 0 * * *', async () => {
+      try {
+        await checkBirthdays(client);
+      } catch (error) {
+        logger.error('Birthday check failed', { error });
+      }
+    });
+    if (birthdayJob) scheduledJobs.push(birthdayJob);
     try {
       await initReminders();
       await schedulePendingReminders(client);
@@ -342,6 +366,14 @@ module.exports = {
     try {
       await initEconomy();
       logger.info('Economy system initialized');
+
+      // Clean up and refund expired games from previous session
+      const refundedGames = await cleanupExpiredGames((guildId, userId, amount, details) => {
+        return addBalance(guildId, userId, amount, details);
+      });
+      if (refundedGames.length > 0) {
+        logger.info('Refunded expired games from previous session', { count: refundedGames.length });
+      }
     } catch (error) {
       logger.error('Failed to initialize economy', { error });
     }
@@ -395,16 +427,94 @@ module.exports = {
       logger.error('Failed to initialize reaction roles', { error });
     }
 
-    // Check for expired tempbans every minute
-    schedule.scheduleJob('* * * * *', () => checkExpiredTempbans(client));
+    // Check for expired tempbans immediately on startup, then every minute
+    try {
+      await checkExpiredTempbans(client);
+      logger.info('Initial tempban check completed');
+    } catch (error) {
+      logger.error('Failed to check expired tempbans on startup', { error });
+    }
+    const tempbanJob = schedule.scheduleJob('* * * * *', async () => {
+      try {
+        await checkExpiredTempbans(client);
+      } catch (error) {
+        logger.error('Tempban check failed', { error });
+      }
+    });
+    if (tempbanJob) scheduledJobs.push(tempbanJob);
     logger.info('Tempban scheduler initialized');
 
-    // Check for expired birthday roles every hour
-    schedule.scheduleJob('0 * * * *', () => checkExpiredBirthdayRoles(client));
+    // Check for expired birthday roles immediately on startup, then every hour
+    try {
+      await checkExpiredBirthdayRoles(client);
+      logger.info('Initial birthday role check completed');
+    } catch (error) {
+      logger.error('Failed to check expired birthday roles on startup', { error });
+    }
+    const birthdayRoleJob = schedule.scheduleJob('0 * * * *', async () => {
+      try {
+        await checkExpiredBirthdayRoles(client);
+      } catch (error) {
+        logger.error('Birthday role check failed', { error });
+      }
+    });
+    if (birthdayRoleJob) scheduledJobs.push(birthdayRoleJob);
     logger.info('Birthday role scheduler initialized');
 
     // Send weekly recap every Sunday at midnight
-    schedule.scheduleJob('0 0 * * 0', () => sendWeeklyRecap(client));
+    const weeklyRecapJob = schedule.scheduleJob('0 0 * * 0', async () => {
+      try {
+        await sendWeeklyRecap(client);
+      } catch (error) {
+        logger.error('Weekly recap failed', { error });
+      }
+    });
+    if (weeklyRecapJob) scheduledJobs.push(weeklyRecapJob);
     logger.info('Weekly recap scheduler initialized');
+
+    // Initialize automated backup system
+    try {
+      await initBackupSystem(false); // false = don't run immediately on startup
+      logger.info('Backup system initialized');
+    } catch (error) {
+      logger.error('Failed to initialize backup system', { error });
+    }
+
+    // Initialize health check system and run initial check
+    try {
+      initHealthCheckSystem('0 * * * *'); // Run hourly
+      logger.info('Health check system initialized');
+
+      // Run initial health check on startup
+      healthCheckTimer = setTimeout(async () => {
+        try {
+          await runAllHealthChecks();
+        } catch (error) {
+          logger.error('Initial health check failed', { error });
+        }
+      }, 5000); // Wait 5 seconds after startup to let systems stabilize
+    } catch (error) {
+      logger.error('Failed to initialize health check system', { error });
+    }
+
+    // Cleanup function for graceful shutdown
+    const cleanup = () => {
+      logger.info('Cleaning up scheduled jobs and timers');
+
+      // Cancel all scheduled jobs
+      for (const job of scheduledJobs) {
+        job.cancel();
+      }
+
+      // Clear health check timer
+      if (healthCheckTimer) {
+        clearTimeout(healthCheckTimer);
+        healthCheckTimer = null;
+      }
+    };
+
+    // Register cleanup handlers
+    process.once('SIGINT', cleanup);
+    process.once('SIGTERM', cleanup);
   },
 };
