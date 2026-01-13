@@ -5,9 +5,12 @@ This guide provides complete implementation for CSRF protection and input valida
 ## Prerequisites
 
 Install required packages:
+
 ```bash
-npm install csurf express-validator
+npm install @dr.pogodin/csurf express-validator
 ```
+
+**Note:** Using `@dr.pogodin/csurf` (maintained fork) instead of deprecated `csurf` package.
 
 ## 1. CSRF Protection Implementation
 
@@ -16,7 +19,7 @@ npm install csurf express-validator
 **File:** `web/middleware/csrf.js` (NEW)
 
 ```javascript
-const csrf = require('csurf');
+const csrf = require('@dr.pogodin/csurf');
 const logger = require('../../utils/logger');
 
 // CSRF protection middleware
@@ -526,7 +529,7 @@ app.use('/api/', apiLimiter);
 
 Before deploying with security features:
 
-- [ ] Install csurf and express-validator: `npm install csurf express-validator`
+- [ ] Install required packages: `npm install @dr.pogodin/csurf express-validator`
 - [ ] Create csrf.js middleware
 - [ ] Create validation.js middleware
 - [ ] Update server.js with CSRF middleware
