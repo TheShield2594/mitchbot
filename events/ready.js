@@ -23,6 +23,10 @@ const activeBirthdayRoles = new Map(); // key: `${guildId}-${userId}`, value: { 
 // Track announced birthdays to prevent duplicates on same day
 const announcedBirthdays = new Map(); // key: `${guildId}-${userId}-${today}`, value: timestamp
 
+// Track scheduled jobs and timers for cleanup
+const scheduledJobs = [];
+let healthCheckTimer = null;
+
 async function checkBirthdays(client) {
   const now = new Date();
   const today = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -320,11 +324,19 @@ module.exports = {
         });
       }
     } catch (error) {
-      logger.error('CRITICAL: Migrations failed - bot may not work correctly', { error });
-      // Don't exit - let bot continue with potentially old data format
+      logger.error('CRITICAL: Migrations failed - shutting down to prevent data corruption', { error });
+      process.exit(1); // Exit to prevent running with incompatible data format
     }
 
-    schedule.scheduleJob('0 0 * * *', () => checkBirthdays(client));
+    // Schedule birthday checks daily at midnight
+    const birthdayJob = schedule.scheduleJob('0 0 * * *', async () => {
+      try {
+        await checkBirthdays(client);
+      } catch (error) {
+        logger.error('Birthday check failed', { error });
+      }
+    });
+    if (birthdayJob) scheduledJobs.push(birthdayJob);
     try {
       await initReminders();
       await schedulePendingReminders(client);
@@ -422,7 +434,14 @@ module.exports = {
     } catch (error) {
       logger.error('Failed to check expired tempbans on startup', { error });
     }
-    schedule.scheduleJob('* * * * *', () => checkExpiredTempbans(client));
+    const tempbanJob = schedule.scheduleJob('* * * * *', async () => {
+      try {
+        await checkExpiredTempbans(client);
+      } catch (error) {
+        logger.error('Tempban check failed', { error });
+      }
+    });
+    if (tempbanJob) scheduledJobs.push(tempbanJob);
     logger.info('Tempban scheduler initialized');
 
     // Check for expired birthday roles immediately on startup, then every hour
@@ -432,11 +451,25 @@ module.exports = {
     } catch (error) {
       logger.error('Failed to check expired birthday roles on startup', { error });
     }
-    schedule.scheduleJob('0 * * * *', () => checkExpiredBirthdayRoles(client));
+    const birthdayRoleJob = schedule.scheduleJob('0 * * * *', async () => {
+      try {
+        await checkExpiredBirthdayRoles(client);
+      } catch (error) {
+        logger.error('Birthday role check failed', { error });
+      }
+    });
+    if (birthdayRoleJob) scheduledJobs.push(birthdayRoleJob);
     logger.info('Birthday role scheduler initialized');
 
     // Send weekly recap every Sunday at midnight
-    schedule.scheduleJob('0 0 * * 0', () => sendWeeklyRecap(client));
+    const weeklyRecapJob = schedule.scheduleJob('0 0 * * 0', async () => {
+      try {
+        await sendWeeklyRecap(client);
+      } catch (error) {
+        logger.error('Weekly recap failed', { error });
+      }
+    });
+    if (weeklyRecapJob) scheduledJobs.push(weeklyRecapJob);
     logger.info('Weekly recap scheduler initialized');
 
     // Initialize automated backup system
@@ -453,7 +486,7 @@ module.exports = {
       logger.info('Health check system initialized');
 
       // Run initial health check on startup
-      setTimeout(async () => {
+      healthCheckTimer = setTimeout(async () => {
         try {
           await runAllHealthChecks();
         } catch (error) {
@@ -463,5 +496,25 @@ module.exports = {
     } catch (error) {
       logger.error('Failed to initialize health check system', { error });
     }
+
+    // Cleanup function for graceful shutdown
+    const cleanup = () => {
+      logger.info('Cleaning up scheduled jobs and timers');
+
+      // Cancel all scheduled jobs
+      for (const job of scheduledJobs) {
+        job.cancel();
+      }
+
+      // Clear health check timer
+      if (healthCheckTimer) {
+        clearTimeout(healthCheckTimer);
+        healthCheckTimer = null;
+      }
+    };
+
+    // Register cleanup handlers
+    process.once('SIGINT', cleanup);
+    process.once('SIGTERM', cleanup);
   },
 };

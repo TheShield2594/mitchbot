@@ -373,9 +373,10 @@ async function runAllHealthChecks() {
 
 /**
  * Initialize health check system with scheduled checks
- * @param {string} schedule - Cron schedule (default: hourly)
+ * @param {string} schedulePattern - Cron schedule (default: hourly)
+ * @param {boolean} runImmediately - Whether to run a health check immediately
  */
-function initHealthCheckSystem(schedulePattern = '0 * * * *') {
+async function initHealthCheckSystem(schedulePattern = '0 * * * *', runImmediately = false) {
   logger.info('Health check system initialized', { schedule: schedulePattern });
 
   // Schedule regular health checks
@@ -386,6 +387,16 @@ function initHealthCheckSystem(schedulePattern = '0 * * * *') {
       logger.error('Scheduled health check failed', { error });
     }
   });
+
+  // Run immediately if requested
+  if (runImmediately) {
+    logger.info('Running immediate health check');
+    try {
+      await runAllHealthChecks();
+    } catch (error) {
+      logger.error('Immediate health check failed', { error });
+    }
+  }
 }
 
 module.exports = {

@@ -522,13 +522,13 @@ function claimCrime(guildId, userId, now = new Date()) {
   }
 }
 
-function attemptRob(guildId, userId, targetId, now = new Date()) {
+async function attemptRob(guildId, userId, targetId, now = new Date()) {
   // Lock both users to prevent race conditions
   // Sort IDs to prevent deadlocks (always acquire locks in same order)
   const [firstId, secondId] = [userId, targetId].sort();
   const lockKey = `rob:${guildId}:${firstId}:${secondId}`;
 
-  return withLock(lockKey, () => {
+  return withLock(lockKey, async () => {
     const nowMs = now.getTime();
     const guildData = getGuildEconomy(guildId);
     const config = getEconomyConfig(guildId);
@@ -571,8 +571,8 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
     }
   }
 
-  const userBalance = getBalance(guildId, userId);
-  const targetBalance = getBalance(guildId, targetId);
+  const userBalance = await getBalance(guildId, userId);
+  const targetBalance = await getBalance(guildId, targetId);
 
   // Check if target has minimum balance
   const minimumBalance = config.robMinimumBalance || 100;
@@ -617,13 +617,13 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
     robData.successfulRobs = (robData.successfulRobs || 0) + 1;
 
     // Transfer money from target to robber
-    addBalance(guildId, targetId, -stolenAmount, {
+    await addBalance(guildId, targetId, -stolenAmount, {
       type: "robbed",
       reason: `Robbed by user ${userId}`,
       robberId: userId,
     });
 
-    addBalance(guildId, userId, stolenAmount, {
+    await addBalance(guildId, userId, stolenAmount, {
       type: "rob_success",
       reason: `Robbed user ${targetId}`,
       victimId: targetId,
@@ -634,8 +634,8 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
       ok: true,
       success: true,
       stolenAmount,
-      balance: getBalance(guildId, userId),
-      targetBalance: getBalance(guildId, targetId),
+      balance: await getBalance(guildId, userId),
+      targetBalance: await getBalance(guildId, targetId),
       nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
     };
   } else {
@@ -643,7 +643,7 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
     const penalty = potentialPenalty;
     robData.failedRobs = (robData.failedRobs || 0) + 1;
 
-    addBalance(guildId, userId, -penalty, {
+    await addBalance(guildId, userId, -penalty, {
       type: "rob_failure",
       reason: `Failed rob attempt on user ${targetId}`,
       targetId,
@@ -654,7 +654,7 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
       ok: true,
       success: false,
       penalty,
-      balance: getBalance(guildId, userId),
+      balance: await getBalance(guildId, userId),
       nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
     };
   });
@@ -1017,11 +1017,12 @@ function deleteShopItem(guildId, itemId) {
 }
 
 // Purchase and inventory management
-function purchaseItem(guildId, userId, itemId) {
-  // Lock to prevent race conditions on stock and balance
-  const lockKey = `purchase:${guildId}:${userId}:${itemId}`;
+async function purchaseItem(guildId, userId, itemId) {
+  // Lock per-item to serialize all purchases of the same item
+  // This prevents stock race conditions when multiple users buy simultaneously
+  const lockKey = `purchase:${guildId}:item:${itemId}`;
 
-  return withLock(lockKey, () => {
+  return withLock(lockKey, async () => {
     const guildData = getGuildEconomy(guildId);
     const item = getShopItem(guildId, itemId);
 
@@ -1033,14 +1034,14 @@ function purchaseItem(guildId, userId, itemId) {
       return { ok: false, error: "Item out of stock" };
     }
 
-    const balance = getBalance(guildId, userId);
+    const balance = await getBalance(guildId, userId);
 
     if (balance < item.price) {
       return { ok: false, error: "Insufficient funds", balance, price: item.price };
     }
 
     // Deduct balance
-    addBalance(guildId, userId, -item.price, {
+    await addBalance(guildId, userId, -item.price, {
       type: "purchase",
       reason: `Purchased ${item.name}`,
       metadata: { itemId: item.id, itemName: item.name },
@@ -1069,12 +1070,12 @@ function purchaseItem(guildId, userId, itemId) {
       item.stock -= 1;
     }
 
-    saveEconomyData();
+    await saveEconomyData();
 
     return {
       ok: true,
       item: inventoryItem,
-      balance: getBalance(guildId, userId),
+      balance: await getBalance(guildId, userId),
     };
   });
 }
@@ -1173,32 +1174,32 @@ function getLeaderboard(guildId, limit = 10) {
 }
 
 // Transfer coins between users
-function transferCoins(guildId, fromUserId, toUserId, amount) {
+async function transferCoins(guildId, fromUserId, toUserId, amount) {
   // Lock both users to prevent race conditions
   // Sort IDs to prevent deadlocks (always acquire locks in same order)
   const [firstId, secondId] = [fromUserId, toUserId].sort();
   const lockKey = `transfer:${guildId}:${firstId}:${secondId}`;
 
-  return withLock(lockKey, () => {
+  return withLock(lockKey, async () => {
     if (amount <= 0) {
       return { ok: false, error: "Amount must be positive" };
     }
 
-    const fromBalance = getBalance(guildId, fromUserId);
+    const fromBalance = await getBalance(guildId, fromUserId);
 
     if (fromBalance < amount) {
       return { ok: false, error: "Insufficient funds", balance: fromBalance };
     }
 
     // Deduct from sender
-    addBalance(guildId, fromUserId, -amount, {
+    await addBalance(guildId, fromUserId, -amount, {
       type: "transfer_out",
       reason: `Transferred to <@${toUserId}>`,
       metadata: { recipientId: toUserId },
     });
 
     // Add to recipient
-    addBalance(guildId, toUserId, amount, {
+    await addBalance(guildId, toUserId, amount, {
       type: "transfer_in",
       reason: `Received from <@${fromUserId}>`,
       metadata: { senderId: fromUserId },
@@ -1207,8 +1208,8 @@ function transferCoins(guildId, fromUserId, toUserId, amount) {
     return {
       ok: true,
       amount,
-      fromBalance: getBalance(guildId, fromUserId),
-      toBalance: getBalance(guildId, toUserId),
+      fromBalance: await getBalance(guildId, fromUserId),
+      toBalance: await getBalance(guildId, toUserId),
     };
   });
 }

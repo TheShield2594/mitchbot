@@ -159,10 +159,22 @@ async function runMigrations(context = {}) {
       logger.info('Migration 002 completed successfully');
       */
 
-      // For now, just increment version
+      // Record that this migration was skipped
+      status.migrations['002_placeholder'] = {
+        completedAt: new Date().toISOString(),
+        result: { skipped: true, reason: 'Placeholder migration' },
+      };
       status.version = 2;
       status.lastRun = new Date().toISOString();
       await saveMigrationStatus(status);
+
+      results.push({
+        migration: '002_placeholder',
+        success: true,
+        result: { skipped: true },
+      });
+
+      logger.info('Migration 002 skipped (placeholder)');
     }
 
     logger.info('All migrations completed successfully', {

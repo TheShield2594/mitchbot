@@ -16,6 +16,7 @@ const REFRESH_INTERVAL_MS = 15000; // Refresh every 15 seconds
 let redisClient = null;
 let lockRefreshInterval = null;
 let currentPid = process.pid;
+let exitHandlersRegistered = false;
 
 /**
  * Try to create Redis client if REDIS_URL is configured
@@ -265,9 +266,14 @@ async function releaseInstanceLock() {
 }
 
 /**
- * Setup exit handlers to ensure lock is released
+ * Setup exit handlers to ensure lock is released (idempotent)
  */
 function setupExitHandlers() {
+  // Only register handlers once to prevent duplicate listeners
+  if (exitHandlersRegistered) {
+    return;
+  }
+
   const cleanup = async (signal) => {
     logger.info('Received shutdown signal, releasing instance lock', { signal });
     await releaseInstanceLock();
@@ -291,6 +297,8 @@ function setupExitHandlers() {
     await releaseInstanceLock();
     process.exit(1);
   });
+
+  exitHandlersRegistered = true;
 }
 
 /**

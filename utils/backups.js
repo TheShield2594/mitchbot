@@ -16,6 +16,9 @@ const backupPath = path.join(__dirname, '..', 'backups');
 const BACKUP_RETENTION_DAYS = 7; // Keep backups for 7 days
 const BACKUP_TIME = '3 0 * * *'; // 3 AM daily
 
+// Track scheduled job to prevent duplicates
+let backupJob = null;
+
 /**
  * Ensure backup directory exists
  */
@@ -105,6 +108,14 @@ async function cleanupOldBackups() {
     const now = Date.now();
     const retentionMs = BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
+    // Ensure backup directory exists
+    try {
+      await fsp.access(backupPath);
+    } catch (error) {
+      logger.warn('Backup directory does not exist, nothing to clean up');
+      return { deleted: [], kept: [] };
+    }
+
     const entries = await fsp.readdir(backupPath, { withFileTypes: true });
     const directories = entries.filter(entry => entry.isDirectory());
 
@@ -156,6 +167,14 @@ async function cleanupOldBackups() {
  */
 async function listBackups() {
   try {
+    // Ensure backup directory exists
+    try {
+      await fsp.access(backupPath);
+    } catch (error) {
+      logger.warn('Backup directory does not exist');
+      return [];
+    }
+
     const entries = await fsp.readdir(backupPath, { withFileTypes: true });
     const directories = entries.filter(entry => entry.isDirectory());
 
@@ -210,14 +229,19 @@ async function restoreBackup(backupName) {
     const restored = [];
     const failed = [];
 
+    const restoreTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
     for (const file of jsonFiles) {
       try {
         const sourcePath = path.join(backupDir, file);
         const destPath = path.join(dataPath, file);
 
-        // Create backup of current file before overwriting
+        // Create backup of current file before overwriting with unique timestamp
         try {
-          await fsp.copyFile(destPath, `${destPath}.pre-restore`);
+          await fsp.access(destPath); // Check if file exists
+          const preRestorePath = `${destPath}.pre-restore-${restoreTimestamp}`;
+          await fsp.copyFile(destPath, preRestorePath);
+          logger.info('Created pre-restore backup', { file, preRestorePath });
         } catch (error) {
           // File might not exist, that's okay
         }
@@ -282,8 +306,14 @@ async function initBackupSystem(runImmediately = false) {
     await ensureBackupDirectory();
     logger.info('Backup system initialized', { backupPath, retentionDays: BACKUP_RETENTION_DAYS });
 
+    // Cancel existing job if it exists to prevent duplicates
+    if (backupJob) {
+      backupJob.cancel();
+      logger.info('Cancelled existing backup job');
+    }
+
     // Schedule daily backups
-    schedule.scheduleJob(BACKUP_TIME, async () => {
+    backupJob = schedule.scheduleJob(BACKUP_TIME, async () => {
       try {
         await createBackup();
         await cleanupOldBackups();
@@ -291,6 +321,10 @@ async function initBackupSystem(runImmediately = false) {
         logger.error('Scheduled backup failed', { error });
       }
     });
+
+    if (!backupJob) {
+      throw new Error('Failed to schedule backup job');
+    }
 
     logger.info('Backup scheduler started', { schedule: BACKUP_TIME });
 

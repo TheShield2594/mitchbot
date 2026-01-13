@@ -72,14 +72,27 @@ async function saveActiveGames(games) {
  * @returns {Promise<void>}
  */
 async function saveGame(gameId, gameData) {
-  const games = await loadActiveGames();
+  // Wrap entire read-modify-write in write queue to prevent races
+  writeQueue = writeQueue
+    .then(async () => {
+      const games = await loadActiveGames();
+      games[gameId] = {
+        ...gameData,
+        savedAt: Date.now(),
+      };
 
-  games[gameId] = {
-    ...gameData,
-    savedAt: Date.now(),
-  };
+      // Save directly without re-queueing
+      const payload = JSON.stringify(games, null, 2);
+      const tmpPath = `${gameStatePath}.tmp`;
+      await fsp.writeFile(tmpPath, payload, 'utf8');
+      await fsp.rename(tmpPath, gameStatePath);
+    })
+    .catch((error) => {
+      console.error('Failed to save game', { gameId, error });
+      throw error;
+    });
 
-  await saveActiveGames(games);
+  return writeQueue;
 }
 
 /**
@@ -88,9 +101,24 @@ async function saveGame(gameId, gameData) {
  * @returns {Promise<void>}
  */
 async function removeGame(gameId) {
-  const games = await loadActiveGames();
-  delete games[gameId];
-  await saveActiveGames(games);
+  // Wrap entire read-modify-write in write queue to prevent races
+  writeQueue = writeQueue
+    .then(async () => {
+      const games = await loadActiveGames();
+      delete games[gameId];
+
+      // Save directly without re-queueing
+      const payload = JSON.stringify(games, null, 2);
+      const tmpPath = `${gameStatePath}.tmp`;
+      await fsp.writeFile(tmpPath, payload, 'utf8');
+      await fsp.rename(tmpPath, gameStatePath);
+    })
+    .catch((error) => {
+      console.error('Failed to remove game', { gameId, error });
+      throw error;
+    });
+
+  return writeQueue;
 }
 
 /**
