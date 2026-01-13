@@ -21,6 +21,55 @@ let economyData = {};
 let writeQueue = Promise.resolve();
 let hasLoaded = false;
 
+// Transaction locks to prevent race conditions on balance updates
+// Key: `${guildId}:${userId}`, Value: Promise
+const transactionLocks = new Map();
+
+/**
+ * Acquires a lock for a user's balance operations
+ * @param {string} guildId
+ * @param {string} userId
+ * @returns {Promise<Function>} Release function
+ */
+async function acquireBalanceLock(guildId, userId) {
+  const lockKey = `${guildId}:${userId}`;
+
+  // Wait for any existing lock to be released
+  while (transactionLocks.has(lockKey)) {
+    await transactionLocks.get(lockKey);
+  }
+
+  // Create a new lock
+  let releaseLock;
+  const lockPromise = new Promise(resolve => {
+    releaseLock = resolve;
+  });
+
+  transactionLocks.set(lockKey, lockPromise);
+
+  // Return the release function
+  return () => {
+    transactionLocks.delete(lockKey);
+    releaseLock();
+  };
+}
+
+/**
+ * Executes a balance operation with a lock to prevent race conditions
+ * @param {string} guildId
+ * @param {string} userId
+ * @param {Function} operation - Async function to execute while locked
+ * @returns {Promise<any>} Result of the operation
+ */
+async function withBalanceLock(guildId, userId, operation) {
+  const release = await acquireBalanceLock(guildId, userId);
+  try {
+    return await operation();
+  } finally {
+    release();
+  }
+}
+
 function getDefaultEconomyConfig() {
   return {
     enabled: true,
@@ -161,17 +210,17 @@ function getEconomyConfig(guildId) {
   return guildData.config;
 }
 
-function updateEconomyConfig(guildId, updates) {
+async function updateEconomyConfig(guildId, updates) {
   const guildData = getGuildEconomy(guildId);
   guildData.config = {
     ...guildData.config,
     ...updates,
   };
-  saveEconomyData();
+  await saveEconomyData();
   return guildData.config;
 }
 
-function getBalance(guildId, userId) {
+async function getBalance(guildId, userId) {
   const guildData = getGuildEconomy(guildId);
   const config = getEconomyConfig(guildId);
 
@@ -180,10 +229,16 @@ function getBalance(guildId, userId) {
     const startingBalance = config.startingBalance || 0;
     if (startingBalance > 0) {
       guildData.balances[userId] = startingBalance;
-      saveEconomyData();
+      await saveEconomyData();
     }
   }
 
+  return Number(guildData.balances[userId] || 0);
+}
+
+// Synchronous version for internal use (doesn't trigger save)
+function getBalanceSync(guildId, userId) {
+  const guildData = getGuildEconomy(guildId);
   return Number(guildData.balances[userId] || 0);
 }
 
@@ -208,8 +263,8 @@ function logTransaction(guildId, entry) {
   return transaction;
 }
 
-function addBalance(guildId, userId, amount, details = {}) {
-  const current = getBalance(guildId, userId);
+async function addBalance(guildId, userId, amount, details = {}) {
+  const current = getBalanceSync(guildId, userId);
   const updated = current + amount;
   setBalance(guildId, userId, updated);
 
@@ -222,7 +277,7 @@ function addBalance(guildId, userId, amount, details = {}) {
     metadata: details.metadata || null,
   });
 
-  saveEconomyData();
+  await saveEconomyData();
 
   return { balance: updated, transaction };
 }
@@ -250,42 +305,44 @@ function getDailyCooldown(lastClaimAt, nowMs, cooldownHours = 24) {
   };
 }
 
-function claimDaily(guildId, userId, now = new Date()) {
-  const nowMs = now.getTime();
-  const guildData = getGuildEconomy(guildId);
-  const config = getEconomyConfig(guildId);
-  const dailyData = guildData.daily[userId] || {};
+async function claimDaily(guildId, userId, now = new Date()) {
+  return withBalanceLock(guildId, userId, async () => {
+    const nowMs = now.getTime();
+    const guildData = getGuildEconomy(guildId);
+    const config = getEconomyConfig(guildId);
+    const dailyData = guildData.daily[userId] || {};
 
-  const { remainingMs, nextClaimAt } = getDailyCooldown(
-    dailyData.lastClaimAt,
-    nowMs,
-    config.dailyCooldownHours
-  );
-  if (remainingMs > 0) {
+    const { remainingMs, nextClaimAt } = getDailyCooldown(
+      dailyData.lastClaimAt,
+      nowMs,
+      config.dailyCooldownHours
+    );
+    if (remainingMs > 0) {
+      return {
+        ok: false,
+        remainingMs,
+        nextClaimAt,
+        balance: getBalanceSync(guildId, userId),
+      };
+    }
+
+    dailyData.lastClaimAt = new Date(nowMs).toISOString();
+    dailyData.totalClaims = (dailyData.totalClaims || 0) + 1;
+    guildData.daily[userId] = dailyData;
+
+    const result = await addBalance(guildId, userId, config.dailyReward, {
+      type: "daily_reward",
+      reason: "Daily reward claim",
+    });
+
+    const cooldownMs = config.dailyCooldownHours * 60 * 60 * 1000;
     return {
-      ok: false,
-      remainingMs,
-      nextClaimAt,
-      balance: getBalance(guildId, userId),
+      ok: true,
+      reward: config.dailyReward,
+      balance: result.balance,
+      nextClaimAt: new Date(nowMs + cooldownMs).toISOString(),
     };
-  }
-
-  dailyData.lastClaimAt = new Date(nowMs).toISOString();
-  dailyData.totalClaims = (dailyData.totalClaims || 0) + 1;
-  guildData.daily[userId] = dailyData;
-
-  const result = addBalance(guildId, userId, config.dailyReward, {
-    type: "daily_reward",
-    reason: "Daily reward claim",
   });
-
-  const cooldownMs = config.dailyCooldownHours * 60 * 60 * 1000;
-  return {
-    ok: true,
-    reward: config.dailyReward,
-    balance: result.balance,
-    nextClaimAt: new Date(nowMs + cooldownMs).toISOString(),
-  };
 }
 
 function formatCoins(amount, currencyName = "coins") {
@@ -306,172 +363,183 @@ function formatRelativeTimestamp(isoString) {
 }
 
 // Work command functionality
-function claimWork(guildId, userId, now = new Date()) {
-  const nowMs = now.getTime();
-  const guildData = getGuildEconomy(guildId);
-  const config = getEconomyConfig(guildId);
-  const workData = guildData.work[userId] || {};
+async function claimWork(guildId, userId, now = new Date()) {
+  return withBalanceLock(guildId, userId, async () => {
+    const nowMs = now.getTime();
+    const guildData = getGuildEconomy(guildId);
+    const config = getEconomyConfig(guildId);
+    const workData = guildData.work[userId] || {};
 
-  const cooldownMs = (config.workCooldownMinutes || 60) * 60 * 1000;
+    const cooldownMs = (config.workCooldownMinutes || 60) * 60 * 1000;
 
-  if (workData.lastWorkAt) {
-    const lastWorkMs = new Date(workData.lastWorkAt).getTime();
-    const elapsed = nowMs - lastWorkMs;
+    if (workData.lastWorkAt) {
+      const lastWorkMs = new Date(workData.lastWorkAt).getTime();
+      const elapsed = nowMs - lastWorkMs;
 
-    if (elapsed < cooldownMs) {
-      const remainingMs = cooldownMs - elapsed;
-      return {
-        ok: false,
-        remainingMs,
-        nextWorkAt: new Date(nowMs + remainingMs).toISOString(),
-        balance: getBalance(guildId, userId),
-      };
+      if (elapsed < cooldownMs) {
+        const remainingMs = cooldownMs - elapsed;
+        return {
+          ok: false,
+          remainingMs,
+          nextWorkAt: new Date(nowMs + remainingMs).toISOString(),
+          balance: getBalanceSync(guildId, userId),
+        };
+      }
     }
-  }
 
-  // Calculate random reward between min and max
-  const min = config.workRewardMin || 50;
-  const max = config.workRewardMax || 150;
-  const reward = Math.floor(Math.random() * (max - min + 1)) + min;
-
-  workData.lastWorkAt = new Date(nowMs).toISOString();
-  workData.totalWorks = (workData.totalWorks || 0) + 1;
-  guildData.work[userId] = workData;
-
-  const result = addBalance(guildId, userId, reward, {
-    type: "work_reward",
-    reason: "Work command",
-  });
-
-  return {
-    ok: true,
-    reward,
-    balance: result.balance,
-    nextWorkAt: new Date(nowMs + cooldownMs).toISOString(),
-  };
-}
-
-function claimBeg(guildId, userId, now = new Date()) {
-  const nowMs = now.getTime();
-  const guildData = getGuildEconomy(guildId);
-  const config = getEconomyConfig(guildId);
-  const begData = guildData.beg[userId] || {};
-
-  const cooldownMs = (config.begCooldownMinutes || 30) * 60 * 1000;
-
-  if (begData.lastBegAt) {
-    const lastBegMs = new Date(begData.lastBegAt).getTime();
-    const elapsed = nowMs - lastBegMs;
-
-    if (elapsed < cooldownMs) {
-      const remainingMs = cooldownMs - elapsed;
-      return {
-        ok: false,
-        remainingMs,
-        nextBegAt: new Date(nowMs + remainingMs).toISOString(),
-        balance: getBalance(guildId, userId),
-      };
-    }
-  }
-
-  // Calculate random reward between min and max
-  const min = config.begRewardMin || 10;
-  const max = config.begRewardMax || 50;
-  const reward = Math.floor(Math.random() * (max - min + 1)) + min;
-
-  begData.lastBegAt = new Date(nowMs).toISOString();
-  begData.totalBegs = (begData.totalBegs || 0) + 1;
-  guildData.beg[userId] = begData;
-
-  const result = addBalance(guildId, userId, reward, {
-    type: "beg_reward",
-    reason: "Beg command",
-  });
-
-  return {
-    ok: true,
-    reward,
-    balance: result.balance,
-    nextBegAt: new Date(nowMs + cooldownMs).toISOString(),
-  };
-}
-
-function claimCrime(guildId, userId, now = new Date()) {
-  const nowMs = now.getTime();
-  const guildData = getGuildEconomy(guildId);
-  const config = getEconomyConfig(guildId);
-  const crimeData = guildData.crime[userId] || {};
-
-  const cooldownMs = (config.crimeCooldownMinutes || 120) * 60 * 1000;
-
-  if (crimeData.lastCrimeAt) {
-    const lastCrimeMs = new Date(crimeData.lastCrimeAt).getTime();
-    const elapsed = nowMs - lastCrimeMs;
-
-    if (elapsed < cooldownMs) {
-      const remainingMs = cooldownMs - elapsed;
-      return {
-        ok: false,
-        remainingMs,
-        nextCrimeAt: new Date(nowMs + remainingMs).toISOString(),
-        balance: getBalance(guildId, userId),
-      };
-    }
-  }
-
-  crimeData.lastCrimeAt = new Date(nowMs).toISOString();
-  crimeData.totalCrimes = (crimeData.totalCrimes || 0) + 1;
-  guildData.crime[userId] = crimeData;
-
-  // Check if crime succeeds or fails
-  const failChance = config.crimeFailChance || 0.4;
-  const success = Math.random() > failChance;
-
-  if (success) {
-    // Crime succeeded - get reward
-    const min = config.crimeRewardMin || 100;
-    const max = config.crimeRewardMax || 300;
+    // Calculate random reward between min and max
+    const min = config.workRewardMin || 50;
+    const max = config.workRewardMax || 150;
     const reward = Math.floor(Math.random() * (max - min + 1)) + min;
 
-    crimeData.successfulCrimes = (crimeData.successfulCrimes || 0) + 1;
+    workData.lastWorkAt = new Date(nowMs).toISOString();
+    workData.totalWorks = (workData.totalWorks || 0) + 1;
+    guildData.work[userId] = workData;
 
-    const result = addBalance(guildId, userId, reward, {
-      type: "crime_reward",
-      reason: "Crime command (success)",
+    const result = await addBalance(guildId, userId, reward, {
+      type: "work_reward",
+      reason: "Work command",
     });
 
     return {
       ok: true,
-      success: true,
       reward,
       balance: result.balance,
-      nextCrimeAt: new Date(nowMs + cooldownMs).toISOString(),
+      nextWorkAt: new Date(nowMs + cooldownMs).toISOString(),
     };
-  } else {
-    // Crime failed - lose money
-    const min = config.crimePenaltyMin || 50;
-    const max = config.crimePenaltyMax || 150;
-    const penalty = Math.floor(Math.random() * (max - min + 1)) + min;
+  });
+}
 
-    crimeData.failedCrimes = (crimeData.failedCrimes || 0) + 1;
+async function claimBeg(guildId, userId, now = new Date()) {
+  return withBalanceLock(guildId, userId, async () => {
+    const nowMs = now.getTime();
+    const guildData = getGuildEconomy(guildId);
+    const config = getEconomyConfig(guildId);
+    const begData = guildData.beg[userId] || {};
 
-    const result = addBalance(guildId, userId, -penalty, {
-      type: "crime_penalty",
-      reason: "Crime command (failed)",
+    const cooldownMs = (config.begCooldownMinutes || 30) * 60 * 1000;
+
+    if (begData.lastBegAt) {
+      const lastBegMs = new Date(begData.lastBegAt).getTime();
+      const elapsed = nowMs - lastBegMs;
+
+      if (elapsed < cooldownMs) {
+        const remainingMs = cooldownMs - elapsed;
+        return {
+          ok: false,
+          remainingMs,
+          nextBegAt: new Date(nowMs + remainingMs).toISOString(),
+          balance: getBalanceSync(guildId, userId),
+        };
+      }
+    }
+
+    // Calculate random reward between min and max
+    const min = config.begRewardMin || 10;
+    const max = config.begRewardMax || 50;
+    const reward = Math.floor(Math.random() * (max - min + 1)) + min;
+
+    begData.lastBegAt = new Date(nowMs).toISOString();
+    begData.totalBegs = (begData.totalBegs || 0) + 1;
+    guildData.beg[userId] = begData;
+
+    const result = await addBalance(guildId, userId, reward, {
+      type: "beg_reward",
+      reason: "Beg command",
     });
 
     return {
       ok: true,
-      success: false,
-      penalty,
+      reward,
       balance: result.balance,
-      nextCrimeAt: new Date(nowMs + cooldownMs).toISOString(),
+      nextBegAt: new Date(nowMs + cooldownMs).toISOString(),
     };
-  }
+  });
 }
 
-function attemptRob(guildId, userId, targetId, now = new Date()) {
-  const nowMs = now.getTime();
+async function claimCrime(guildId, userId, now = new Date()) {
+  return withBalanceLock(guildId, userId, async () => {
+    const nowMs = now.getTime();
+    const guildData = getGuildEconomy(guildId);
+    const config = getEconomyConfig(guildId);
+    const crimeData = guildData.crime[userId] || {};
+
+    const cooldownMs = (config.crimeCooldownMinutes || 120) * 60 * 1000;
+
+    if (crimeData.lastCrimeAt) {
+      const lastCrimeMs = new Date(crimeData.lastCrimeAt).getTime();
+      const elapsed = nowMs - lastCrimeMs;
+
+      if (elapsed < cooldownMs) {
+        const remainingMs = cooldownMs - elapsed;
+        return {
+          ok: false,
+          remainingMs,
+          nextCrimeAt: new Date(nowMs + remainingMs).toISOString(),
+          balance: getBalanceSync(guildId, userId),
+        };
+      }
+    }
+
+    crimeData.lastCrimeAt = new Date(nowMs).toISOString();
+    crimeData.totalCrimes = (crimeData.totalCrimes || 0) + 1;
+    guildData.crime[userId] = crimeData;
+
+    // Check if crime succeeds or fails
+    const failChance = config.crimeFailChance || 0.4;
+    const success = Math.random() > failChance;
+
+    if (success) {
+      // Crime succeeded - get reward
+      const min = config.crimeRewardMin || 100;
+      const max = config.crimeRewardMax || 300;
+      const reward = Math.floor(Math.random() * (max - min + 1)) + min;
+
+      crimeData.successfulCrimes = (crimeData.successfulCrimes || 0) + 1;
+
+      const result = await addBalance(guildId, userId, reward, {
+        type: "crime_reward",
+        reason: "Crime command (success)",
+      });
+
+      return {
+        ok: true,
+        success: true,
+        reward,
+        balance: result.balance,
+        nextCrimeAt: new Date(nowMs + cooldownMs).toISOString(),
+      };
+    } else {
+      // Crime failed - lose money
+      const min = config.crimePenaltyMin || 50;
+      const max = config.crimePenaltyMax || 150;
+      const penalty = Math.floor(Math.random() * (max - min + 1)) + min;
+
+      crimeData.failedCrimes = (crimeData.failedCrimes || 0) + 1;
+
+      const result = await addBalance(guildId, userId, -penalty, {
+        type: "crime_penalty",
+        reason: "Crime command (failed)",
+      });
+
+      return {
+        ok: true,
+        success: false,
+        penalty,
+        balance: result.balance,
+        nextCrimeAt: new Date(nowMs + cooldownMs).toISOString(),
+      };
+    }
+  });
+}
+
+async function attemptRob(guildId, userId, targetId, now = new Date()) {
+  // For two-user operations, acquire locks in sorted order to prevent deadlocks
+  const [firstId, secondId] = [userId, targetId].sort();
+
+  return withBalanceLock(guildId, firstId, async () => {
+    return withBalanceLock(guildId, secondId, async () => {
+      const nowMs = now.getTime();
   const guildData = getGuildEconomy(guildId);
   const config = getEconomyConfig(guildId);
   const robData = guildData.rob[userId] || { targets: {} };
@@ -513,8 +581,8 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
     }
   }
 
-  const userBalance = getBalance(guildId, userId);
-  const targetBalance = getBalance(guildId, targetId);
+  const userBalance = getBalanceSync(guildId, userId);
+  const targetBalance = getBalanceSync(guildId, targetId);
 
   // Check if target has minimum balance
   const minimumBalance = config.robMinimumBalance || 100;
@@ -559,52 +627,55 @@ function attemptRob(guildId, userId, targetId, now = new Date()) {
     robData.successfulRobs = (robData.successfulRobs || 0) + 1;
 
     // Transfer money from target to robber
-    addBalance(guildId, targetId, -stolenAmount, {
+    await addBalance(guildId, targetId, -stolenAmount, {
       type: "robbed",
       reason: `Robbed by user ${userId}`,
       robberId: userId,
     });
 
-    addBalance(guildId, userId, stolenAmount, {
-      type: "rob_success",
-      reason: `Robbed user ${targetId}`,
-      victimId: targetId,
-      stolen: stolenAmount,
+      await addBalance(guildId, userId, stolenAmount, {
+        type: "rob_success",
+        reason: `Robbed user ${targetId}`,
+        victimId: targetId,
+        stolen: stolenAmount,
+      });
+
+      return {
+        ok: true,
+        success: true,
+        stolenAmount,
+        balance: getBalanceSync(guildId, userId),
+        targetBalance: getBalanceSync(guildId, targetId),
+        nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
+      };
+    } else {
+      // Rob failed - lose money as penalty
+      const penalty = potentialPenalty;
+      robData.failedRobs = (robData.failedRobs || 0) + 1;
+
+      await addBalance(guildId, userId, -penalty, {
+        type: "rob_failure",
+        reason: `Failed rob attempt on user ${targetId}`,
+        targetId,
+        penalty,
+      });
+
+      return {
+        ok: true,
+        success: false,
+        penalty,
+        balance: getBalanceSync(guildId, userId),
+        nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
+      };
+    }
     });
-
-    return {
-      ok: true,
-      success: true,
-      stolenAmount,
-      balance: getBalance(guildId, userId),
-      targetBalance: getBalance(guildId, targetId),
-      nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
-    };
-  } else {
-    // Rob failed - lose money as penalty
-    const penalty = potentialPenalty;
-    robData.failedRobs = (robData.failedRobs || 0) + 1;
-
-    addBalance(guildId, userId, -penalty, {
-      type: "rob_failure",
-      reason: `Failed rob attempt on user ${targetId}`,
-      targetId,
-      penalty,
-    });
-
-    return {
-      ok: true,
-      success: false,
-      penalty,
-      balance: getBalance(guildId, userId),
-      nextRobAt: new Date(nowMs + cooldownMs).toISOString(),
-    };
-  }
+  });
 }
 
 // Fishing command functionality
-function claimFishing(guildId, userId, now = new Date()) {
-  const nowMs = now.getTime();
+async function claimFishing(guildId, userId, now = new Date()) {
+  return withBalanceLock(guildId, userId, async () => {
+    const nowMs = now.getTime();
   const guildData = getGuildEconomy(guildId);
   const config = getEconomyConfig(guildId);
   const fishingData = guildData.fishing[userId] || {};
@@ -621,7 +692,7 @@ function claimFishing(guildId, userId, now = new Date()) {
         ok: false,
         remainingMs,
         nextFishAt: new Date(nowMs + remainingMs).toISOString(),
-        balance: getBalance(guildId, userId),
+        balance: getBalanceSync(guildId, userId),
       };
     }
   }
@@ -666,24 +737,26 @@ function claimFishing(guildId, userId, now = new Date()) {
 
   guildData.fishing[userId] = fishingData;
 
-  const result = addBalance(guildId, userId, caughtFish.value, {
+  const result = await addBalance(guildId, userId, caughtFish.value, {
     type: "fishing_reward",
     reason: `Caught ${caughtFish.name}`,
     fish: caughtFish.name,
     rarity: caughtFish.rarity,
   });
 
-  return {
-    ok: true,
-    fish: caughtFish,
-    balance: result.balance,
-    nextFishAt: new Date(nowMs + cooldownMs).toISOString(),
-  };
+    return {
+      ok: true,
+      fish: caughtFish,
+      balance: result.balance,
+      nextFishAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  });
 }
 
 // Mining command functionality
-function claimMining(guildId, userId, now = new Date()) {
-  const nowMs = now.getTime();
+async function claimMining(guildId, userId, now = new Date()) {
+  return withBalanceLock(guildId, userId, async () => {
+    const nowMs = now.getTime();
   const guildData = getGuildEconomy(guildId);
   const config = getEconomyConfig(guildId);
   const miningData = guildData.mining[userId] || {};
@@ -700,7 +773,7 @@ function claimMining(guildId, userId, now = new Date()) {
         ok: false,
         remainingMs,
         nextMineAt: new Date(nowMs + remainingMs).toISOString(),
-        balance: getBalance(guildId, userId),
+        balance: getBalanceSync(guildId, userId),
       };
     }
   }
@@ -744,24 +817,26 @@ function claimMining(guildId, userId, now = new Date()) {
 
   guildData.mining[userId] = miningData;
 
-  const result = addBalance(guildId, userId, minedOre.value, {
+  const result = await addBalance(guildId, userId, minedOre.value, {
     type: "mining_reward",
     reason: `Mined ${minedOre.name}`,
     ore: minedOre.name,
     rarity: minedOre.rarity,
   });
 
-  return {
-    ok: true,
-    ore: minedOre,
-    balance: result.balance,
-    nextMineAt: new Date(nowMs + cooldownMs).toISOString(),
-  };
+    return {
+      ok: true,
+      ore: minedOre,
+      balance: result.balance,
+      nextMineAt: new Date(nowMs + cooldownMs).toISOString(),
+    };
+  });
 }
 
 // Hunting command functionality
-function claimHunting(guildId, userId, now = new Date()) {
-  const nowMs = now.getTime();
+async function claimHunting(guildId, userId, now = new Date()) {
+  return withBalanceLock(guildId, userId, async () => {
+    const nowMs = now.getTime();
   const guildData = getGuildEconomy(guildId);
   const config = getEconomyConfig(guildId);
   const huntingData = guildData.hunting[userId] || {};
@@ -778,7 +853,7 @@ function claimHunting(guildId, userId, now = new Date()) {
         ok: false,
         remainingMs,
         nextHuntAt: new Date(nowMs + remainingMs).toISOString(),
-        balance: getBalance(guildId, userId),
+        balance: getBalanceSync(guildId, userId),
       };
     }
   }
@@ -829,7 +904,7 @@ function claimHunting(guildId, userId, now = new Date()) {
 
     guildData.hunting[userId] = huntingData;
 
-    const result = addBalance(guildId, userId, caughtAnimal.value, {
+    const result = await addBalance(guildId, userId, caughtAnimal.value, {
       type: "hunting_reward",
       reason: `Hunted ${caughtAnimal.name}`,
       animal: caughtAnimal.name,
@@ -850,22 +925,23 @@ function claimHunting(guildId, userId, now = new Date()) {
     guildData.hunting[userId] = huntingData;
 
     // Use addBalance with 0 to ensure consistent saving and transaction logging
-    addBalance(guildId, userId, 0, {
+    await addBalance(guildId, userId, 0, {
       type: "hunting_failed",
       reason: "Hunt failed - no catch",
     });
 
-    return {
-      ok: true,
-      success: false,
-      balance: getBalance(guildId, userId),
-      nextHuntAt: new Date(nowMs + cooldownMs).toISOString(),
-    };
-  }
+      return {
+        ok: true,
+        success: false,
+        balance: getBalanceSync(guildId, userId),
+        nextHuntAt: new Date(nowMs + cooldownMs).toISOString(),
+      };
+    }
+  });
 }
 
 // Rollback hunt when data validation fails
-function rollbackHunt(guildId, userId, rewardAmount = null) {
+async function rollbackHunt(guildId, userId, rewardAmount = null) {
   const guildData = getGuildEconomy(guildId);
   const huntingData = guildData.hunting[userId];
 
@@ -888,17 +964,17 @@ function rollbackHunt(guildId, userId, rewardAmount = null) {
 
   // Reverse the balance credit if reward was given
   if (rewardAmount !== null && rewardAmount > 0) {
-    addBalance(guildId, userId, -rewardAmount, {
+    await addBalance(guildId, userId, -rewardAmount, {
       type: "hunting_rollback",
       reason: "Hunt rollback due to data validation failure",
     });
   } else {
-    saveEconomyData();
+    await saveEconomyData();
   }
 }
 
 // Shop item management
-function addShopItem(guildId, itemData) {
+async function addShopItem(guildId, itemData) {
   const guildData = getGuildEconomy(guildId);
   const item = {
     id: randomUUID(),
@@ -913,7 +989,7 @@ function addShopItem(guildId, itemData) {
   };
 
   guildData.shop.push(item);
-  saveEconomyData();
+  await saveEconomyData();
   return item;
 }
 
@@ -927,7 +1003,7 @@ function getShopItem(guildId, itemId) {
   return guildData.shop.find(item => item.id === itemId);
 }
 
-function updateShopItem(guildId, itemId, updates) {
+async function updateShopItem(guildId, itemId, updates) {
   const guildData = getGuildEconomy(guildId);
   const itemIndex = guildData.shop.findIndex(item => item.id === itemId);
 
@@ -941,11 +1017,11 @@ function updateShopItem(guildId, itemId, updates) {
     id: itemId, // Preserve ID
   };
 
-  saveEconomyData();
+  await saveEconomyData();
   return guildData.shop[itemIndex];
 }
 
-function deleteShopItem(guildId, itemId) {
+async function deleteShopItem(guildId, itemId) {
   const guildData = getGuildEconomy(guildId);
   const itemIndex = guildData.shop.findIndex(item => item.id === itemId);
 
@@ -954,13 +1030,14 @@ function deleteShopItem(guildId, itemId) {
   }
 
   guildData.shop.splice(itemIndex, 1);
-  saveEconomyData();
+  await saveEconomyData();
   return true;
 }
 
 // Purchase and inventory management
-function purchaseItem(guildId, userId, itemId) {
-  const guildData = getGuildEconomy(guildId);
+async function purchaseItem(guildId, userId, itemId) {
+  return withBalanceLock(guildId, userId, async () => {
+    const guildData = getGuildEconomy(guildId);
   const item = getShopItem(guildId, itemId);
 
   if (!item) {
@@ -971,14 +1048,14 @@ function purchaseItem(guildId, userId, itemId) {
     return { ok: false, error: "Item out of stock" };
   }
 
-  const balance = getBalance(guildId, userId);
+  const balance = getBalanceSync(guildId, userId);
 
   if (balance < item.price) {
     return { ok: false, error: "Insufficient funds", balance, price: item.price };
   }
 
   // Deduct balance
-  addBalance(guildId, userId, -item.price, {
+  await addBalance(guildId, userId, -item.price, {
     type: "purchase",
     reason: `Purchased ${item.name}`,
     metadata: { itemId: item.id, itemName: item.name },
@@ -1007,13 +1084,14 @@ function purchaseItem(guildId, userId, itemId) {
     item.stock -= 1;
   }
 
-  saveEconomyData();
+    await saveEconomyData();
 
-  return {
-    ok: true,
-    item: inventoryItem,
-    balance: getBalance(guildId, userId),
-  };
+    return {
+      ok: true,
+      item: inventoryItem,
+      balance: getBalanceSync(guildId, userId),
+    };
+  });
 }
 
 function getInventory(guildId, userId) {
@@ -1021,7 +1099,7 @@ function getInventory(guildId, userId) {
   return guildData.inventory[userId] || [];
 }
 
-function removeInventoryItem(guildId, userId, inventoryItemId) {
+async function removeInventoryItem(guildId, userId, inventoryItemId) {
   const guildData = getGuildEconomy(guildId);
 
   if (!guildData.inventory[userId]) {
@@ -1035,11 +1113,11 @@ function removeInventoryItem(guildId, userId, inventoryItemId) {
   }
 
   guildData.inventory[userId].splice(itemIndex, 1);
-  saveEconomyData();
+  await saveEconomyData();
   return true;
 }
 
-function tradeItem(guildId, fromUserId, toUserId, inventoryItemId) {
+async function tradeItem(guildId, fromUserId, toUserId, inventoryItemId) {
   const guildData = getGuildEconomy(guildId);
 
   // Check if sender has the item
@@ -1074,7 +1152,7 @@ function tradeItem(guildId, fromUserId, toUserId, inventoryItemId) {
   logTransaction(guildId, {
     userId: fromUserId,
     amount: 0,
-    balanceAfter: getBalance(guildId, fromUserId),
+    balanceAfter: getBalanceSync(guildId, fromUserId),
     type: "item_trade_sent",
     reason: `Traded ${item.name} to user ${toUserId}`,
     metadata: { itemId: inventoryItemId, itemName: item.name, recipientId: toUserId },
@@ -1083,13 +1161,13 @@ function tradeItem(guildId, fromUserId, toUserId, inventoryItemId) {
   logTransaction(guildId, {
     userId: toUserId,
     amount: 0,
-    balanceAfter: getBalance(guildId, toUserId),
+    balanceAfter: getBalanceSync(guildId, toUserId),
     type: "item_trade_received",
     reason: `Received ${item.name} from user ${fromUserId}`,
     metadata: { itemId: inventoryItemId, itemName: item.name, senderId: fromUserId },
   });
 
-  saveEconomyData();
+  await saveEconomyData();
 
   return {
     ok: true,
@@ -1110,37 +1188,44 @@ function getLeaderboard(guildId, limit = 10) {
 }
 
 // Transfer coins between users
-function transferCoins(guildId, fromUserId, toUserId, amount) {
-  if (amount <= 0) {
-    return { ok: false, error: "Amount must be positive" };
-  }
+async function transferCoins(guildId, fromUserId, toUserId, amount) {
+  // For two-user operations, acquire locks in sorted order to prevent deadlocks
+  const [firstId, secondId] = [fromUserId, toUserId].sort();
 
-  const fromBalance = getBalance(guildId, fromUserId);
+  return withBalanceLock(guildId, firstId, async () => {
+    return withBalanceLock(guildId, secondId, async () => {
+      if (amount <= 0) {
+        return { ok: false, error: "Amount must be positive" };
+      }
 
-  if (fromBalance < amount) {
-    return { ok: false, error: "Insufficient funds", balance: fromBalance };
-  }
+      const fromBalance = getBalanceSync(guildId, fromUserId);
 
-  // Deduct from sender
-  addBalance(guildId, fromUserId, -amount, {
-    type: "transfer_out",
-    reason: `Transferred to <@${toUserId}>`,
-    metadata: { recipientId: toUserId },
+      if (fromBalance < amount) {
+        return { ok: false, error: "Insufficient funds", balance: fromBalance };
+      }
+
+      // Deduct from sender
+      await addBalance(guildId, fromUserId, -amount, {
+        type: "transfer_out",
+        reason: `Transferred to <@${toUserId}>`,
+        metadata: { recipientId: toUserId },
+      });
+
+      // Add to recipient
+      await addBalance(guildId, toUserId, amount, {
+        type: "transfer_in",
+        reason: `Received from <@${fromUserId}>`,
+        metadata: { senderId: fromUserId },
+      });
+
+      return {
+        ok: true,
+        amount,
+        fromBalance: getBalanceSync(guildId, fromUserId),
+        toBalance: getBalanceSync(guildId, toUserId),
+      };
+    });
   });
-
-  // Add to recipient
-  addBalance(guildId, toUserId, amount, {
-    type: "transfer_in",
-    reason: `Received from <@${fromUserId}>`,
-    metadata: { senderId: fromUserId },
-  });
-
-  return {
-    ok: true,
-    amount,
-    fromBalance: getBalance(guildId, fromUserId),
-    toBalance: getBalance(guildId, toUserId),
-  };
 }
 
 module.exports = {
@@ -1162,6 +1247,7 @@ module.exports = {
   formatCoins,
   formatRelativeTimestamp,
   getBalance,
+  getBalanceSync,
   setBalance,
   getDailyCooldown,
   getEconomyConfig,

@@ -1,7 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
+const fsp = fs.promises;
 const birthdaysPath = path.join(__dirname, '..', 'data', 'birthdays.json');
+
+// Write queue to serialize writes and prevent race conditions
+let writeQueue = Promise.resolve();
 
 // Prototype pollution protection
 const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
@@ -17,21 +21,24 @@ function isSafeKey(key) {
   return !DANGEROUS_KEYS.includes(key);
 }
 
-function ensureBirthdaysFile() {
+async function ensureBirthdaysFile() {
   try {
     if (!fs.existsSync(birthdaysPath)) {
-      fs.mkdirSync(path.dirname(birthdaysPath), { recursive: true });
-      fs.writeFileSync(birthdaysPath, JSON.stringify({}, null, 4));
+      await fsp.mkdir(path.dirname(birthdaysPath), { recursive: true });
+      await fsp.writeFile(birthdaysPath, JSON.stringify({}, null, 4));
     }
   } catch (error) {
     console.warn('Failed to ensure birthdays file', { error });
   }
 }
 
-function loadBirthdays() {
-  ensureBirthdaysFile();
-
+// Synchronous version for initial load
+function loadBirthdaysSync() {
   try {
+    if (!fs.existsSync(birthdaysPath)) {
+      fs.mkdirSync(path.dirname(birthdaysPath), { recursive: true });
+      fs.writeFileSync(birthdaysPath, JSON.stringify({}, null, 4));
+    }
     const data = fs.readFileSync(birthdaysPath, 'utf8');
     return JSON.parse(data);
   } catch (error) {
@@ -40,15 +47,34 @@ function loadBirthdays() {
   }
 }
 
-function saveBirthdays(birthdays) {
+async function loadBirthdays() {
+  await ensureBirthdaysFile();
+
   try {
-    fs.writeFileSync(birthdaysPath, JSON.stringify(birthdays, null, 4));
+    const data = await fsp.readFile(birthdaysPath, 'utf8');
+    return JSON.parse(data);
   } catch (error) {
     console.error(error);
+    return {};
   }
 }
 
-let birthdays = loadBirthdays();
+async function saveBirthdays(birthdays) {
+  const payload = JSON.stringify(birthdays, null, 4);
+  writeQueue = writeQueue
+    .then(async () => {
+      const tmpPath = `${birthdaysPath}.tmp`;
+      await fsp.writeFile(tmpPath, payload, 'utf8');
+      await fsp.rename(tmpPath, birthdaysPath);
+    })
+    .catch((error) => {
+      console.error('Failed to save birthdays', { error });
+    });
+
+  return writeQueue;
+}
+
+let birthdays = loadBirthdaysSync();
 
 /**
  * Migrate from old global format to new per-guild format
@@ -58,7 +84,7 @@ let birthdays = loadBirthdays();
  * @param {Array<string>} guildIds - Array of guild IDs to migrate birthdays to
  * @returns {boolean} - True if migration was performed, false if already migrated
  */
-function migrateToPerGuild(guildIds) {
+async function migrateToPerGuild(guildIds) {
   // Validate guildIds parameter
   if (!guildIds || !Array.isArray(guildIds) || guildIds.length === 0) {
     console.log('[Birthdays] No guilds provided for migration');
@@ -115,7 +141,7 @@ function migrateToPerGuild(guildIds) {
   }
 
   birthdays = newBirthdays;
-  saveBirthdays(birthdays);
+  await saveBirthdays(birthdays);
 
   console.log(`[Birthdays] Migration complete. Copied ${Object.keys(oldBirthdays).length} birthdays to ${validGuildIds.length} guilds`);
   return true;
@@ -157,7 +183,7 @@ function getAllBirthdays() {
  * @param {string} userId - User ID
  * @param {string} date - Birthday in MM-DD format
  */
-function addBirthday(guildId, userId, date) {
+async function addBirthday(guildId, userId, date) {
   if (!guildId) {
     console.error('[Birthdays] addBirthday called without guildId');
     return;
@@ -206,7 +232,7 @@ function addBirthday(guildId, userId, date) {
   }
 
   birthdays[guildId][userId] = date;
-  saveBirthdays(birthdays);
+  await saveBirthdays(birthdays);
 }
 
 /**
@@ -214,7 +240,7 @@ function addBirthday(guildId, userId, date) {
  * @param {string} guildId - Guild ID
  * @param {string} userId - User ID
  */
-function removeBirthday(guildId, userId) {
+async function removeBirthday(guildId, userId) {
   if (!guildId) {
     console.error('[Birthdays] removeBirthday called without guildId');
     return;
@@ -243,7 +269,7 @@ function removeBirthday(guildId, userId) {
   }
 
   delete birthdays[guildId][userId];
-  saveBirthdays(birthdays);
+  await saveBirthdays(birthdays);
 }
 
 module.exports = {
